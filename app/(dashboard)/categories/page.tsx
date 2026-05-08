@@ -1,0 +1,168 @@
+'use client'
+
+import { useState } from 'react'
+import { Plus, Pencil, Trash2, Tag } from 'lucide-react'
+import { useCategories } from '@/hooks/useCategories'
+import { categoriesService } from '@/services/categories.service'
+import { Modal } from '@/components/ui/Modal'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
+import { EmptyState } from '@/components/ui/EmptyState'
+import type { Category } from '@/types'
+
+const COLOR_PRESETS = [
+  '#ef4444','#f97316','#eab308','#22c55e','#10b981',
+  '#06b6d4','#3b82f6','#8b5cf6','#ec4899','#6b7280',
+]
+
+export default function CategoriesPage() {
+  const { data: categories, loading, refetch } = useCategories()
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<Category | null>(null)
+  const [form, setForm] = useState<Partial<Category>>({ type: 'expense', color: '#6b7280' })
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const income = categories.filter((c) => c.type === 'income')
+  const expense = categories.filter((c) => c.type === 'expense')
+
+  function openCreate() {
+    setEditing(null)
+    setForm({ type: 'expense', color: '#6b7280' })
+    setError(null)
+    setModalOpen(true)
+  }
+
+  function openEdit(cat: Category) {
+    setEditing(cat)
+    setForm({ ...cat })
+    setError(null)
+    setModalOpen(true)
+  }
+
+  async function handleSave() {
+    if (!form.name) { setError('El nombre es obligatorio.'); return }
+    setSaving(true)
+    setError(null)
+    try {
+      if (editing?.id) {
+        await categoriesService.update(editing.id, form as Partial<Category>)
+      } else {
+        await categoriesService.create(form as Omit<Category, 'id' | 'user_id' | 'created_at' | 'updated_at'>)
+      }
+      setModalOpen(false)
+      refetch()
+    } catch { setError('Error al guardar.') }
+    finally { setSaving(false) }
+  }
+
+  async function handleDelete(id: string) {
+    setDeleting(id)
+    try { await categoriesService.delete(id); refetch() }
+    finally { setDeleting(null) }
+  }
+
+  function CategoryGroup({ title, items }: { title: string; items: Category[] }) {
+    return (
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-800">
+          <h2 className="font-semibold text-gray-200">{title}</h2>
+        </div>
+        {items.length === 0 ? (
+          <EmptyState title="Sin categorías" description="Creá una categoría para empezar." />
+        ) : (
+          <div className="divide-y divide-gray-800">
+            {items.map((cat) => (
+              <div key={cat.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-800/40 transition-colors group">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${cat.color}20` }}>
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-200">{cat.name}</p>
+                </div>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => openEdit(cat)} className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-500 hover:text-gray-200">
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    onClick={() => cat.id && handleDelete(cat.id)}
+                    disabled={deleting === cat.id}
+                    className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-500 hover:text-red-400"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Categorías</h1>
+          <p className="text-gray-500 text-sm mt-1">{categories.length} categorías</p>
+        </div>
+        <Button onClick={openCreate} size="sm">
+          <Plus size={16} />
+          Nueva categoría
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-16 text-gray-500">Cargando…</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <CategoryGroup title="Ingresos" items={income} />
+          <CategoryGroup title="Gastos" items={expense} />
+        </div>
+      )}
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Editar categoría' : 'Nueva categoría'}>
+        <div className="space-y-4">
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-sm text-red-400">{error}</div>
+          )}
+          <Input
+            label="Nombre"
+            value={form.name ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            placeholder="Ej: Alimentación"
+            required
+          />
+          <Select
+            label="Tipo"
+            value={form.type ?? 'expense'}
+            onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as Category['type'] }))}
+            options={[{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }]}
+          />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-gray-300">Color</label>
+            <div className="flex flex-wrap gap-2">
+              {COLOR_PRESETS.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => setForm((f) => ({ ...f, color }))}
+                  className={`w-7 h-7 rounded-full border-2 transition-all ${form.color === color ? 'border-white scale-110' : 'border-transparent'}`}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button variant="ghost" onClick={() => setModalOpen(false)} className="flex-1">Cancelar</Button>
+            <Button onClick={handleSave} loading={saving} className="flex-1">
+              {editing ? 'Guardar' : 'Crear'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  )
+}
