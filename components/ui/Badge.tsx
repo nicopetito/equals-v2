@@ -1,4 +1,3 @@
-import { cn } from '@/lib/utils'
 import type { TransactionType } from '@/types'
 
 interface TypeBadgeProps {
@@ -8,12 +7,12 @@ interface TypeBadgeProps {
 export function TypeBadge({ type }: TypeBadgeProps) {
   return (
     <span
-      className={cn(
-        'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold',
+      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
+      style={
         type === 'income'
-          ? 'bg-emerald-500/10 text-emerald-400'
-          : 'bg-red-500/10 text-red-400'
-      )}
+          ? { background: '#d1fae5', color: '#059669' }
+          : { background: '#fee2e2', color: '#dc2626' }
+      }
     >
       {type === 'income' ? 'Ingreso' : 'Gasto'}
     </span>

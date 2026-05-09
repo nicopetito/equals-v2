@@ -12,11 +12,7 @@ interface ModalProps {
   size?: 'sm' | 'md' | 'lg'
 }
 
-const SIZES = {
-  sm: 'max-w-md',
-  md: 'max-w-lg',
-  lg: 'max-w-2xl',
-}
+const SIZES = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl' }
 
 export function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
   useEffect(() => {
@@ -30,19 +26,17 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div
-        className={cn(
-          'relative w-full bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]',
-          SIZES[size]
-        )}
-      >
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className={cn('relative w-full bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh]', SIZES[size])}>
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
-            <h2 className="text-lg font-semibold text-gray-100">{title}</h2>
+          <div
+            className="flex items-center justify-between px-6 py-4 border-b border-gray-100 rounded-t-2xl"
+            style={{ background: 'linear-gradient(135deg,#463397,#9850eb)' }}
+          >
+            <h2 className="text-base font-bold text-white">{title}</h2>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+              className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
             >
               <X size={18} />
             </button>

@@ -23,7 +23,7 @@ export default function LoginPage() {
     try {
       await signIn(email, password)
       router.push('/dashboard')
-    } catch (err) {
+    } catch {
       setError('Email o contraseña incorrectos.')
     } finally {
       setLoading(false)
@@ -31,19 +31,27 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950 p-4">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#f8f7ff' }}>
       <div className="w-full max-w-md">
+        {/* Logo / Brand */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Equals</h1>
-          <p className="text-gray-400">Ingresá a tu cuenta</p>
+          <div
+            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 shadow-lg"
+            style={{ background: 'linear-gradient(135deg,#463397,#9850eb)' }}
+          >
+            <span className="text-white text-2xl font-bold">E</span>
+          </div>
+          <h1 className="text-3xl font-bold" style={{ color: '#463397' }}>Equals</h1>
+          <p className="text-gray-500 mt-1">Ingresá a tu cuenta</p>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="bg-gray-900 border border-gray-800 rounded-2xl p-8 space-y-5"
+          className="bg-white rounded-2xl p-8 space-y-5 border border-gray-100"
+          style={{ boxShadow: '0 10px 15px rgba(70,51,151,0.08)' }}
         >
           {error && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-sm text-red-400">
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600">
               {error}
             </div>
           )}
@@ -53,7 +61,7 @@ export default function LoginPage() {
             type="email"
             placeholder="tu@email.com"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={e => setEmail(e.target.value)}
             required
             autoComplete="email"
           />
@@ -63,7 +71,7 @@ export default function LoginPage() {
             type="password"
             placeholder="••••••••"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={e => setPassword(e.target.value)}
             required
             autoComplete="current-password"
           />
@@ -75,7 +83,7 @@ export default function LoginPage() {
 
           <p className="text-center text-sm text-gray-500">
             ¿No tenés cuenta?{' '}
-            <Link href="/register" className="text-indigo-400 hover:text-indigo-300 font-medium">
+            <Link href="/register" className="font-semibold" style={{ color: '#463397' }}>
               Registrarte
             </Link>
           </p>

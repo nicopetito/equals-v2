@@ -8,19 +8,16 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <div className="flex h-screen bg-gray-950 overflow-hidden">
-      {/* Desktop Sidebar */}
-      <div className="hidden md:flex">
+    <div className="flex h-screen overflow-hidden" style={{ background: '#f8f7ff' }}>
+      {/* Desktop sidebar */}
+      <div className="hidden md:flex shrink-0">
         <Sidebar />
       </div>
 
-      {/* Mobile Sidebar Overlay */}
+      {/* Mobile sidebar overlay */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden">
-          <div
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setMobileOpen(false)}
-          />
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
           <div className="relative z-10 h-full">
             <Sidebar mobile onClose={() => setMobileOpen(false)} />
           </div>
@@ -34,7 +31,6 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       </main>
 
-      {/* Mobile bottom nav */}
       <MobileNav onMenuOpen={() => setMobileOpen(true)} />
     </div>
   )
