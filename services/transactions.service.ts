@@ -112,6 +112,34 @@ export const transactionsService = {
     if (error) throw error
   },
 
+  async createBatch(
+    transactions: Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'updated_at'>[]
+  ): Promise<{ success: number; errors: number }> {
+    const supabase = getSupabase()
+    const user_id = await getUserId()
+    if (!user_id) throw new Error('Not authenticated')
+
+    const CHUNK = 100
+    let success = 0
+    let errors = 0
+
+    for (let i = 0; i < transactions.length; i += CHUNK) {
+      const chunk = transactions.slice(i, i + CHUNK).map(tx => ({ ...tx, user_id }))
+      const { data, error } = await supabase
+        .from('transactions')
+        .insert(chunk)
+        .select()
+
+      if (error) {
+        errors += chunk.length
+      } else {
+        success += (data ?? []).length
+      }
+    }
+
+    return { success, errors }
+  },
+
   async getMonthlyTrends(months = 6, currency = 'ARS'): Promise<MonthlyTrend[]> {
     const supabase = getSupabase()
     const user_id = await getUserId()

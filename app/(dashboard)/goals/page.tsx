@@ -48,12 +48,13 @@ export default function GoalsPage() {
   async function handleSave() {
     if (!form.name) { setError('El nombre es obligatorio.'); return }
     setSaving(true); setError(null)
+    const payload = { ...form, wallet_id: form.wallet_id || null }
     try {
       if (editing?.id) {
-        await goalsService.update(editing.id, form as Partial<Goal>)
+        await goalsService.update(editing.id, payload as Partial<Goal>)
         addToast('Objetivo actualizado', 'success')
       } else {
-        await goalsService.create(form as Omit<Goal, 'id' | 'user_id' | 'created_at' | 'updated_at'>)
+        await goalsService.create(payload as Omit<Goal, 'id' | 'user_id' | 'created_at' | 'updated_at'>)
         addToast('Objetivo creado', 'success')
       }
       setModalOpen(false); refetch()

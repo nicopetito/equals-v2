@@ -67,12 +67,13 @@ export default function ScheduledPage() {
   async function handleSave() {
     if (!form.description || !form.amount) { setError('Completá descripción y monto.'); return }
     setSaving(true); setError(null)
+    const payload = { ...form, category_id: form.category_id || null, wallet_id: form.wallet_id || null }
     try {
       if (editing?.id) {
-        await recurringService.update(editing.id, form as Partial<RecurringTransaction>)
+        await recurringService.update(editing.id, payload as Partial<RecurringTransaction>)
         addToast('Operación actualizada', 'success')
       } else {
-        await recurringService.create(form as Omit<RecurringTransaction, 'id' | 'user_id' | 'created_at' | 'updated_at'>)
+        await recurringService.create(payload as Omit<RecurringTransaction, 'id' | 'user_id' | 'created_at' | 'updated_at'>)
         addToast('Operación creada', 'success')
       }
       setModalOpen(false); load()

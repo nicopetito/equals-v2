@@ -6,7 +6,7 @@ import { useState } from 'react'
 import {
   LayoutDashboard, Wallet, CreditCard, Tag,
   CalendarClock, Target, DollarSign, PiggyBank,
-  LogOut, ChevronLeft, ChevronRight, X, Zap,
+  LogOut, ChevronLeft, ChevronRight, X, Zap, Upload,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { href: '/goals',        label: 'Objetivos',    icon: Target,          color: '#F43F5E', bg: '#FFF1F2' },
   { href: '/dollar',       label: 'Dólar',        icon: DollarSign,      color: '#0EA5E9', bg: '#F0F9FF' },
   { href: '/plazo-fijo',   label: 'Plazo Fijo',   icon: PiggyBank,       color: '#10B981', bg: '#ECFDF5' },
+  { href: '/import',       label: 'Importar CSV', icon: Upload,          color: '#7C3AED', bg: '#F5F3FF' },
 ]
 
 function UserAvatar({ email }: { email: string }) {

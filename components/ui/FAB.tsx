@@ -52,9 +52,12 @@ export function FAB() {
     }
     setSaving(true); setError(null)
     try {
-      await transactionsService.create(
-        form as Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'updated_at'>
-      )
+      const payload = {
+        ...form,
+        category_id: form.category_id || null,
+        wallet_id:   form.wallet_id   || null,
+      } as Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+      await transactionsService.create(payload)
       addToast(
         form.type === 'income' ? '✓ Ingreso registrado' : '✓ Gasto registrado',
         'success'

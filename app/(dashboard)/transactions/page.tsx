@@ -103,12 +103,13 @@ export default function TransactionsPage() {
   async function handleSave() {
     if (!form.description || !form.amount || !form.date) { setFormError('Completá todos los campos obligatorios.'); return }
     setSaving(true); setFormError(null)
+    const payload = { ...form, category_id: form.category_id || null, wallet_id: form.wallet_id || null }
     try {
       if (editing?.id) {
-        await transactionsService.update(editing.id, form as Partial<Transaction>)
+        await transactionsService.update(editing.id, payload as Partial<Transaction>)
         addToast('Transacción actualizada', 'success')
       } else {
-        await transactionsService.create(form as Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'updated_at'>)
+        await transactionsService.create(payload as Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'updated_at'>)
         addToast('Transacción creada', 'success')
       }
       setModalOpen(false); refetch()

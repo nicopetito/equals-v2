@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning'
 
@@ -27,15 +27,23 @@ export function useToast() {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+
+  // Limpiar todos los timers al desmontar
+  useEffect(() => {
+    return () => { timersRef.current.forEach(t => clearTimeout(t)) }
+  }, [])
 
   const removeToast = useCallback((id: string) => {
+    timersRef.current.delete(id)
     setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
 
   const addToast = useCallback((message: string, type: ToastType = 'success', duration = 3500) => {
     const id = crypto.randomUUID()
     setToasts(prev => [...prev, { id, message, type, duration }])
-    setTimeout(() => removeToast(id), duration)
+    const timer = setTimeout(() => removeToast(id), duration)
+    timersRef.current.set(id, timer)
   }, [removeToast])
 
   return (
