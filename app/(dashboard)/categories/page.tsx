@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Plus, Pencil, Trash2, Tag } from 'lucide-react'
 import { useCategories } from '@/hooks/useCategories'
 import { categoriesService } from '@/services/categories.service'
+import { useToast } from '@/components/providers/ToastProvider'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -19,6 +20,7 @@ const COLOR_PRESETS = [
 
 export default function CategoriesPage() {
   const { data: categories, loading, refetch } = useCategories()
+  const { addToast } = useToast()
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing]     = useState<Category | null>(null)
   const [form, setForm]           = useState<Partial<Category>>({ type: 'expense', color: '#6366F1' })
@@ -41,16 +43,24 @@ export default function CategoriesPage() {
     if (!form.name) { setError('El nombre es obligatorio.'); return }
     setSaving(true); setError(null)
     try {
-      if (editing?.id) await categoriesService.update(editing.id, form as Partial<Category>)
-      else await categoriesService.create(form as Omit<Category, 'id' | 'user_id' | 'created_at' | 'updated_at'>)
+      if (editing?.id) {
+        await categoriesService.update(editing.id, form as Partial<Category>)
+        addToast('Categoría actualizada', 'success')
+      } else {
+        await categoriesService.create(form as Omit<Category, 'id' | 'user_id' | 'created_at' | 'updated_at'>)
+        addToast('Categoría creada', 'success')
+      }
       setModalOpen(false); refetch()
-    } catch { setError('Error al guardar.') }
+    } catch {
+      setError('Error al guardar.')
+      addToast('Error al guardar', 'error')
+    }
     finally { setSaving(false) }
   }
 
   async function handleDelete(id: string) {
     setDeleting(id)
-    try { await categoriesService.delete(id); refetch() }
+    try { await categoriesService.delete(id); refetch(); addToast('Categoría eliminada', 'info') }
     finally { setDeleting(null) }
   }
 

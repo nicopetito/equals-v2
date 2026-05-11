@@ -10,6 +10,8 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { CategoryBadge } from '@/components/ui/CategoryBadge'
 import { TypeBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
+import { IncomeExpenseChart } from '@/components/ui/IncomeExpenseChart'
+import { HealthScore } from '@/components/ui/HealthScore'
 import { formatCurrency } from '@/utils/format'
 import { formatDate, getDateRangeForPeriod, PERIOD_OPTIONS, type Period } from '@/utils/date'
 import type { TransactionWithDetails, Currency } from '@/types'
@@ -249,6 +251,28 @@ export default function DashboardPage() {
             </div>
           )
       }
+
+      {/* ── Evolución + Salud financiera ───────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="lg:col-span-2">
+          <IncomeExpenseChart
+            transactions={filtered}
+            start={start}
+            end={end}
+            currency={currency === 'all' ? 'ARS' : currency}
+            loading={loading}
+          />
+        </div>
+        <div>
+          <HealthScore
+            income={stats.single?.income ?? Object.values(stats.byCurrency ?? {}).reduce((s, v) => s + v.income, 0)}
+            expenses={stats.single?.expenses ?? Object.values(stats.byCurrency ?? {}).reduce((s, v) => s + v.expenses, 0)}
+            transactionCount={filtered.length}
+            categoryCount={new Set(filtered.map(t => t.category_name).filter(Boolean)).size}
+            loading={loading}
+          />
+        </div>
+      </div>
 
       {/* ── Transacciones + Top Gastos ──────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">

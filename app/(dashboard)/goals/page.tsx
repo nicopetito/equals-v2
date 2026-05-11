@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Plus, Pencil, Trash2, Target, CheckCircle2, Calendar } from 'lucide-react'
 import { useGoals } from '@/hooks/useGoals'
 import { goalsService } from '@/services/goals.service'
+import { useToast } from '@/components/providers/ToastProvider'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -23,6 +24,7 @@ const COLOR_PRESETS = [
 
 export default function GoalsPage() {
   const { data: goals, loading, refetch } = useGoals()
+  const { addToast } = useToast()
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing]     = useState<Goal | null>(null)
   const [form, setForm]           = useState<Partial<Goal>>({
@@ -47,16 +49,24 @@ export default function GoalsPage() {
     if (!form.name) { setError('El nombre es obligatorio.'); return }
     setSaving(true); setError(null)
     try {
-      if (editing?.id) await goalsService.update(editing.id, form as Partial<Goal>)
-      else await goalsService.create(form as Omit<Goal, 'id' | 'user_id' | 'created_at' | 'updated_at'>)
+      if (editing?.id) {
+        await goalsService.update(editing.id, form as Partial<Goal>)
+        addToast('Objetivo actualizado', 'success')
+      } else {
+        await goalsService.create(form as Omit<Goal, 'id' | 'user_id' | 'created_at' | 'updated_at'>)
+        addToast('Objetivo creado', 'success')
+      }
       setModalOpen(false); refetch()
-    } catch { setError('Error al guardar.') }
+    } catch {
+      setError('Error al guardar.')
+      addToast('Error al guardar', 'error')
+    }
     finally { setSaving(false) }
   }
 
   async function handleDelete(id: string) {
     setDeleting(id)
-    try { await goalsService.delete(id); refetch() }
+    try { await goalsService.delete(id); refetch(); addToast('Objetivo eliminado', 'info') }
     finally { setDeleting(null) }
   }
 

@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { Plus, PiggyBank, TrendingUp, Trash2, Calendar, Percent, Building2, AlertCircle } from 'lucide-react'
+import { useToast } from '@/components/providers/ToastProvider'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -30,6 +31,7 @@ function calcInterest(principal: number, rate: number, startDate: string, endDat
 export default function FixedTermPage() {
   const [items, setItems]     = useState<FixedTerm[]>([])
   const [modalOpen, setModalOpen] = useState(false)
+  const { addToast } = useToast()
   const [form, setForm]       = useState({
     name: '', principal: 0, currency: 'ARS',
     annual_rate: 0, start_date: new Date().toISOString().split('T')[0], end_date: '', bank: '',
@@ -49,6 +51,7 @@ export default function FixedTermPage() {
     }
     setItems(prev => [...prev, { ...form, id: crypto.randomUUID() }])
     setModalOpen(false)
+    addToast('Plazo fijo agregado', 'success')
   }
 
   const totalByCurrency = useMemo(() =>
@@ -168,7 +171,7 @@ export default function FixedTermPage() {
                     </div>
                   </div>
                   <button
-                    onClick={() => setItems(p => p.filter(i => i.id !== item.id))}
+                    onClick={() => { setItems(p => p.filter(i => i.id !== item.id)); addToast('Plazo fijo eliminado', 'info') }}
                     className="w-8 h-8 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
                     style={{ color: 'var(--text-muted)' }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'var(--expense-50)'; e.currentTarget.style.color = 'var(--expense-500)' }}

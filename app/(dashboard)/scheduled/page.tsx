@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Pencil, Trash2, CalendarClock, ToggleLeft, ToggleRight, Clock } from 'lucide-react'
 import { recurringService } from '@/services/recurring.service'
+import { useToast } from '@/components/providers/ToastProvider'
 import { useCategories } from '@/hooks/useCategories'
 import { useWallets } from '@/hooks/useWallets'
 import { Modal } from '@/components/ui/Modal'
@@ -35,6 +36,7 @@ export default function ScheduledPage() {
   const [loading, setLoading] = useState(true)
   const { data: categories }  = useCategories()
   const { data: wallets }     = useWallets()
+  const { addToast }          = useToast()
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<RecurringTransactionWithDetails | null>(null)
   const [form, setForm]       = useState<Partial<RecurringTransaction>>({
@@ -66,10 +68,18 @@ export default function ScheduledPage() {
     if (!form.description || !form.amount) { setError('Completá descripción y monto.'); return }
     setSaving(true); setError(null)
     try {
-      if (editing?.id) await recurringService.update(editing.id, form as Partial<RecurringTransaction>)
-      else await recurringService.create(form as Omit<RecurringTransaction, 'id' | 'user_id' | 'created_at' | 'updated_at'>)
+      if (editing?.id) {
+        await recurringService.update(editing.id, form as Partial<RecurringTransaction>)
+        addToast('Operación actualizada', 'success')
+      } else {
+        await recurringService.create(form as Omit<RecurringTransaction, 'id' | 'user_id' | 'created_at' | 'updated_at'>)
+        addToast('Operación creada', 'success')
+      }
       setModalOpen(false); load()
-    } catch { setError('Error al guardar.') }
+    } catch {
+      setError('Error al guardar.')
+      addToast('Error al guardar', 'error')
+    }
     finally { setSaving(false) }
   }
 
@@ -182,7 +192,7 @@ export default function ScheduledPage() {
                     <Pencil size={14} />
                   </button>
                   <button
-                    onClick={() => item.id && recurringService.delete(item.id).then(load)}
+                    onClick={() => item.id && recurringService.delete(item.id).then(() => { load(); addToast('Operación eliminada', 'info') })}
                     className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors"
                     style={{ color: 'var(--text-muted)' }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'var(--expense-50)'; e.currentTarget.style.color = 'var(--expense-500)' }}

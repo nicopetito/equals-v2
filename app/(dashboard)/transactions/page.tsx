@@ -6,6 +6,7 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
 import { useWallets } from '@/hooks/useWallets'
 import { transactionsService } from '@/services/transactions.service'
+import { useToast } from '@/components/providers/ToastProvider'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -57,6 +58,7 @@ export default function TransactionsPage() {
   const { data: transactions, loading, refetch } = useTransactions()
   const { data: categories } = useCategories()
   const { data: wallets } = useWallets()
+  const { addToast } = useToast()
 
   const [period, setPeriod]       = useState<Period>('30_days')
   const [filterType, setFilterType] = useState<FilterType>('all')
@@ -102,16 +104,24 @@ export default function TransactionsPage() {
     if (!form.description || !form.amount || !form.date) { setFormError('Completá todos los campos obligatorios.'); return }
     setSaving(true); setFormError(null)
     try {
-      if (editing?.id) await transactionsService.update(editing.id, form as Partial<Transaction>)
-      else await transactionsService.create(form as Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'updated_at'>)
+      if (editing?.id) {
+        await transactionsService.update(editing.id, form as Partial<Transaction>)
+        addToast('Transacción actualizada', 'success')
+      } else {
+        await transactionsService.create(form as Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'updated_at'>)
+        addToast('Transacción creada', 'success')
+      }
       setModalOpen(false); refetch()
-    } catch { setFormError('Error al guardar. Intentá de nuevo.') }
+    } catch {
+      setFormError('Error al guardar. Intentá de nuevo.')
+      addToast('Error al guardar', 'error')
+    }
     finally { setSaving(false) }
   }
 
   async function handleDelete(id: string) {
     setDeleting(id)
-    try { await transactionsService.delete(id); refetch() }
+    try { await transactionsService.delete(id); refetch(); addToast('Transacción eliminada', 'info') }
     finally { setDeleting(null) }
   }
 
