@@ -13,6 +13,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { BudgetVsActualChart } from '@/components/ui/BudgetVsActualChart'
 import { formatCurrency } from '@/utils/format'
 
 const CURRENCY_OPTS = [
@@ -205,6 +206,15 @@ export default function BudgetsPage() {
             />
           </div>
         </div>
+      )}
+
+      {/* Gráfico presupuesto vs real */}
+      {budgets.length > 0 && (
+        <BudgetVsActualChart
+          budgets={budgets}
+          transactions={allTransactions}
+          month={monthStr}
+        />
       )}
 
       {/* Lista de presupuestos */}

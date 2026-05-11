@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, Plus, BarChart3, FileText } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, Plus, FileText } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useWallets } from '@/hooks/useWallets'
 import { StatCard } from '@/components/ui/StatCard'
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button'
 import { IncomeExpenseChart } from '@/components/ui/IncomeExpenseChart'
 import { HealthScore } from '@/components/ui/HealthScore'
 import { CategoryDonutChart } from '@/components/ui/CategoryDonutChart'
+import { NetWorthSparkline } from '@/components/ui/NetWorthSparkline'
 import { ReportModal } from '@/components/ui/ReportModal'
 import { formatCurrency } from '@/utils/format'
 import { formatDate, getDateRangeForPeriod, PERIOD_OPTIONS, type Period } from '@/utils/date'
@@ -36,11 +37,7 @@ function FilterPills<T extends string>({
   return (
     <div
       className="flex flex-wrap gap-1 rounded-2xl p-1"
-      style={{
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border)',
-        boxShadow: 'var(--shadow-xs)',
-      }}
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-xs)' }}
     >
       {options.map(opt => (
         <button
@@ -67,13 +64,13 @@ function getGreeting() {
 }
 
 export default function DashboardPage() {
-  const [period, setPeriod]       = useState<Period>('30_days')
-  const [currency, setCurrency]   = useState<Currency | 'all'>('all')
+  const [period, setPeriod]         = useState<Period>('30_days')
+  const [currency, setCurrency]     = useState<Currency | 'all'>('all')
   const [reportOpen, setReportOpen] = useState(false)
   const router = useRouter()
 
   const { data: allTransactions, loading: txLoading } = useTransactions()
-  const { data: wallets, loading: walletsLoading } = useWallets()
+  const { data: wallets, loading: walletsLoading }    = useWallets()
 
   const { start, end } = getDateRangeForPeriod(period)
 
@@ -102,6 +99,14 @@ export default function DashboardPage() {
     return { byCurrency: null, single: { income, expenses, balance: income - expenses } }
   }, [filtered, currency])
 
+  const savingsRate = useMemo(() => {
+    const inc = stats.single?.income
+      ?? Object.values(stats.byCurrency ?? {}).reduce((s, v) => s + v.income, 0)
+    const exp = stats.single?.expenses
+      ?? Object.values(stats.byCurrency ?? {}).reduce((s, v) => s + v.expenses, 0)
+    return inc > 0 ? Math.round(((inc - exp) / inc) * 100) : null
+  }, [stats])
+
   const walletByCurrency = useMemo(() =>
     wallets.reduce<Record<string, number>>((acc, w) => {
       if (w.currency) acc[w.currency] = (acc[w.currency] ?? 0) + (w.current_balance ?? 0)
@@ -114,27 +119,12 @@ export default function DashboardPage() {
     [filtered]
   )
 
-  const topExpenses = useMemo(() => {
-    const map = new Map<string, { amount: number; color: string }>()
-    filtered.filter(t => t.type === 'expense').forEach(t => {
-      const key = t.category_name ?? 'Sin categoría'
-      const ex = map.get(key) ?? { amount: 0, color: t.category_color ?? '#6366F1' }
-      ex.amount += t.amount
-      map.set(key, ex)
-    })
-    const total = Array.from(map.values()).reduce((s, v) => s + v.amount, 0)
-    return Array.from(map.entries())
-      .sort(([, a], [, b]) => b.amount - a.amount)
-      .slice(0, 5)
-      .map(([name, data]) => ({ name, ...data, pct: total > 0 ? (data.amount / total) * 100 : 0 }))
-  }, [filtered])
-
   const loading = txLoading || walletsLoading
 
   return (
     <div className="p-5 md:p-7 max-w-7xl mx-auto space-y-6 animate-fade-in">
 
-      {/* ── Encabezado de página ─────────────────────────────── */}
+      {/* ── Encabezado ──────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -144,7 +134,7 @@ export default function DashboardPage() {
             </span>
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-            Tu finanzas
+            Tus finanzas
           </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
             Resumen de tu actividad financiera
@@ -170,18 +160,11 @@ export default function DashboardPage() {
       {Object.keys(walletByCurrency).length > 0 && !loading && (
         <div
           className="rounded-2xl p-5"
-          style={{
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border)',
-            boxShadow: 'var(--shadow-sm)',
-          }}
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
         >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div
-                className="w-8 h-8 rounded-xl flex items-center justify-center"
-                style={{ background: 'var(--brand-50)' }}
-              >
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'var(--brand-50)' }}>
                 <Wallet size={16} style={{ color: 'var(--brand-500)' }} />
               </div>
               <h2 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
@@ -205,10 +188,7 @@ export default function DashboardPage() {
                 <div
                   key={curr}
                   className="rounded-2xl p-4 transition-all hover:-translate-y-0.5"
-                  style={{
-                    background: color + '0D',
-                    border: `1px solid ${color}20`,
-                  }}
+                  style={{ background: color + '0D', border: `1px solid ${color}20` }}
                 >
                   <div
                     className="text-xs font-bold mb-2 px-2 py-0.5 rounded-full inline-block"
@@ -251,11 +231,13 @@ export default function DashboardPage() {
             </div>
           ))
         : stats.single && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               <StatCard title="Ingresos" value={formatCurrency(stats.single.income,   currency)} icon={TrendingUp}  variant="income"  loading={loading} />
               <StatCard title="Gastos"   value={formatCurrency(stats.single.expenses, currency)} icon={TrendingDown} variant="expense" loading={loading} />
               <StatCard title="Balance"  value={formatCurrency(stats.single.balance,  currency)} icon={Wallet}
                 variant={stats.single.balance >= 0 ? 'income' : 'expense'} loading={loading} />
+              {/* Patrimonio acumulado */}
+              <NetWorthSparkline transactions={allTransactions} currency={currency} loading={loading} />
             </div>
           )
       }
@@ -282,31 +264,59 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Distribución de gastos (donut) ─────────────────── */}
+      {/* ── Distribución (donut con toggle) + Resumen ──────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <CategoryDonutChart
           transactions={filtered}
           currency={currency === 'all' ? 'ARS' : currency}
           loading={loading}
         />
-        {/* Mini resumen rápido */}
+
+        {/* Panel de resumen */}
         <div
-          className="rounded-2xl p-5 flex flex-col justify-between"
+          className="rounded-2xl p-5 flex flex-col"
           style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
         >
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'var(--brand-50)' }}>
-              <BarChart3 size={16} style={{ color: 'var(--brand-500)' }} />
-            </div>
-            <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
-              Resumen rápido
-            </span>
-          </div>
+          <p className="font-bold text-sm mb-4" style={{ color: 'var(--text-primary)' }}>
+            Resumen del período
+          </p>
+
           <div className="space-y-3 flex-1">
+            {/* Tasa de ahorro */}
+            {savingsRate !== null && (
+              <div
+                className="flex items-center justify-between rounded-xl px-4 py-3"
+                style={{
+                  background: savingsRate >= 20 ? 'var(--income-50)' : savingsRate >= 0 ? '#FFFBEB' : 'var(--expense-50)',
+                  border: `1px solid ${savingsRate >= 20 ? 'var(--income-100)' : savingsRate >= 0 ? '#FDE68A' : 'var(--expense-100)'}`,
+                }}
+              >
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                  Tasa de ahorro
+                </span>
+                <span
+                  className="text-xl font-extrabold tabular-nums"
+                  style={{ color: savingsRate >= 20 ? 'var(--income-600)' : savingsRate >= 0 ? '#D97706' : 'var(--expense-600)' }}
+                >
+                  {savingsRate}%
+                </span>
+              </div>
+            )}
+
+            {/* Métricas rápidas */}
             {[
-              { label: 'Transacciones',   value: String(filtered.length),     color: 'var(--brand-500)' },
-              { label: 'Categorías usadas', value: String(new Set(filtered.map(t => t.category_name).filter(Boolean)).size), color: 'var(--sky-500)' },
-              { label: 'Promedio por gasto',
+              {
+                label: 'Transacciones',
+                value: String(filtered.length),
+                color: 'var(--brand-500)',
+              },
+              {
+                label: 'Categorías usadas',
+                value: String(new Set(filtered.map(t => t.category_name).filter(Boolean)).size),
+                color: 'var(--brand-400)',
+              },
+              {
+                label: 'Promedio por gasto',
                 value: (() => {
                   const gastos = filtered.filter(t => t.type === 'expense')
                   return gastos.length > 0
@@ -315,7 +325,8 @@ export default function DashboardPage() {
                 })(),
                 color: 'var(--expense-500)',
               },
-              { label: 'Mayor ingreso',
+              {
+                label: 'Mayor ingreso',
                 value: (() => {
                   const max = Math.max(0, ...filtered.filter(t => t.type === 'income').map(t => t.amount))
                   return max > 0 ? formatCurrency(max, currency === 'all' ? 'ARS' : currency) : '—'
@@ -329,14 +340,48 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
+
           <button
             onClick={() => setReportOpen(true)}
-            className="mt-4 w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all hover:opacity-90"
+            className="mt-5 w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all hover:opacity-90"
             style={{ background: 'var(--brand-50)', color: 'var(--brand-600)' }}
           >
             <FileText size={14} /> Ver informe completo
           </button>
         </div>
+      </div>
+
+      {/* ── Últimas transacciones (ancho completo) ─────────── */}
+      <div
+        className="rounded-2xl overflow-hidden"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
+      >
+        <div
+          className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: '1px solid var(--border-light)' }}
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'var(--brand-50)' }}>
+              <TrendingUp size={16} style={{ color: 'var(--brand-500)' }} />
+            </div>
+            <h2 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+              Últimas transacciones
+            </h2>
+          </div>
+          <button
+            onClick={() => router.push('/transactions')}
+            className="text-xs font-bold flex items-center gap-1 px-3 py-1.5 rounded-xl transition-colors"
+            style={{ color: 'var(--brand-500)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--brand-50)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          >
+            Ver todas <ArrowUpRight size={13} />
+          </button>
+        </div>
+        {recentTx.length === 0
+          ? <EmptyState title="Sin transacciones" description="No hay movimientos en este período." />
+          : <div>{recentTx.map((tx, i) => <TransactionRow key={tx.id} tx={tx} index={i} />)}</div>
+        }
       </div>
 
       <ReportModal
@@ -346,111 +391,6 @@ export default function DashboardPage() {
         period={PERIOD_OPTIONS.find(p => p.value === period)?.label ?? period}
         currency={currency}
       />
-
-      {/* ── Transacciones + Top Gastos ──────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-
-        {/* Recientes */}
-        <div
-          className="lg:col-span-3 rounded-2xl overflow-hidden"
-          style={{
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border)',
-            boxShadow: 'var(--shadow-sm)',
-          }}
-        >
-          <div
-            className="flex items-center justify-between px-5 py-4"
-            style={{ borderBottom: '1px solid var(--border-light)' }}
-          >
-            <div className="flex items-center gap-2.5">
-              <div
-                className="w-8 h-8 rounded-xl flex items-center justify-center"
-                style={{ background: 'var(--brand-50)' }}
-              >
-                <BarChart3 size={16} style={{ color: 'var(--brand-500)' }} />
-              </div>
-              <h2 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
-                Últimas transacciones
-              </h2>
-            </div>
-            <button
-              onClick={() => router.push('/transactions')}
-              className="text-xs font-bold flex items-center gap-1 px-3 py-1.5 rounded-xl transition-colors"
-              style={{ color: 'var(--brand-500)' }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--brand-50)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-            >
-              Ver todas <ArrowUpRight size={13} />
-            </button>
-          </div>
-          {recentTx.length === 0
-            ? <EmptyState title="Sin transacciones" description="No hay movimientos en este período." />
-            : <div>{recentTx.map((tx, i) => <TransactionRow key={tx.id} tx={tx} index={i} />)}</div>
-          }
-        </div>
-
-        {/* Top gastos */}
-        <div
-          className="lg:col-span-2 rounded-2xl overflow-hidden"
-          style={{
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border)',
-            boxShadow: 'var(--shadow-sm)',
-          }}
-        >
-          <div
-            className="flex items-center gap-2.5 px-5 py-4"
-            style={{ borderBottom: '1px solid var(--border-light)' }}
-          >
-            <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: 'var(--expense-50)' }}
-            >
-              <TrendingDown size={16} style={{ color: 'var(--expense-500)' }} />
-            </div>
-            <h2 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
-              Top gastos por categoría
-            </h2>
-          </div>
-          {topExpenses.length === 0
-            ? <EmptyState title="Sin gastos" description="No hay gastos en este período." />
-            : (
-              <div className="p-5 space-y-4">
-                {topExpenses.map(cat => (
-                  <div key={cat.name}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
-                        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                          {cat.name}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-                          {formatCurrency(cat.amount, currency === 'all' ? 'ARS' : currency)}
-                        </span>
-                        <span className="text-xs ml-1.5 font-semibold" style={{ color: 'var(--text-muted)' }}>
-                          {cat.pct.toFixed(0)}%
-                        </span>
-                      </div>
-                    </div>
-                    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-subtle)' }}>
-                      <div
-                        className="h-full rounded-full transition-all duration-700"
-                        style={{
-                          width: `${cat.pct}%`,
-                          background: `linear-gradient(90deg, ${cat.color}, ${cat.color}99)`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
-          }
-        </div>
-      </div>
     </div>
   )
 }
