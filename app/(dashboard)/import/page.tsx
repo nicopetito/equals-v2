@@ -13,6 +13,8 @@ import {
   type CsvRow, type ColumnMapping, type ParsedRow, type DateFormat, type AmountSignRule,
 } from '@/utils/csv'
 import { transactionsService } from '@/services/transactions.service'
+import { markImportUsed } from '@/utils/achievements'
+import { useAuth } from '@/hooks/useAuth'
 import { useCategories } from '@/hooks/useCategories'
 import { useWallets } from '@/hooks/useWallets'
 import { useToast } from '@/components/providers/ToastProvider'
@@ -95,6 +97,7 @@ function StepBar({ current }: { current: Step }) {
 export default function ImportPage() {
   const router   = useRouter()
   const { addToast } = useToast()
+  const { user }     = useAuth()
   const { data: categories } = useCategories()
   const { data: wallets }    = useWallets()
 
@@ -229,8 +232,11 @@ export default function ImportPage() {
       const res = await transactionsService.createBatch(toImport)
       setResult(res)
       setStep('done')
-      if (res.success > 0) addToast(`✓ ${res.success} transacciones importadas`, 'success')
-      if (res.errors > 0)  addToast(`${res.errors} filas con error`, 'warning')
+      if (res.success > 0) {
+        addToast(`✓ ${res.success} transacciones importadas`, 'success')
+        if (user?.id) markImportUsed(user.id)
+      }
+      if (res.errors > 0) addToast(`${res.errors} filas con error`, 'warning')
     } catch {
       addToast('Error al importar. Intentá de nuevo.', 'error')
     } finally {

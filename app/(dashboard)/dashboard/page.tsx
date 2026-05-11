@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, Plus, BarChart3 } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, Plus, BarChart3, FileText } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useWallets } from '@/hooks/useWallets'
 import { StatCard } from '@/components/ui/StatCard'
@@ -12,6 +12,8 @@ import { TypeBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { IncomeExpenseChart } from '@/components/ui/IncomeExpenseChart'
 import { HealthScore } from '@/components/ui/HealthScore'
+import { CategoryDonutChart } from '@/components/ui/CategoryDonutChart'
+import { ReportModal } from '@/components/ui/ReportModal'
 import { formatCurrency } from '@/utils/format'
 import { formatDate, getDateRangeForPeriod, PERIOD_OPTIONS, type Period } from '@/utils/date'
 import type { TransactionWithDetails, Currency } from '@/types'
@@ -65,8 +67,9 @@ function getGreeting() {
 }
 
 export default function DashboardPage() {
-  const [period, setPeriod] = useState<Period>('30_days')
-  const [currency, setCurrency] = useState<Currency | 'all'>('all')
+  const [period, setPeriod]       = useState<Period>('30_days')
+  const [currency, setCurrency]   = useState<Currency | 'all'>('all')
+  const [reportOpen, setReportOpen] = useState(false)
   const router = useRouter()
 
   const { data: allTransactions, loading: txLoading } = useTransactions()
@@ -147,9 +150,14 @@ export default function DashboardPage() {
             Resumen de tu actividad financiera
           </p>
         </div>
-        <Button onClick={() => router.push('/transactions')} size="md">
-          <Plus size={16} /> Nueva transacción
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setReportOpen(true)} size="md">
+            <FileText size={15} /> Exportar informe
+          </Button>
+          <Button onClick={() => router.push('/transactions')} size="md">
+            <Plus size={16} /> Nueva transacción
+          </Button>
+        </div>
       </div>
 
       {/* ── Filtros ─────────────────────────────────────────── */}
@@ -273,6 +281,71 @@ export default function DashboardPage() {
           />
         </div>
       </div>
+
+      {/* ── Distribución de gastos (donut) ─────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <CategoryDonutChart
+          transactions={filtered}
+          currency={currency === 'all' ? 'ARS' : currency}
+          loading={loading}
+        />
+        {/* Mini resumen rápido */}
+        <div
+          className="rounded-2xl p-5 flex flex-col justify-between"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'var(--brand-50)' }}>
+              <BarChart3 size={16} style={{ color: 'var(--brand-500)' }} />
+            </div>
+            <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
+              Resumen rápido
+            </span>
+          </div>
+          <div className="space-y-3 flex-1">
+            {[
+              { label: 'Transacciones',   value: String(filtered.length),     color: 'var(--brand-500)' },
+              { label: 'Categorías usadas', value: String(new Set(filtered.map(t => t.category_name).filter(Boolean)).size), color: 'var(--sky-500)' },
+              { label: 'Promedio por gasto',
+                value: (() => {
+                  const gastos = filtered.filter(t => t.type === 'expense')
+                  return gastos.length > 0
+                    ? formatCurrency(gastos.reduce((s, t) => s + t.amount, 0) / gastos.length, currency === 'all' ? 'ARS' : currency)
+                    : '—'
+                })(),
+                color: 'var(--expense-500)',
+              },
+              { label: 'Mayor ingreso',
+                value: (() => {
+                  const max = Math.max(0, ...filtered.filter(t => t.type === 'income').map(t => t.amount))
+                  return max > 0 ? formatCurrency(max, currency === 'all' ? 'ARS' : currency) : '—'
+                })(),
+                color: 'var(--income-600)',
+              },
+            ].map(item => (
+              <div key={item.label} className="flex items-center justify-between">
+                <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{item.label}</span>
+                <span className="text-sm font-extrabold tabular-nums" style={{ color: item.color }}>{item.value}</span>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => setReportOpen(true)}
+            className="mt-4 w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all hover:opacity-90"
+            style={{ background: 'var(--brand-50)', color: 'var(--brand-600)' }}
+          >
+            <FileText size={14} /> Ver informe completo
+          </button>
+        </div>
+      </div>
+
+      <ReportModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        transactions={filtered}
+        period={PERIOD_OPTIONS.find(p => p.value === period)?.label ?? period}
+        currency={currency}
+      />
 
       {/* ── Transacciones + Top Gastos ──────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">

@@ -5,6 +5,7 @@ import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
 import { FAB } from '@/components/ui/FAB'
 import { ToastContainer } from '@/components/ui/ToastContainer'
+import { Onboarding } from '@/components/ui/Onboarding'
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -40,6 +41,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
       <MobileNav onMenuOpen={() => setMobileOpen(true)} />
       <FAB />
       <ToastContainer />
+      <Onboarding />
     </div>
   )
 }

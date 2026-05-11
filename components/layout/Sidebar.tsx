@@ -6,7 +6,8 @@ import { useState } from 'react'
 import {
   LayoutDashboard, Wallet, CreditCard, Tag,
   CalendarClock, Target, DollarSign, PiggyBank,
-  LogOut, ChevronLeft, ChevronRight, X, Zap, Upload,
+  LogOut, ChevronLeft, ChevronRight, X, Zap,
+  Upload, SlidersHorizontal, CalendarDays, Trophy,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -18,9 +19,12 @@ const NAV_ITEMS = [
   { href: '/categories',   label: 'Categorías',   icon: Tag,             color: '#0EA5E9', bg: '#F0F9FF' },
   { href: '/scheduled',    label: 'Op. Futuras',  icon: CalendarClock,   color: '#8B5CF6', bg: '#F5F3FF' },
   { href: '/goals',        label: 'Objetivos',    icon: Target,          color: '#F43F5E', bg: '#FFF1F2' },
-  { href: '/dollar',       label: 'Dólar',        icon: DollarSign,      color: '#0EA5E9', bg: '#F0F9FF' },
-  { href: '/plazo-fijo',   label: 'Plazo Fijo',   icon: PiggyBank,       color: '#10B981', bg: '#ECFDF5' },
-  { href: '/import',       label: 'Importar CSV', icon: Upload,          color: '#7C3AED', bg: '#F5F3FF' },
+  { href: '/dollar',        label: 'Dólar',        icon: DollarSign,          color: '#0EA5E9', bg: '#F0F9FF' },
+  { href: '/plazo-fijo',   label: 'Plazo Fijo',   icon: PiggyBank,           color: '#10B981', bg: '#ECFDF5' },
+  { href: '/budgets',      label: 'Presupuestos', icon: SlidersHorizontal,   color: '#F43F5E', bg: '#FFF1F2' },
+  { href: '/calendar',     label: 'Calendario',   icon: CalendarDays,        color: '#0EA5E9', bg: '#F0F9FF' },
+  { href: '/achievements', label: 'Logros',       icon: Trophy,              color: '#F59E0B', bg: '#FFFBEB' },
+  { href: '/import',       label: 'Importar CSV', icon: Upload,              color: '#7C3AED', bg: '#F5F3FF' },
 ]
 
 function UserAvatar({ email }: { email: string }) {
