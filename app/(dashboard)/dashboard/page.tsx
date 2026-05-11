@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, Plus } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, Plus, BarChart3 } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useWallets } from '@/hooks/useWallets'
 import { StatCard } from '@/components/ui/StatCard'
@@ -15,26 +15,37 @@ import { formatDate, getDateRangeForPeriod, PERIOD_OPTIONS, type Period } from '
 import type { TransactionWithDetails, Currency } from '@/types'
 
 const CURRENCIES: { value: Currency | 'all'; label: string }[] = [
-  { value: 'all', label: 'Todas' },
+  { value: 'all',    label: 'Todas' },
   { value: 'ARS',    label: 'ARS' },
   { value: 'USD',    label: 'USD' },
   { value: 'EUR',    label: 'EUR' },
   { value: 'CRYPTO', label: 'CRYPTO' },
 ]
 
+const WALLET_COLORS: Record<string, string> = {
+  ARS: '#6366F1', USD: '#10B981', EUR: '#0EA5E9', CRYPTO: '#F59E0B',
+}
+
 function FilterPills<T extends string>({
   options, value, onChange,
 }: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
   return (
-    <div className="flex flex-wrap gap-1 bg-white border border-gray-200 rounded-xl p-1" style={{ boxShadow: '0 1px 3px rgba(70,51,151,0.06)' }}>
+    <div
+      className="flex flex-wrap gap-1 rounded-2xl p-1"
+      style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
+        boxShadow: 'var(--shadow-xs)',
+      }}
+    >
       {options.map(opt => (
         <button
           key={opt.value}
           onClick={() => onChange(opt.value)}
-          className="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all"
+          className="px-4 py-1.5 text-xs font-bold rounded-xl transition-all duration-200"
           style={value === opt.value
-            ? { background: 'linear-gradient(135deg,#463397,#9850eb)', color: 'white' }
-            : { color: '#6b7280' }
+            ? { background: 'var(--grad-brand)', color: 'white', boxShadow: '0 2px 8px rgba(99,102,241,0.30)' }
+            : { color: 'var(--text-muted)' }
           }
         >
           {opt.label}
@@ -42,6 +53,13 @@ function FilterPills<T extends string>({
       ))}
     </div>
   )
+}
+
+function getGreeting() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Buenos días'
+  if (h < 19) return 'Buenas tardes'
+  return 'Buenas noches'
 }
 
 export default function DashboardPage() {
@@ -95,7 +113,7 @@ export default function DashboardPage() {
     const map = new Map<string, { amount: number; color: string }>()
     filtered.filter(t => t.type === 'expense').forEach(t => {
       const key = t.category_name ?? 'Sin categoría'
-      const ex = map.get(key) ?? { amount: 0, color: t.category_color ?? '#6b7280' }
+      const ex = map.get(key) ?? { amount: 0, color: t.category_color ?? '#6366F1' }
       ex.amount += t.amount
       map.set(key, ex)
     })
@@ -109,35 +127,116 @@ export default function DashboardPage() {
   const loading = txLoading || walletsLoading
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-7">
-      {/* Header */}
+    <div className="p-5 md:p-7 max-w-7xl mx-auto space-y-6 animate-fade-in">
+
+      {/* ── Encabezado de página ─────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold" style={{ color: '#463397', textShadow: '0 2px 8px rgba(70,51,151,0.12)' }}>
-            Dashboard
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xl" aria-hidden>👋</span>
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+              {getGreeting()}
+            </span>
+          </div>
+          <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            Tu finanzas
           </h1>
-          <p className="text-gray-500 text-sm mt-1">Resumen de tu actividad financiera</p>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            Resumen de tu actividad financiera
+          </p>
         </div>
-        <Button onClick={() => router.push('/transactions')} size="sm">
+        <Button onClick={() => router.push('/transactions')} size="md">
           <Plus size={16} /> Nueva transacción
         </Button>
       </div>
 
-      {/* Filters */}
+      {/* ── Filtros ─────────────────────────────────────────── */}
       <div className="flex flex-wrap gap-3">
         <FilterPills options={PERIOD_OPTIONS} value={period} onChange={setPeriod} />
         <FilterPills options={CURRENCIES} value={currency} onChange={v => setCurrency(v as Currency | 'all')} />
       </div>
 
-      {/* Stats */}
+      {/* ── Billeteras ─────────────────────────────────────── */}
+      {Object.keys(walletByCurrency).length > 0 && !loading && (
+        <div
+          className="rounded-2xl p-5"
+          style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center"
+                style={{ background: 'var(--brand-50)' }}
+              >
+                <Wallet size={16} style={{ color: 'var(--brand-500)' }} />
+              </div>
+              <h2 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+                Mis billeteras
+              </h2>
+            </div>
+            <button
+              onClick={() => router.push('/wallets')}
+              className="text-xs font-bold flex items-center gap-1 px-3 py-1.5 rounded-xl transition-colors"
+              style={{ color: 'var(--brand-500)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--brand-50)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              Ver todas <ArrowUpRight size={13} />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {Object.entries(walletByCurrency).map(([curr, bal]) => {
+              const color = WALLET_COLORS[curr] ?? '#6366F1'
+              return (
+                <div
+                  key={curr}
+                  className="rounded-2xl p-4 transition-all hover:-translate-y-0.5"
+                  style={{
+                    background: color + '0D',
+                    border: `1px solid ${color}20`,
+                  }}
+                >
+                  <div
+                    className="text-xs font-bold mb-2 px-2 py-0.5 rounded-full inline-block"
+                    style={{ background: color + '18', color }}
+                  >
+                    {curr}
+                  </div>
+                  <p
+                    className="text-xl font-extrabold tabular-nums"
+                    style={{ color: bal >= 0 ? 'var(--income-600)' : 'var(--expense-600)' }}
+                  >
+                    {formatCurrency(bal, curr)}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Stats Cards ─────────────────────────────────────── */}
       {currency === 'all' && stats.byCurrency
         ? Object.entries(stats.byCurrency).map(([curr, data]) => (
             <div key={curr}>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">{curr}</p>
+              <div className="flex items-center gap-2 mb-3">
+                <span
+                  className="px-2.5 py-1 rounded-full text-xs font-extrabold"
+                  style={{ background: 'var(--brand-50)', color: 'var(--brand-600)' }}
+                >
+                  {curr}
+                </span>
+                <div className="h-px flex-1" style={{ background: 'var(--border)' }} />
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <StatCard title="Ingresos"  value={formatCurrency(data.income,   curr)} icon={TrendingUp}   variant="income"  loading={loading} />
-                <StatCard title="Gastos"    value={formatCurrency(data.expenses, curr)} icon={TrendingDown}  variant="expense" loading={loading} />
-                <StatCard title="Balance"   value={formatCurrency(data.balance,  curr)} icon={Wallet} variant={data.balance >= 0 ? 'income' : 'expense'} loading={loading} />
+                <StatCard title="Ingresos"  value={formatCurrency(data.income,   curr)} icon={TrendingUp}  variant="income"  loading={loading} />
+                <StatCard title="Gastos"    value={formatCurrency(data.expenses, curr)} icon={TrendingDown} variant="expense" loading={loading} />
+                <StatCard title="Balance"   value={formatCurrency(data.balance,  curr)} icon={Wallet}
+                  variant={data.balance >= 0 ? 'income' : 'expense'} loading={loading} />
               </div>
             </div>
           ))
@@ -145,52 +244,77 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <StatCard title="Ingresos" value={formatCurrency(stats.single.income,   currency)} icon={TrendingUp}  variant="income"  loading={loading} />
               <StatCard title="Gastos"   value={formatCurrency(stats.single.expenses, currency)} icon={TrendingDown} variant="expense" loading={loading} />
-              <StatCard title="Balance"  value={formatCurrency(stats.single.balance,  currency)} icon={Wallet} variant={stats.single.balance >= 0 ? 'income' : 'expense'} loading={loading} />
+              <StatCard title="Balance"  value={formatCurrency(stats.single.balance,  currency)} icon={Wallet}
+                variant={stats.single.balance >= 0 ? 'income' : 'expense'} loading={loading} />
             </div>
           )
       }
 
-      {/* Wallets */}
-      {Object.keys(walletByCurrency).length > 0 && (
-        <div className="bg-white rounded-2xl p-5 border border-gray-100" style={{ boxShadow: '0 2px 4px rgba(70,51,151,0.08)' }}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-gray-800">Billeteras</h2>
-            <button onClick={() => router.push('/wallets')} className="text-sm font-semibold flex items-center gap-1" style={{ color: '#463397' }}>
-              Ver todas <ArrowUpRight size={14} />
-            </button>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {Object.entries(walletByCurrency).map(([curr, bal]) => (
-              <div key={curr} className="rounded-xl p-3 border border-violet-100" style={{ background: 'linear-gradient(135deg,rgba(70,51,151,0.04),rgba(152,80,235,0.04))' }}>
-                <p className="text-xs text-gray-500 mb-1 font-medium">{curr}</p>
-                <p className="text-lg font-bold tabular-nums" style={{ color: bal >= 0 ? '#059669' : '#dc2626' }}>
-                  {formatCurrency(bal, curr)}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* ── Transacciones + Top Gastos ──────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Recent transactions */}
-        <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-100" style={{ boxShadow: '0 2px 4px rgba(70,51,151,0.08)' }}>
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-            <h2 className="font-bold text-gray-800">Últimas transacciones</h2>
-            <button onClick={() => router.push('/transactions')} className="text-sm font-semibold flex items-center gap-1" style={{ color: '#463397' }}>
-              Ver todas <ArrowUpRight size={14} />
+        {/* Recientes */}
+        <div
+          className="lg:col-span-3 rounded-2xl overflow-hidden"
+          style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+        >
+          <div
+            className="flex items-center justify-between px-5 py-4"
+            style={{ borderBottom: '1px solid var(--border-light)' }}
+          >
+            <div className="flex items-center gap-2.5">
+              <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center"
+                style={{ background: 'var(--brand-50)' }}
+              >
+                <BarChart3 size={16} style={{ color: 'var(--brand-500)' }} />
+              </div>
+              <h2 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+                Últimas transacciones
+              </h2>
+            </div>
+            <button
+              onClick={() => router.push('/transactions')}
+              className="text-xs font-bold flex items-center gap-1 px-3 py-1.5 rounded-xl transition-colors"
+              style={{ color: 'var(--brand-500)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--brand-50)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              Ver todas <ArrowUpRight size={13} />
             </button>
           </div>
           {recentTx.length === 0
             ? <EmptyState title="Sin transacciones" description="No hay movimientos en este período." />
-            : <div className="divide-y divide-gray-50">{recentTx.map(tx => <TransactionRow key={tx.id} tx={tx} />)}</div>
+            : <div>{recentTx.map((tx, i) => <TransactionRow key={tx.id} tx={tx} index={i} />)}</div>
           }
         </div>
 
-        {/* Top expenses */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100" style={{ boxShadow: '0 2px 4px rgba(70,51,151,0.08)' }}>
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h2 className="font-bold text-gray-800">Top gastos por categoría</h2>
+        {/* Top gastos */}
+        <div
+          className="lg:col-span-2 rounded-2xl overflow-hidden"
+          style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+        >
+          <div
+            className="flex items-center gap-2.5 px-5 py-4"
+            style={{ borderBottom: '1px solid var(--border-light)' }}
+          >
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center"
+              style={{ background: 'var(--expense-50)' }}
+            >
+              <TrendingDown size={16} style={{ color: 'var(--expense-500)' }} />
+            </div>
+            <h2 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+              Top gastos por categoría
+            </h2>
           </div>
           {topExpenses.length === 0
             ? <EmptyState title="Sin gastos" description="No hay gastos en este período." />
@@ -198,17 +322,30 @@ export default function DashboardPage() {
               <div className="p-5 space-y-4">
                 {topExpenses.map(cat => (
                   <div key={cat.name}>
-                    <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
-                        <span className="text-sm text-gray-700 font-medium">{cat.name}</span>
+                        <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+                        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          {cat.name}
+                        </span>
                       </div>
-                      <span className="text-sm font-bold tabular-nums text-gray-800">
-                        {formatCurrency(cat.amount, currency === 'all' ? 'ARS' : currency)}
-                      </span>
+                      <div className="text-right">
+                        <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
+                          {formatCurrency(cat.amount, currency === 'all' ? 'ARS' : currency)}
+                        </span>
+                        <span className="text-xs ml-1.5 font-semibold" style={{ color: 'var(--text-muted)' }}>
+                          {cat.pct.toFixed(0)}%
+                        </span>
+                      </div>
                     </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${cat.pct}%`, backgroundColor: cat.color }} />
+                    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-subtle)' }}>
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${cat.pct}%`,
+                          background: `linear-gradient(90deg, ${cat.color}, ${cat.color}99)`,
+                        }}
+                      />
                     </div>
                   </div>
                 ))}
@@ -221,29 +358,39 @@ export default function DashboardPage() {
   )
 }
 
-function TransactionRow({ tx }: { tx: TransactionWithDetails }) {
+function TransactionRow({ tx, index }: { tx: TransactionWithDetails; index: number }) {
   const isIncome = tx.type === 'income'
   return (
-    <div className="flex items-center gap-3 px-5 py-3.5 hover:bg-violet-50/50 transition-colors">
+    <div
+      className="flex items-center gap-3.5 px-5 py-3.5 transition-colors cursor-default"
+      style={{ borderBottom: '1px solid var(--border-light)' }}
+      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-subtle)')}
+      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+    >
       <div
-        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-        style={{ background: isIncome ? '#d1fae5' : '#fee2e2' }}
+        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
+        style={{ background: isIncome ? 'var(--income-50)' : 'var(--expense-50)' }}
       >
         {isIncome
-          ? <TrendingUp size={16} className="text-emerald-600" />
-          : <TrendingDown size={16} className="text-red-500" />
+          ? <TrendingUp size={17} style={{ color: 'var(--income-500)' }} />
+          : <TrendingDown size={17} style={{ color: 'var(--expense-500)' }} />
         }
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-800 truncate">{tx.description}</p>
+        <p className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+          {tx.description}
+        </p>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-xs text-gray-400">{formatDate(tx.date)}</span>
+          <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{formatDate(tx.date)}</span>
           {tx.category_name && <CategoryBadge name={tx.category_name} color={tx.category_color} />}
         </div>
       </div>
       <div className="text-right shrink-0">
-        <p className="text-sm font-bold tabular-nums" style={{ color: isIncome ? '#059669' : '#dc2626' }}>
-          {isIncome ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
+        <p
+          className="text-sm font-bold tabular-nums"
+          style={{ color: isIncome ? 'var(--income-600)' : 'var(--expense-600)' }}
+        >
+          {isIncome ? '+' : '−'}{formatCurrency(tx.amount, tx.currency)}
         </p>
         <TypeBadge type={tx.type} />
       </div>

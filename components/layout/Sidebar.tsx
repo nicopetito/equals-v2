@@ -6,20 +6,20 @@ import { useState } from 'react'
 import {
   LayoutDashboard, Wallet, CreditCard, Tag,
   CalendarClock, Target, DollarSign, PiggyBank,
-  LogOut, ChevronLeft, ChevronRight, X,
+  LogOut, ChevronLeft, ChevronRight, X, Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 
 const NAV_ITEMS = [
-  { href: '/dashboard',   label: 'Dashboard',            icon: LayoutDashboard },
-  { href: '/transactions',label: 'Transacciones',         icon: Wallet },
-  { href: '/wallets',     label: 'Billeteras',            icon: CreditCard },
-  { href: '/categories',  label: 'Categorías',            icon: Tag },
-  { href: '/scheduled',   label: 'Operaciones Futuras',   icon: CalendarClock },
-  { href: '/goals',       label: 'Objetivos',             icon: Target },
-  { href: '/dollar',      label: 'Dólar',                 icon: DollarSign },
-  { href: '/plazo-fijo',  label: 'Plazo Fijo',            icon: PiggyBank },
+  { href: '/dashboard',    label: 'Inicio',              icon: LayoutDashboard, color: '#6366F1', bg: '#EEF2FF' },
+  { href: '/transactions', label: 'Transacciones',       icon: Wallet,          color: '#10B981', bg: '#ECFDF5' },
+  { href: '/wallets',      label: 'Billeteras',          icon: CreditCard,      color: '#F59E0B', bg: '#FFFBEB' },
+  { href: '/categories',   label: 'Categorías',          icon: Tag,             color: '#0EA5E9', bg: '#F0F9FF' },
+  { href: '/scheduled',    label: 'Op. Futuras',         icon: CalendarClock,   color: '#8B5CF6', bg: '#F5F3FF' },
+  { href: '/goals',        label: 'Objetivos',           icon: Target,          color: '#F43F5E', bg: '#FFF1F2' },
+  { href: '/dollar',       label: 'Dólar',               icon: DollarSign,      color: '#0EA5E9', bg: '#F0F9FF' },
+  { href: '/plazo-fijo',   label: 'Plazo Fijo',          icon: PiggyBank,       color: '#10B981', bg: '#ECFDF5' },
 ]
 
 interface SidebarProps {
@@ -39,53 +39,74 @@ export function Sidebar({ onClose, mobile = false }: SidebarProps) {
     router.push('/login')
   }
 
-  const sidebarStyle = {
-    background: 'linear-gradient(180deg, #463397 0%, #2c116a 100%)',
-    boxShadow: '0 20px 25px rgba(70,51,151,0.25)',
-  }
+  const isCollapsed = collapsed && !mobile
 
   return (
     <aside
-      style={sidebarStyle}
       className={cn(
-        'flex flex-col text-white transition-all duration-300 ease-in-out',
+        'flex flex-col transition-all duration-300 ease-in-out select-none',
         mobile
           ? 'w-72 h-full rounded-none'
-          : cn(
-              'rounded-3xl my-5 ml-5',
-              collapsed ? 'w-20' : 'w-64'
-            )
+          : cn('rounded-3xl my-4 ml-4', isCollapsed ? 'w-[72px]' : 'w-60')
       )}
+      style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
+        boxShadow: 'var(--shadow-md)',
+      }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-6 border-b border-white/10">
-        {(!collapsed || mobile) && (
-          <div className="flex items-center gap-3">
-            <span className="text-2xl font-bold tracking-tight">Equals</span>
+      {/* Header — Logo */}
+      <div
+        className={cn(
+          'flex items-center px-4 py-5',
+          isCollapsed ? 'justify-center' : 'justify-between'
+        )}
+        style={{ borderBottom: '1px solid var(--border-light)' }}
+      >
+        {!isCollapsed && (
+          <div className="flex items-center gap-2.5">
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center shadow-md shrink-0"
+              style={{ background: 'var(--grad-brand)', boxShadow: 'var(--shadow-brand)' }}
+            >
+              <Zap size={16} className="text-white" fill="white" />
+            </div>
+            <div>
+              <span className="font-extrabold text-lg tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                Equals
+              </span>
+            </div>
+          </div>
+        )}
+        {isCollapsed && (
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md"
+            style={{ background: 'var(--grad-brand)', boxShadow: 'var(--shadow-brand)' }}
+          >
+            <Zap size={17} className="text-white" fill="white" />
           </div>
         )}
         {mobile ? (
           <button
             onClick={onClose}
-            className="ml-auto p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+            className="p-2 rounded-xl transition-colors hover:bg-slate-100"
+            style={{ color: 'var(--text-muted)' }}
           >
-            <X size={18} />
+            <X size={17} />
           </button>
         ) : (
           <button
             onClick={() => setCollapsed(c => !c)}
-            className={cn(
-              'p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors',
-              collapsed && 'mx-auto'
-            )}
+            className="p-1.5 rounded-xl transition-colors hover:bg-slate-100"
+            style={{ color: 'var(--text-muted)' }}
           >
-            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            {isCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
           </button>
         )}
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 py-4 space-y-1 overflow-y-auto px-3">
+      {/* Nav items */}
+      <nav className="flex-1 py-3 space-y-0.5 overflow-y-auto px-2.5">
         {NAV_ITEMS.map(item => {
           const active = pathname === item.href || pathname.startsWith(item.href + '/')
           return (
@@ -95,41 +116,73 @@ export function Sidebar({ onClose, mobile = false }: SidebarProps) {
               onClick={onClose}
               title={item.label}
               className={cn(
-                'relative flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200',
-                active
-                  ? 'bg-white/15 text-white'
-                  : 'text-white/70 hover:bg-white/10 hover:text-white',
-                collapsed && !mobile && 'justify-center px-0'
+                'relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 group',
+                isCollapsed && 'justify-center px-0'
               )}
+              style={active
+                ? { background: item.bg, color: item.color }
+                : { color: 'var(--text-muted)' }
+              }
+              onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg-subtle)' }}
+              onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
             >
-              {active && (
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all"
+                style={active
+                  ? { background: item.color + '20', color: item.color }
+                  : { color: 'var(--text-faint)' }
+                }
+              >
+                <item.icon size={17} />
+              </div>
+              {!isCollapsed && <span className="truncate">{item.label}</span>}
+
+              {/* Dot indicator for active */}
+              {active && !isCollapsed && (
                 <span
-                  className="absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full"
-                  style={{ height: '60%', background: '#9850eb' }}
+                  className="ml-auto w-2 h-2 rounded-full shrink-0"
+                  style={{ background: item.color }}
                 />
               )}
-              <item.icon size={22} className="shrink-0" />
-              {(!collapsed || mobile) && <span>{item.label}</span>}
+
+              {/* Tooltip on collapsed */}
+              {isCollapsed && (
+                <span
+                  className="absolute left-full ml-3 px-2.5 py-1.5 rounded-lg text-xs font-bold text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-50"
+                  style={{ background: 'var(--text-primary)', boxShadow: 'var(--shadow-md)' }}
+                >
+                  {item.label}
+                </span>
+              )}
             </Link>
           )
         })}
       </nav>
 
-      {/* Footer logout */}
-      <div className="px-3 pb-5 pt-4 border-t border-white/10">
+      {/* Footer — Logout */}
+      <div className="px-2.5 pb-4 pt-3" style={{ borderTop: '1px solid var(--border-light)' }}>
         {showLogout ? (
-          <div className="bg-white rounded-xl p-3 space-y-2">
-            <p className="text-sm font-semibold text-gray-700 text-center">¿Cerrar sesión?</p>
+          <div
+            className="rounded-2xl p-3 space-y-2.5"
+            style={{ background: 'var(--expense-50)', border: '1px solid var(--expense-100)' }}
+          >
+            {!isCollapsed && (
+              <p className="text-xs font-bold text-center" style={{ color: 'var(--expense-600)' }}>
+                ¿Cerrar sesión?
+              </p>
+            )}
             <div className="flex gap-2">
               <button
                 onClick={handleLogout}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm py-2 rounded-lg transition-colors font-medium"
+                className="flex-1 text-white text-xs py-2 rounded-xl font-bold transition-all hover:opacity-90"
+                style={{ background: 'var(--grad-expense)' }}
               >
-                Sí
+                Sí, salir
               </button>
               <button
                 onClick={() => setShowLogout(false)}
-                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm py-2 rounded-lg transition-colors font-medium"
+                className="flex-1 text-xs py-2 rounded-xl font-semibold transition-colors hover:bg-slate-100"
+                style={{ color: 'var(--text-secondary)', background: 'var(--bg-subtle)' }}
               >
                 No
               </button>
@@ -140,12 +193,21 @@ export function Sidebar({ onClose, mobile = false }: SidebarProps) {
             onClick={() => setShowLogout(true)}
             title="Cerrar sesión"
             className={cn(
-              'flex items-center gap-4 w-full px-4 py-3 rounded-xl text-sm font-medium text-white/70 hover:bg-white/10 hover:text-red-300 transition-all',
-              collapsed && !mobile && 'justify-center px-0'
+              'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-all',
+              isCollapsed && 'justify-center px-0'
             )}
+            style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'var(--expense-50)'
+              e.currentTarget.style.color = 'var(--expense-600)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.color = 'var(--text-muted)'
+            }}
           >
-            <LogOut size={22} className="shrink-0" />
-            {(!collapsed || mobile) && <span>Salir</span>}
+            <LogOut size={17} className="shrink-0" />
+            {!isCollapsed && <span>Cerrar sesión</span>}
           </button>
         )}
       </div>

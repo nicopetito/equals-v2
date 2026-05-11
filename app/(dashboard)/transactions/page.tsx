@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Plus, Search, TrendingUp, TrendingDown, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Search, TrendingUp, TrendingDown, Pencil, Trash2, Filter } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
 import { useWallets } from '@/hooks/useWallets'
@@ -22,7 +22,36 @@ const CURRENCY_OPTS = [
 ]
 type FilterType = 'all' | TransactionType
 
-const CARD_STYLE = { background: '#fff', boxShadow: '0 2px 4px rgba(70,51,151,0.08)', border: '1px solid #f3f0ff' }
+const TYPE_FILTERS: { value: FilterType; label: string }[] = [
+  { value: 'all',     label: 'Todos' },
+  { value: 'income',  label: 'Ingresos' },
+  { value: 'expense', label: 'Gastos' },
+]
+
+function PillGroup<T extends string>({
+  options, value, onChange,
+}: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
+  return (
+    <div
+      className="flex gap-1 rounded-xl p-1"
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+    >
+      {options.map(opt => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          className="px-3 py-1.5 text-xs font-bold rounded-lg transition-all"
+          style={value === opt.value
+            ? { background: 'var(--grad-brand)', color: 'white' }
+            : { color: 'var(--text-muted)' }
+          }
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 export default function TransactionsPage() {
   const { data: transactions, loading, refetch } = useTransactions()
@@ -50,13 +79,18 @@ export default function TransactionsPage() {
     }),
   [transactions, start.toISOString(), end.toISOString(), filterType, search])
 
+  const totals = useMemo(() => {
+    const income   = filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+    const expenses = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+    return { income, expenses }
+  }, [filtered])
+
   function openCreate() {
     setEditing(null)
     setForm({ type: 'expense', currency: 'ARS', date: new Date().toISOString().split('T')[0] })
     setFormError(null)
     setModalOpen(true)
   }
-
   function openEdit(tx: TransactionWithDetails) {
     setEditing(tx)
     setForm({ ...tx })
@@ -65,7 +99,7 @@ export default function TransactionsPage() {
   }
 
   async function handleSave() {
-    if (!form.description || !form.amount || !form.date) { setFormError('Completá los campos obligatorios.'); return }
+    if (!form.description || !form.amount || !form.date) { setFormError('Completá todos los campos obligatorios.'); return }
     setSaving(true); setFormError(null)
     try {
       if (editing?.id) await transactionsService.update(editing.id, form as Partial<Transaction>)
@@ -84,77 +118,161 @@ export default function TransactionsPage() {
   const categoryOptions = [{ value: '', label: 'Sin categoría' }, ...categories.map(c => ({ value: c.id!, label: c.name }))]
   const walletOptions   = [{ value: '', label: 'Sin billetera'  }, ...wallets.map(w =>    ({ value: w.id!, label: w.name }))]
 
-  const pillStyle = (active: boolean) => active
-    ? { background: 'linear-gradient(135deg,#463397,#9850eb)', color: 'white' }
-    : { color: '#6b7280' }
-
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="p-5 md:p-7 max-w-5xl mx-auto space-y-6 animate-fade-in">
+
+      {/* Encabezado */}
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold" style={{ color: '#463397' }}>Transacciones</h1>
-          <p className="text-gray-500 text-sm mt-1">{filtered.length} movimientos</p>
+          <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            Transacciones
+          </h1>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            {filtered.length} movimientos encontrados
+          </p>
         </div>
-        <Button onClick={openCreate} size="sm"><Plus size={16} />Nueva transacción</Button>
+        <Button onClick={openCreate} size="md">
+          <Plus size={16} /> Nueva transacción
+        </Button>
       </div>
 
-      {/* Filters */}
+      {/* Resumen rápido */}
+      {filtered.length > 0 && (
+        <div className="grid grid-cols-2 gap-3">
+          <div
+            className="rounded-2xl p-4"
+            style={{ background: 'var(--income-50)', border: '1px solid var(--income-100)' }}
+          >
+            <p className="text-xs font-bold mb-1" style={{ color: 'var(--income-600)' }}>Total ingresos</p>
+            <p className="text-xl font-extrabold tabular-nums" style={{ color: 'var(--income-600)' }}>
+              +{formatCurrency(totals.income, 'ARS')}
+            </p>
+          </div>
+          <div
+            className="rounded-2xl p-4"
+            style={{ background: 'var(--expense-50)', border: '1px solid var(--expense-100)' }}
+          >
+            <p className="text-xs font-bold mb-1" style={{ color: 'var(--expense-600)' }}>Total gastos</p>
+            <p className="text-xl font-extrabold tabular-nums" style={{ color: 'var(--expense-600)' }}>
+              −{formatCurrency(totals.expenses, 'ARS')}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Filtros */}
       <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-48">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        {/* Búsqueda */}
+        <div className="relative flex-1 min-w-52">
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-faint)' }} />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar transacciones…"
-            className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-200 text-gray-800 rounded-xl text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-400"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              color: 'var(--text-primary)',
+              boxShadow: 'var(--shadow-xs)',
+            }}
           />
         </div>
-        <div className="flex bg-white border border-gray-200 rounded-xl p-1 gap-1">
-          {(['all', 'income', 'expense'] as FilterType[]).map(t => (
-            <button key={t} onClick={() => setFilterType(t)} className="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all" style={pillStyle(filterType === t)}>
-              {t === 'all' ? 'Todos' : t === 'income' ? 'Ingresos' : 'Gastos'}
-            </button>
-          ))}
-        </div>
-        <div className="flex bg-white border border-gray-200 rounded-xl p-1 gap-1">
-          {PERIOD_OPTIONS.map(opt => (
-            <button key={opt.value} onClick={() => setPeriod(opt.value)} className="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all" style={pillStyle(period === opt.value)}>
-              {opt.label}
-            </button>
-          ))}
-        </div>
+        <PillGroup options={TYPE_FILTERS} value={filterType} onChange={setFilterType} />
+        <PillGroup options={PERIOD_OPTIONS} value={period} onChange={setPeriod} />
       </div>
 
-      {/* List */}
-      <div className="bg-white rounded-2xl overflow-hidden" style={CARD_STYLE}>
+      {/* Lista */}
+      <div
+        className="rounded-2xl overflow-hidden"
+        style={{
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
         {loading ? (
-          <div className="p-8 text-center text-gray-400">Cargando…</div>
+          <div className="p-12 text-center" style={{ color: 'var(--text-muted)' }}>
+            <div className="w-8 h-8 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin mx-auto mb-3" />
+            Cargando transacciones…
+          </div>
         ) : filtered.length === 0 ? (
-          <EmptyState title="Sin transacciones" description="No hay movimientos para el período seleccionado." action={{ label: 'Nueva transacción', onClick: openCreate }} />
+          <EmptyState
+            icon={Filter}
+            title="Sin transacciones"
+            description="No hay movimientos para el período y filtros seleccionados."
+            action={{ label: '+ Nueva transacción', onClick: openCreate }}
+          />
         ) : (
-          <div className="divide-y divide-gray-50">
-            {filtered.map(tx => (
-              <div key={tx.id} className="flex items-center gap-4 px-5 py-4 hover:bg-violet-50/40 transition-colors group">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: tx.type === 'income' ? '#d1fae5' : '#fee2e2' }}>
-                  {tx.type === 'income' ? <TrendingUp size={18} className="text-emerald-600" /> : <TrendingDown size={18} className="text-red-500" />}
+          <div>
+            {filtered.map((tx, i) => (
+              <div
+                key={tx.id}
+                className="flex items-center gap-4 px-5 py-4 group transition-colors"
+                style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-light)' : 'none' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-subtle)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <div
+                  className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{ background: tx.type === 'income' ? 'var(--income-50)' : 'var(--expense-50)' }}
+                >
+                  {tx.type === 'income'
+                    ? <TrendingUp size={18} style={{ color: 'var(--income-500)' }} />
+                    : <TrendingDown size={18} style={{ color: 'var(--expense-500)' }} />
+                  }
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-800 truncate">{tx.description}</p>
+                  <p className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+                    {tx.description}
+                  </p>
                   <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                    <span className="text-xs text-gray-400">{formatDate(tx.date)}</span>
+                    <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{formatDate(tx.date)}</span>
                     {tx.category_name && <CategoryBadge name={tx.category_name} color={tx.category_color} />}
-                    {tx.wallet_name && <span className="text-xs text-gray-400">{tx.wallet_name}</span>}
+                    {tx.wallet_name && (
+                      <span
+                        className="text-xs font-medium px-2 py-0.5 rounded-full"
+                        style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)' }}
+                      >
+                        {tx.wallet_name}
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold tabular-nums" style={{ color: tx.type === 'income' ? '#059669' : '#dc2626' }}>
-                    {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
+                <div className="text-right mr-2">
+                  <p
+                    className="text-base font-extrabold tabular-nums"
+                    style={{ color: tx.type === 'income' ? 'var(--income-600)' : 'var(--expense-600)' }}
+                  >
+                    {tx.type === 'income' ? '+' : '−'}{formatCurrency(tx.amount, tx.currency)}
                   </p>
-                  <p className="text-xs text-gray-400">{tx.currency}</p>
+                  <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--text-faint)' }}>
+                    {tx.currency}
+                  </p>
                 </div>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openEdit(tx)} className="p-1.5 rounded-lg hover:bg-violet-100 text-gray-400 hover:text-violet-700"><Pencil size={14} /></button>
-                  <button onClick={() => tx.id && handleDelete(tx.id)} disabled={deleting === tx.id} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button
+                    onClick={() => openEdit(tx)}
+                    className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors"
+                    style={{ color: 'var(--text-muted)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--brand-50)'; e.currentTarget.style.color = 'var(--brand-500)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)' }}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    onClick={() => tx.id && handleDelete(tx.id)}
+                    disabled={deleting === tx.id}
+                    className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors"
+                    style={{ color: 'var(--text-muted)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--expense-50)'; e.currentTarget.style.color = 'var(--expense-500)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)' }}
+                  >
+                    {deleting === tx.id
+                      ? <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                      : <Trash2 size={14} />
+                    }
+                  </button>
                 </div>
               </div>
             ))}
@@ -162,21 +280,87 @@ export default function TransactionsPage() {
         )}
       </div>
 
+      {/* Modal crear/editar */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Editar transacción' : 'Nueva transacción'}>
         <div className="space-y-4">
-          {formError && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600">{formError}</div>}
-          <Select label="Tipo" value={form.type ?? 'expense'} onChange={e => setForm(f => ({ ...f, type: e.target.value as TransactionType }))} options={[{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }]} />
-          <Input label="Descripción" value={form.description ?? ''} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Ej: Supermercado" required />
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Monto" type="number" min="0" step="0.01" value={form.amount ?? ''} onChange={e => setForm(f => ({ ...f, amount: parseFloat(e.target.value) || 0 }))} required />
-            <Select label="Moneda" value={form.currency ?? 'ARS'} onChange={e => setForm(f => ({ ...f, currency: e.target.value as Currency }))} options={CURRENCY_OPTS} />
+          {formError && (
+            <div
+              className="rounded-xl px-4 py-3 text-sm font-medium"
+              style={{ background: 'var(--expense-50)', color: 'var(--expense-600)', border: '1px solid var(--expense-100)' }}
+            >
+              {formError}
+            </div>
+          )}
+
+          {/* Selector de tipo visual */}
+          <div className="flex gap-2">
+            {(['expense', 'income'] as TransactionType[]).map(t => (
+              <button
+                key={t}
+                onClick={() => setForm(f => ({ ...f, type: t }))}
+                className="flex-1 py-3 rounded-xl font-bold text-sm transition-all"
+                style={form.type === t
+                  ? t === 'income'
+                    ? { background: 'var(--income-50)', color: 'var(--income-600)', border: '2px solid var(--income-500)' }
+                    : { background: 'var(--expense-50)', color: 'var(--expense-600)', border: '2px solid var(--expense-500)' }
+                  : { background: 'var(--bg-subtle)', color: 'var(--text-muted)', border: '2px solid transparent' }
+                }
+              >
+                {t === 'income' ? '↑ Ingreso' : '↓ Gasto'}
+              </button>
+            ))}
           </div>
-          <Input label="Fecha" type="date" value={form.date ?? ''} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} required />
-          <Select label="Categoría" value={form.category_id ?? ''} onChange={e => setForm(f => ({ ...f, category_id: e.target.value || null }))} options={categoryOptions} />
-          <Select label="Billetera" value={form.wallet_id ?? ''} onChange={e => setForm(f => ({ ...f, wallet_id: e.target.value || null }))} options={walletOptions} />
+
+          <Input
+            label="Descripción"
+            value={form.description ?? ''}
+            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+            placeholder="Ej: Supermercado, salario, alquiler…"
+            required
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Monto"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.amount ?? ''}
+              onChange={e => setForm(f => ({ ...f, amount: parseFloat(e.target.value) || 0 }))}
+              required
+            />
+            <Select
+              label="Moneda"
+              value={form.currency ?? 'ARS'}
+              onChange={e => setForm(f => ({ ...f, currency: e.target.value as Currency }))}
+              options={CURRENCY_OPTS}
+            />
+          </div>
+          <Input
+            label="Fecha"
+            type="date"
+            value={form.date ?? ''}
+            onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+            required
+          />
+          <Select
+            label="Categoría"
+            value={form.category_id ?? ''}
+            onChange={e => setForm(f => ({ ...f, category_id: e.target.value || null }))}
+            options={categoryOptions}
+          />
+          <Select
+            label="Billetera"
+            value={form.wallet_id ?? ''}
+            onChange={e => setForm(f => ({ ...f, wallet_id: e.target.value || null }))}
+            options={walletOptions}
+          />
           <div className="flex gap-3 pt-2">
-            <Button variant="ghost" onClick={() => setModalOpen(false)} className="flex-1">Cancelar</Button>
-            <Button onClick={handleSave} loading={saving} className="flex-1">{editing ? 'Guardar cambios' : 'Crear transacción'}</Button>
+            <Button variant="secondary" onClick={() => setModalOpen(false)} className="flex-1">
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} loading={saving} className="flex-1">
+              {editing ? 'Guardar cambios' : 'Crear transacción'}
+            </Button>
           </div>
         </div>
       </Modal>

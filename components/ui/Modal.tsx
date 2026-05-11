@@ -25,23 +25,50 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className={cn('relative w-full bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh]', SIZES[size])}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 backdrop-blur-sm"
+        style={{ background: 'rgba(15,23,42,0.55)' }}
+        onClick={onClose}
+      />
+
+      {/* Panel */}
+      <div
+        className={cn(
+          'relative w-full flex flex-col max-h-[92vh] rounded-3xl overflow-hidden animate-fade-in',
+          SIZES[size]
+        )}
+        style={{
+          background: 'var(--bg-card)',
+          boxShadow: 'var(--shadow-xl)',
+          border: '1px solid var(--border-light)',
+        }}
+      >
+        {/* Header */}
         {title && (
           <div
-            className="flex items-center justify-between px-6 py-4 border-b border-gray-100 rounded-t-2xl"
-            style={{ background: 'linear-gradient(135deg,#463397,#9850eb)' }}
+            className="flex items-center justify-between px-6 py-4 shrink-0"
+            style={{ borderBottom: '1px solid var(--border-light)' }}
           >
-            <h2 className="text-base font-bold text-white">{title}</h2>
+            <div className="flex items-center gap-3">
+              <div
+                className="w-1.5 h-6 rounded-full"
+                style={{ background: 'var(--grad-brand)' }}
+              />
+              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{title}</h2>
+            </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+              className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors hover:bg-slate-100"
+              style={{ color: 'var(--text-muted)' }}
             >
-              <X size={18} />
+              <X size={16} />
             </button>
           </div>
         )}
+
+        {/* Body */}
         <div className="flex-1 overflow-y-auto p-6">{children}</div>
       </div>
     </div>

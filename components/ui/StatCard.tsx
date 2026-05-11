@@ -1,5 +1,4 @@
 import { type LucideIcon } from 'lucide-react'
-import { cn } from '@/lib/utils'
 
 interface StatCardProps {
   title: string
@@ -7,55 +6,74 @@ interface StatCardProps {
   subtitle?: string
   icon: LucideIcon
   trend?: { value: number; label: string }
-  variant?: 'default' | 'income' | 'expense' | 'neutral'
+  variant?: 'default' | 'income' | 'expense' | 'neutral' | 'goal' | 'sky'
   loading?: boolean
 }
 
-const ICON_VARIANTS = {
-  default: { background: 'linear-gradient(135deg,#463397,#9850eb)', color: 'white' },
-  income:  { background: 'linear-gradient(135deg,#10b981,#34d399)', color: 'white' },
-  expense: { background: 'linear-gradient(135deg,#ef4444,#f87171)', color: 'white' },
-  neutral: { background: '#f3f4f6', color: '#6b7280' },
-}
-
-const VALUE_COLORS = {
-  default: '#463397',
-  income:  '#059669',
-  expense: '#dc2626',
-  neutral: '#374151',
+const VARIANTS = {
+  default:  { grad: 'var(--grad-brand)',   shadow: 'var(--shadow-brand)',   text: '#EEF2FF' },
+  income:   { grad: 'var(--grad-income)',  shadow: 'var(--shadow-income)',  text: '#ECFDF5' },
+  expense:  { grad: 'var(--grad-expense)', shadow: 'var(--shadow-expense)', text: '#FFF1F2' },
+  goal:     { grad: 'var(--grad-goal)',    shadow: '0 8px 24px rgba(245,158,11,0.35)', text: '#FFFBEB' },
+  sky:      { grad: 'var(--grad-sky)',     shadow: '0 8px 24px rgba(14,165,233,0.35)', text: '#F0F9FF' },
+  neutral:  { grad: 'linear-gradient(135deg,#475569,#334155)', shadow: '0 8px 24px rgba(71,85,105,0.3)', text: '#F8FAFC' },
 }
 
 export function StatCard({ title, value, subtitle, icon: Icon, trend, variant = 'default', loading }: StatCardProps) {
+  const v = VARIANTS[variant]
+
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl p-5 border border-gray-100 animate-pulse" style={{ boxShadow: '0 2px 4px rgba(70,51,151,0.08)' }}>
+      <div
+        className="rounded-2xl p-5 animate-pulse"
+        style={{ background: v.grad, boxShadow: v.shadow, minHeight: 120 }}
+      >
         <div className="flex items-start justify-between mb-4">
-          <div className="w-11 h-11 rounded-xl bg-gray-100" />
+          <div className="w-11 h-11 rounded-xl bg-white/20" />
+          <div className="w-14 h-6 rounded-full bg-white/20" />
         </div>
-        <div className="h-7 bg-gray-100 rounded w-3/4 mb-2" />
-        <div className="h-4 bg-gray-100 rounded w-1/2" />
+        <div className="h-8 bg-white/20 rounded-xl w-3/4 mb-2" />
+        <div className="h-4 bg-white/15 rounded-lg w-1/2" />
       </div>
     )
   }
 
   return (
     <div
-      className="bg-white rounded-2xl p-5 border border-gray-100 hover:border-violet-200 transition-all hover:-translate-y-0.5"
-      style={{ boxShadow: '0 2px 4px rgba(70,51,151,0.08)' }}
+      className="rounded-2xl p-5 flex flex-col justify-between transition-all hover:-translate-y-0.5 hover:scale-[1.01]"
+      style={{
+        background: v.grad,
+        boxShadow: v.shadow,
+        minHeight: 120,
+      }}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="p-2.5 rounded-xl" style={ICON_VARIANTS[variant]}>
-          <Icon size={20} />
+      <div className="flex items-start justify-between">
+        <div
+          className="w-11 h-11 rounded-xl flex items-center justify-center"
+          style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(4px)' }}
+        >
+          <Icon size={21} className="text-white" />
         </div>
         {trend && (
-          <span className={cn('text-xs font-semibold px-2 py-1 rounded-full', trend.value >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500')}>
-            {trend.value >= 0 ? '+' : ''}{trend.value.toFixed(1)}%
+          <span
+            className="text-xs font-bold px-2.5 py-1 rounded-full"
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              color: 'white',
+            }}
+          >
+            {trend.value >= 0 ? '▲' : '▼'} {Math.abs(trend.value).toFixed(1)}%
           </span>
         )}
       </div>
-      <p className="text-2xl font-bold tabular-nums mb-1" style={{ color: VALUE_COLORS[variant] }}>{value}</p>
-      <p className="text-sm text-gray-500 font-medium">{title}</p>
-      {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+
+      <div className="mt-4">
+        <p className="text-2xl font-bold tabular-nums text-white leading-tight">{value}</p>
+        <p className="text-sm font-semibold mt-0.5" style={{ color: 'rgba(255,255,255,0.75)' }}>{title}</p>
+        {subtitle && (
+          <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>{subtitle}</p>
+        )}
+      </div>
     </div>
   )
 }

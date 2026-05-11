@@ -14,20 +14,20 @@ export function EmptyState({
   action,
 }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+    <div className="flex flex-col items-center justify-center py-14 px-4 text-center">
       <div
-        className="p-4 rounded-2xl mb-4"
-        style={{ background: 'linear-gradient(135deg,rgba(70,51,151,0.08),rgba(152,80,235,0.08))' }}
+        className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+        style={{ background: 'var(--brand-50)', border: '1px solid var(--brand-100)' }}
       >
-        <Icon size={32} style={{ color: '#9850eb' }} />
+        <Icon size={28} style={{ color: 'var(--brand-500)' }} />
       </div>
-      <p className="text-base font-semibold text-gray-700 mb-1">{title}</p>
-      <p className="text-sm text-gray-400 max-w-xs">{description}</p>
+      <p className="text-base font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{title}</p>
+      <p className="text-sm max-w-xs" style={{ color: 'var(--text-muted)' }}>{description}</p>
       {action && (
         <button
           onClick={action.onClick}
-          className="mt-6 px-5 py-2.5 text-white text-sm font-semibold rounded-xl transition-all hover:opacity-90"
-          style={{ background: 'linear-gradient(135deg,#463397,#9850eb)' }}
+          className="mt-5 px-5 py-2.5 text-white text-sm font-semibold rounded-xl transition-all hover:opacity-90 hover:-translate-y-px"
+          style={{ background: 'var(--grad-brand)', boxShadow: 'var(--shadow-brand)' }}
         >
           {action.label}
         </button>

@@ -2,14 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Wallet, CreditCard, Target, Menu } from 'lucide-react'
+import { LayoutDashboard, Wallet, CreditCard, Target, Grid3X3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const BOTTOM_NAV = [
-  { href: '/dashboard',    label: 'Inicio',      icon: LayoutDashboard },
-  { href: '/transactions', label: 'Movimientos', icon: Wallet },
-  { href: '/wallets',      label: 'Billeteras',  icon: CreditCard },
-  { href: '/goals',        label: 'Objetivos',   icon: Target },
+  { href: '/dashboard',    label: 'Inicio',      icon: LayoutDashboard, color: '#6366F1', bg: '#EEF2FF' },
+  { href: '/transactions', label: 'Movimientos', icon: Wallet,          color: '#10B981', bg: '#ECFDF5' },
+  { href: '/wallets',      label: 'Billeteras',  icon: CreditCard,      color: '#F59E0B', bg: '#FFFBEB' },
+  { href: '/goals',        label: 'Objetivos',   icon: Target,          color: '#F43F5E', bg: '#FFF1F2' },
 ]
 
 interface MobileNavProps {
@@ -21,11 +21,11 @@ export function MobileNav({ onMenuOpen }: MobileNavProps) {
 
   return (
     <nav
-      className="fixed bottom-0 inset-x-0 z-40 flex md:hidden bg-white border-t"
+      className="fixed bottom-3 left-3 right-3 z-40 flex md:hidden rounded-2xl overflow-hidden"
       style={{
-        borderColor: 'rgba(70,51,151,0.1)',
-        boxShadow: '0 -4px 12px rgba(70,51,151,0.10)',
-        minHeight: 64,
+        background: 'var(--bg-card)',
+        boxShadow: '0 -2px 0 rgba(0,0,0,0.04), 0 8px 32px rgba(15,23,42,0.12)',
+        border: '1px solid var(--border)',
       }}
     >
       {BOTTOM_NAV.map(item => {
@@ -34,26 +34,40 @@ export function MobileNav({ onMenuOpen }: MobileNavProps) {
           <Link
             key={item.href}
             href={item.href}
-            className="relative flex-1 flex flex-col items-center justify-center gap-1 py-2 text-xs font-medium transition-colors"
-            style={{ color: active ? '#463397' : '#9ca3af' }}
+            className="relative flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[11px] font-bold transition-all"
+            style={{ color: active ? item.color : 'var(--text-faint)' }}
           >
             {active && (
               <span
-                className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-[3px] rounded-b-full"
-                style={{ background: 'linear-gradient(135deg,#463397,#9850eb)' }}
+                className="absolute top-0 left-1/2 -translate-x-1/2 rounded-b-full"
+                style={{ width: 28, height: 3, background: item.color }}
               />
             )}
-            <item.icon size={22} style={{ transform: active ? 'translateY(-2px)' : undefined, transition: 'transform .2s' }} />
+            <div
+              className="w-10 h-8 rounded-xl flex items-center justify-center transition-all"
+              style={active ? { background: item.bg } : undefined}
+            >
+              <item.icon
+                size={19}
+                style={{
+                  transform: active ? 'scale(1.1)' : undefined,
+                  transition: 'transform 0.2s',
+                }}
+              />
+            </div>
             <span>{item.label}</span>
           </Link>
         )
       })}
+
       <button
         onClick={onMenuOpen}
-        className="flex-1 flex flex-col items-center justify-center gap-1 py-2 text-xs font-medium transition-colors"
-        style={{ color: '#463397', fontWeight: 600 }}
+        className="flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[11px] font-bold transition-all"
+        style={{ color: 'var(--text-faint)' }}
       >
-        <Menu size={22} />
+        <div className="w-10 h-8 rounded-xl flex items-center justify-center">
+          <Grid3X3 size={19} />
+        </div>
         <span>Más</span>
       </button>
     </nav>

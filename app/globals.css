@@ -1,35 +1,104 @@
 @import "tailwindcss";
 
+/* ============================================================
+   LUMINA LIGHT — Sistema de diseño claro, accesible y vibrante
+   Para todas las edades: adolescentes, adultos y mayores.
+   ============================================================ */
 :root {
-  --color-primary:   #463397;
-  --color-secondary: #9850eb;
-  --color-accent:    #6d38c7;
-  --color-dark:      #2c116a;
+  /* --- Fondo --- */
+  --bg-base:        #F4F6FB;
+  --bg-card:        #FFFFFF;
+  --bg-subtle:      #F8FAFC;
+  --bg-accent-soft: #EEF2FF;
 
-  --gradient-primary: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
-  --gradient-sidebar: linear-gradient(180deg, var(--color-primary) 0%, var(--color-dark) 100%);
+  /* --- Texto --- */
+  --text-primary:   #0F172A;
+  --text-secondary: #334155;
+  --text-muted:     #64748B;
+  --text-faint:     #94A3B8;
 
-  --shadow-sm: 0 2px 4px rgba(70,51,151,0.10);
-  --shadow-md: 0 4px 6px rgba(70,51,151,0.15);
-  --shadow-lg: 0 10px 15px rgba(70,51,151,0.20);
-  --shadow-xl: 0 20px 25px rgba(70,51,151,0.25);
+  /* --- Marca (índigo-violeta) --- */
+  --brand-500:      #6366F1;
+  --brand-600:      #4F46E5;
+  --brand-700:      #4338CA;
+  --brand-50:       #EEF2FF;
+  --brand-100:      #E0E7FF;
+  --grad-brand:     linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  --shadow-brand:   0 4px 16px rgba(99,102,241,0.30);
+
+  /* --- Ingreso (esmeralda) --- */
+  --income-500:     #10B981;
+  --income-600:     #059669;
+  --income-50:      #ECFDF5;
+  --income-100:     #D1FAE5;
+  --grad-income:    linear-gradient(135deg, #10B981 0%, #059669 100%);
+  --shadow-income:  0 4px 16px rgba(16,185,129,0.28);
+
+  /* --- Gasto (rosa) --- */
+  --expense-500:    #F43F5E;
+  --expense-600:    #E11D48;
+  --expense-50:     #FFF1F2;
+  --expense-100:    #FFE4E6;
+  --grad-expense:   linear-gradient(135deg, #F43F5E 0%, #E11D48 100%);
+  --shadow-expense: 0 4px 16px rgba(244,63,94,0.28);
+
+  /* --- Meta / Ahorro (ámbar) --- */
+  --goal-500:       #F59E0B;
+  --goal-600:       #D97706;
+  --goal-50:        #FFFBEB;
+  --goal-100:       #FEF3C7;
+  --grad-goal:      linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+  --shadow-goal:    0 4px 16px rgba(245,158,11,0.28);
+
+  /* --- Dólar / Info (cielo) --- */
+  --sky-500:        #0EA5E9;
+  --sky-600:        #0284C7;
+  --sky-50:         #F0F9FF;
+  --sky-100:        #E0F2FE;
+  --grad-sky:       linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%);
+  --shadow-sky:     0 4px 16px rgba(14,165,233,0.28);
+
+  /* --- Bordes y sombras --- */
+  --border:         #E2E8F0;
+  --border-light:   #F1F5F9;
+  --shadow-xs:      0 1px 2px rgba(15,23,42,0.05);
+  --shadow-sm:      0 2px 8px rgba(15,23,42,0.06), 0 1px 3px rgba(15,23,42,0.04);
+  --shadow-md:      0 4px 16px rgba(15,23,42,0.08), 0 2px 6px rgba(15,23,42,0.04);
+  --shadow-lg:      0 8px 32px rgba(15,23,42,0.10), 0 4px 12px rgba(15,23,42,0.05);
+  --shadow-xl:      0 16px 48px rgba(15,23,42,0.12), 0 8px 20px rgba(15,23,42,0.06);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
 html { scroll-behavior: smooth; }
 
 body {
   font-family: var(--font-poppins), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: #f8f7ff;
-  color: #1f1635;
+  background: var(--bg-base);
+  color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   margin: 0;
 }
 
-:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+/* Scrollbar delgado */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+:focus-visible { outline: 2px solid var(--brand-500); outline-offset: 2px; }
 :focus:not(:focus-visible) { outline: none; }
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fadeSlideUp 0.3s ease forwards; }
+
+@keyframes shimmer {
+  from { background-position: -200% center; }
+  to   { background-position: 200% center; }
+}
 
 @media (max-width: 768px) {
   input, textarea, select { font-size: 16px !important; }

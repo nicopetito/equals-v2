@@ -11,9 +11,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ className, label, error, hint, id, ...props }, ref) => {
     const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-')
     return (
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1.5">
         {label && (
-          <label htmlFor={inputId} className="text-sm font-semibold text-gray-700">
+          <label htmlFor={inputId} className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
             {label}
           </label>
         )}
@@ -21,14 +21,18 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           ref={ref}
           id={inputId}
           className={cn(
-            'w-full rounded-xl bg-white border text-gray-800 px-4 py-2.5 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-violet-400 transition-all',
-            error ? 'border-red-400 focus:ring-red-400' : 'border-gray-200',
+            'w-full rounded-xl bg-white border text-sm placeholder:text-slate-400 px-4 py-3 transition-all duration-200',
+            'focus:outline-none focus:ring-2 focus:border-indigo-400',
+            error
+              ? 'border-rose-300 focus:ring-rose-200 focus:border-rose-400'
+              : 'border-[var(--border)] focus:ring-indigo-100',
             className
           )}
+          style={{ color: 'var(--text-primary)', boxShadow: 'var(--shadow-xs)' }}
           {...props}
         />
-        {error && <p className="text-xs text-red-500">{error}</p>}
-        {hint && !error && <p className="text-xs text-gray-400">{hint}</p>}
+        {error && <p className="text-xs font-medium" style={{ color: 'var(--expense-500)' }}>{error}</p>}
+        {hint && !error && <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{hint}</p>}
       </div>
     )
   }

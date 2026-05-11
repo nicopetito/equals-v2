@@ -5,16 +5,16 @@ interface TypeBadgeProps {
 }
 
 export function TypeBadge({ type }: TypeBadgeProps) {
+  const isIncome = type === 'income'
   return (
     <span
-      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
-      style={
-        type === 'income'
-          ? { background: '#d1fae5', color: '#059669' }
-          : { background: '#fee2e2', color: '#dc2626' }
+      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide"
+      style={isIncome
+        ? { background: 'var(--income-50)', color: 'var(--income-600)', border: '1px solid rgba(16,185,129,0.2)' }
+        : { background: 'var(--expense-50)', color: 'var(--expense-600)', border: '1px solid rgba(244,63,94,0.2)' }
       }
     >
-      {type === 'income' ? 'Ingreso' : 'Gasto'}
+      {isIncome ? '↑ Ingreso' : '↓ Gasto'}
     </span>
   )
 }
