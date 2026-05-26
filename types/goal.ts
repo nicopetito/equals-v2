@@ -5,7 +5,7 @@ export interface Goal {
   description?: string
   target_amount: number
   current_amount: number
-  category: string
+  category?: string
   currency?: string
   wallet_id?: string
   icon?: string

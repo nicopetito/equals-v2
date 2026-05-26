@@ -2,14 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Wallet, CreditCard, Target, Grid3X3 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { LayoutDashboard, Wallet, BarChart2, Target, Grid3X3 } from 'lucide-react'
 
 const BOTTOM_NAV = [
-  { href: '/dashboard',    label: 'Inicio',      icon: LayoutDashboard, color: '#6366F1', bg: '#EEF2FF' },
-  { href: '/transactions', label: 'Movimientos', icon: Wallet,          color: '#10B981', bg: '#ECFDF5' },
-  { href: '/wallets',      label: 'Billeteras',  icon: CreditCard,      color: '#F59E0B', bg: '#FFFBEB' },
-  { href: '/goals',        label: 'Objetivos',   icon: Target,          color: '#F43F5E', bg: '#FFF1F2' },
+  { href: '/dashboard',    label: 'Inicio',       icon: LayoutDashboard },
+  { href: '/estadisticas', label: 'Estadísticas', icon: BarChart2       },
+  { href: '/transactions', label: 'Movimientos',  icon: Wallet          },
+  { href: '/goals',        label: 'Objetivos',    icon: Target          },
 ]
 
 interface MobileNavProps {
@@ -23,9 +22,8 @@ export function MobileNav({ onMenuOpen }: MobileNavProps) {
     <nav
       className="fixed bottom-3 left-3 right-3 z-40 flex md:hidden rounded-2xl overflow-hidden"
       style={{
-        background: 'var(--bg-card)',
-        boxShadow: '0 -2px 0 rgba(0,0,0,0.04), 0 8px 32px rgba(15,23,42,0.12)',
-        border: '1px solid var(--border)',
+        background: 'var(--grad-brand)',
+        boxShadow: 'var(--shadow-brand)',
       }}
     >
       {BOTTOM_NAV.map(item => {
@@ -34,26 +32,20 @@ export function MobileNav({ onMenuOpen }: MobileNavProps) {
           <Link
             key={item.href}
             href={item.href}
-            className="relative flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[11px] font-bold transition-all"
-            style={{ color: active ? item.color : 'var(--text-faint)' }}
+            className="relative flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[11px] font-semibold transition-all"
+            style={{ color: active ? 'white' : 'rgba(255,255,255,0.55)' }}
           >
             {active && (
               <span
                 className="absolute top-0 left-1/2 -translate-x-1/2 rounded-b-full"
-                style={{ width: 28, height: 3, background: item.color }}
+                style={{ width: 24, height: 3, background: 'rgba(255,255,255,0.85)' }}
               />
             )}
             <div
-              className="w-10 h-8 rounded-xl flex items-center justify-center transition-all"
-              style={active ? { background: item.bg } : undefined}
+              className="w-9 h-7 rounded-xl flex items-center justify-center transition-all"
+              style={active ? { background: 'rgba(255,255,255,0.18)' } : undefined}
             >
-              <item.icon
-                size={19}
-                style={{
-                  transform: active ? 'scale(1.1)' : undefined,
-                  transition: 'transform 0.2s',
-                }}
-              />
+              <item.icon size={17} />
             </div>
             <span>{item.label}</span>
           </Link>
@@ -62,11 +54,11 @@ export function MobileNav({ onMenuOpen }: MobileNavProps) {
 
       <button
         onClick={onMenuOpen}
-        className="flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[11px] font-bold transition-all"
-        style={{ color: 'var(--text-faint)' }}
+        className="flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[11px] font-semibold transition-all hover:opacity-90"
+        style={{ color: 'rgba(255,255,255,0.55)' }}
       >
-        <div className="w-10 h-8 rounded-xl flex items-center justify-center">
-          <Grid3X3 size={19} />
+        <div className="w-9 h-7 rounded-xl flex items-center justify-center">
+          <Grid3X3 size={17} />
         </div>
         <span>Más</span>
       </button>

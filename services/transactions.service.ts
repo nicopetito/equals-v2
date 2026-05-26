@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { safeNumber } from '@/utils/format'
 import type {
   Transaction,
   TransactionWithDetails,
@@ -47,7 +48,8 @@ export const transactionsService = {
 
     const { data, error } = await query
     if (error) throw error
-    return data ?? []
+    // Supabase returns NUMERIC columns as strings — parse amount to number
+    return (data ?? []).map(t => ({ ...t, amount: safeNumber(t.amount) }))
   },
 
   async getById(id: string): Promise<Transaction | null> {
@@ -158,9 +160,9 @@ export const transactionsService = {
     ;(data ?? []).forEach((item: any) => {
       const key = item.month.substring(0, 7)
       const existing = map.get(key) ?? { income: 0, expenses: 0, count: 0 }
-      if (item.type === 'income') existing.income = Number(item.total_amount)
-      else existing.expenses = Number(item.total_amount)
-      existing.count += Number(item.transaction_count)
+      if (item.type === 'income') existing.income = safeNumber(item.total_amount)
+      else existing.expenses = safeNumber(item.total_amount)
+      existing.count += safeNumber(item.transaction_count)
       map.set(key, existing)
     })
 

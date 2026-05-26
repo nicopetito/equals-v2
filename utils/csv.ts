@@ -234,8 +234,23 @@ export function parseDateStr(str: string, format: DateFormat): string | null {
 
   if (isNaN(day) || isNaN(month) || isNaN(year)) return null
   if (year < 100) year += 2000
+  if (day < 1 || day > 31 || month < 1 || month > 12 || year < 1900 || year > 2099) return null
 
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+export function detectDateFormatFromSample(rows: CsvRow[], dateColumn: string): DateFormat | null {
+  const samples = rows.slice(0, 5).map(r => r[dateColumn] ?? '').filter(Boolean)
+  for (const s of samples) {
+    const dateOnly = s.split(/[\sT]/)[0] ?? ''
+    const parts = dateOnly.split(/[\/\-]/)
+    if (parts.length < 3) continue
+    const first = parseInt(parts[0])
+    const third = parseInt(parts[2])
+    if (first > 31) return 'YYYY-MM-DD'
+    if (third > 31) return 'DD/MM/YYYY'
+  }
+  return null
 }
 
 // ── Transformar filas CSV en transacciones parseadas ──────────────────────────
@@ -311,7 +326,7 @@ export function toTransactionInput(
     description: row.description,
     amount: row.amount,
     type: row.type,
-    currency: row.currency,
+    currency: row.currency as Transaction['currency'],
     date: row.date,
     category_id: row.category_id ?? null,
     wallet_id: row.wallet_id ?? null,

@@ -1,5 +1,8 @@
+import { parseISO, addDays, addMonths, addYears } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
-import type { RecurringTransaction, RecurringTransactionWithDetails } from '@/types'
+import { safeNumber } from '@/utils/format'
+import { transactionsService } from './transactions.service'
+import type { RecurringTransaction, RecurringTransactionWithDetails, RecurringCadence, Currency } from '@/types'
 
 function getSupabase() {
   return createClient()
@@ -8,6 +11,21 @@ function getSupabase() {
 async function getUserId(): Promise<string | null> {
   const { data } = await getSupabase().auth.getUser()
   return data.user?.id ?? null
+}
+
+function nextDateAfter(current: string, cadence: RecurringCadence): string {
+  const d = parseISO(current)
+  let next: Date
+  switch (cadence) {
+    case 'daily':     next = addDays(d, 1);    break
+    case 'weekly':    next = addDays(d, 7);    break
+    case 'biweekly':  next = addDays(d, 14);   break
+    case 'monthly':   next = addMonths(d, 1);  break
+    case 'quarterly': next = addMonths(d, 3);  break
+    case 'yearly':    next = addYears(d, 1);   break
+    default:          next = addMonths(d, 1)
+  }
+  return next.toISOString().split('T')[0]
 }
 
 export const recurringService = {
@@ -23,7 +41,7 @@ export const recurringService = {
       .order('next_date', { ascending: true })
 
     if (error) throw error
-    return data ?? []
+    return (data ?? []).map(r => ({ ...r, amount: safeNumber(r.amount) }))
   },
 
   async create(tx: Omit<RecurringTransaction, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<RecurringTransaction> {
@@ -74,5 +92,22 @@ export const recurringService = {
 
   async toggle(id: string, active: boolean): Promise<void> {
     await recurringService.update(id, { active })
+  },
+
+  async execute(item: RecurringTransactionWithDetails, walletId: string): Promise<void> {
+    await transactionsService.create({
+      description: item.description,
+      amount:      safeNumber(item.amount),
+      type:        item.type,
+      currency:    (item.currency ?? 'ARS') as Currency,
+      category_id: item.category_id ?? null,
+      wallet_id:   walletId,
+      date:        new Date().toISOString().split('T')[0],
+      is_recurring: true,
+      recurring_id: item.id ?? null,
+      notes:        null,
+    })
+    const next = nextDateAfter(item.next_date, item.cadence)
+    await recurringService.update(item.id!, { next_date: next })
   },
 }

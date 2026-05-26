@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -15,6 +16,7 @@ interface ModalProps {
 const SIZES = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl' }
 
 export function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
+  // Escape key
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -22,55 +24,107 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
     return () => document.removeEventListener('keydown', handler)
   }, [open, onClose])
 
+  // Body scroll lock
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [open])
+
   if (!open) return null
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-      {/* Backdrop */}
+  return createPortal(
+    <>
+      {/* ── Overlay: fixed to viewport, outside any stacking context ── */}
       <div
-        className="absolute inset-0 backdrop-blur-sm"
-        style={{ background: 'rgba(15,23,42,0.55)' }}
         onClick={onClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          width: '100vw',
+          height: '100vh',
+          zIndex: 9998,
+          background: 'rgba(248, 250, 252, 0.35)',
+          backdropFilter: 'blur(3px) saturate(110%)',
+          WebkitBackdropFilter: 'blur(3px) saturate(110%)',
+        }}
       />
 
-      {/* Panel */}
+      {/* ── Modal container: centered over the overlay ── */}
       <div
-        className={cn(
-          'relative w-full flex flex-col max-h-[92vh] rounded-3xl overflow-hidden animate-fade-in',
-          SIZES[size]
-        )}
         style={{
-          background: 'var(--bg-card)',
-          boxShadow: 'var(--shadow-xl)',
-          border: '1px solid var(--border-light)',
+          position: 'fixed',
+          inset: 0,
+          width: '100vw',
+          height: '100vh',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem',
+          pointerEvents: 'none',
         }}
       >
-        {/* Header */}
-        {title && (
-          <div
-            className="flex items-center justify-between px-6 py-4 shrink-0"
-            style={{ borderBottom: '1px solid var(--border-light)' }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="w-1.5 h-6 rounded-full"
-                style={{ background: 'var(--grad-brand)' }}
-              />
-              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{title}</h2>
-            </div>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors hover:bg-slate-100"
-              style={{ color: 'var(--text-muted)' }}
+        <div
+          className={cn(
+            'relative w-full flex flex-col animate-fade-in',
+            SIZES[size]
+          )}
+          style={{
+            maxHeight: '90vh',
+            borderRadius: '1rem',
+            overflow: 'hidden',
+            pointerEvents: 'auto',
+            background: 'rgba(255, 255, 255, 0.97)',
+            border: '1px solid rgba(226, 232, 240, 0.9)',
+            boxShadow: '0 24px 70px rgba(15, 23, 42, 0.14), 0 4px 16px rgba(15, 23, 42, 0.06)',
+          }}
+        >
+          {title && (
+            <div
+              className="flex items-center justify-between px-5 py-3 shrink-0"
+              style={{
+                background: 'rgba(109, 59, 215, 0.08)',
+                borderBottom: '1px solid rgba(109, 59, 215, 0.15)',
+              }}
             >
-              <X size={16} />
-            </button>
-          </div>
-        )}
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-[3px] h-4 rounded-full"
+                  style={{ background: 'linear-gradient(180deg, #6d3bd7 0%, #0566d9 100%)' }}
+                />
+                <h2
+                  className="text-sm font-bold tracking-tight"
+                  style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}
+                >
+                  {title}
+                </h2>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-150"
+                style={{ color: 'var(--text-faint)' }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(109,59,215,0.06)'
+                  e.currentTarget.style.color = 'var(--brand-500)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.color = 'var(--text-faint)'
+                }}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6">{children}</div>
+          <div className="flex-1 overflow-y-auto p-5">{children}</div>
+        </div>
       </div>
-    </div>
+    </>,
+    document.body
   )
 }

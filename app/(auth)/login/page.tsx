@@ -9,9 +9,9 @@ import { Button } from '@/components/ui/Button'
 import { LogIn, Zap, Shield, TrendingUp, Target } from 'lucide-react'
 
 const FEATURES = [
-  { icon: TrendingUp, label: 'Seguí tus ingresos y gastos', color: '#10B981' },
-  { icon: Target,     label: 'Alcanzá tus objetivos de ahorro', color: '#F59E0B' },
-  { icon: Shield,     label: 'Datos seguros y privados', color: '#6366F1' },
+  { icon: TrendingUp, label: 'Seguí tus ingresos y gastos', color: '#4edea3' },
+  { icon: Target,     label: 'Alcanzá tus objetivos de ahorro', color: '#ffb869' },
+  { icon: Shield,     label: 'Datos seguros y privados', color: '#d0bcff' },
 ]
 
 export default function LoginPage() {
@@ -44,7 +44,7 @@ export default function LoginPage() {
       {/* Panel izquierdo — ilustración / marca (solo desktop) */}
       <div
         className="hidden lg:flex flex-col justify-between w-2/5 p-12"
-        style={{ background: 'var(--grad-brand)', position: 'relative', overflow: 'hidden' }}
+        style={{ background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)', position: 'relative', overflow: 'hidden' }}
       >
         {/* Orb decorativo */}
         <div
@@ -98,7 +98,7 @@ export default function LoginPage() {
           <div className="flex items-center gap-3 mb-8 lg:hidden">
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: 'var(--grad-brand)', boxShadow: 'var(--shadow-brand)' }}
+              style={{ background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)', boxShadow: 'var(--shadow-brand)' }}
             >
               <Zap size={18} className="text-white" fill="white" />
             </div>

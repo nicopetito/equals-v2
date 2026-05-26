@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useMemo } from 'react'
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
@@ -76,7 +76,7 @@ export function NetWorthSparkline({ transactions, currency, loading }: Props) {
   }
 
   const positive      = current >= 0
-  const accentColor   = positive ? '#10B981' : '#F43F5E'
+  const accentColor   = positive ? '#34d399' : '#f87171'
   const textColor     = positive ? 'var(--income-600)' : 'var(--expense-600)'
   const displayCur    = currency === 'all' ? 'ARS' : currency
 
@@ -141,3 +141,6 @@ export function NetWorthSparkline({ transactions, currency, loading }: Props) {
     </div>
   )
 }
+
+
+

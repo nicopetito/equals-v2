@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { safeNumber } from '@/utils/format'
 import type { Wallet, WalletWithBalance } from '@/types'
 
 function getSupabase() {
@@ -37,7 +38,14 @@ export const walletsService = {
       .eq('user_id', user_id)
 
     if (error) throw error
-    return data ?? []
+    // Supabase returns NUMERIC columns as strings — parse to numbers to prevent NaN
+    return (data ?? []).map(w => ({
+      ...w,
+      initial_balance:   safeNumber(w.initial_balance),
+      transaction_total: safeNumber(w.transaction_total),
+      current_balance:   safeNumber(w.current_balance),
+      transaction_count: safeNumber(w.transaction_count),
+    }))
   },
 
   async create(wallet: Omit<Wallet, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<Wallet> {

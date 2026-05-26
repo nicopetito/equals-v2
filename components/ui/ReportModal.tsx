@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useRef } from 'react'
 import { X, Printer, TrendingUp, TrendingDown, Wallet } from 'lucide-react'
@@ -21,16 +21,27 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
 
   if (!open) return null
 
-  const income   = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-  const expenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+  const currencies = currency !== 'all'
+    ? [currency]
+    : [...new Set(transactions.map(t => t.currency))].filter(Boolean)
+
+  const statsByCurrency = currencies.map(cur => {
+    const txs = currency !== 'all' ? transactions : transactions.filter(t => t.currency === cur)
+    const inc = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+    const exp = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+    return { currency: cur, income: inc, expenses: exp, balance: inc - exp }
+  })
+
+  const income   = statsByCurrency.reduce((s, st) => s + st.income, 0)
+  const expenses = statsByCurrency.reduce((s, st) => s + st.expenses, 0)
   const balance  = income - expenses
   const savingRate = income > 0 ? Math.round(((income - expenses) / income) * 100) : 0
 
-  // Top 5 categorías de gastos
-  const catMap = new Map<string, { amount: number; color: string }>()
+  // Top 5 categorÃ­as de gastos
+  const catMap = new Map<string, { amount: number; color: string; currency: string }>()
   transactions.filter(t => t.type === 'expense').forEach(t => {
-    const name = t.category_name ?? 'Sin categoría'
-    const entry = catMap.get(name) ?? { amount: 0, color: t.category_color ?? '#6366F1' }
+    const name = t.category_name ?? 'Sin categorÃ­a'
+    const entry = catMap.get(name) ?? { amount: 0, color: t.category_color ?? '#6d3bd7', currency: t.currency }
     entry.amount += t.amount
     catMap.set(name, entry)
   })
@@ -53,7 +64,7 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
     win.document.write(`
       <html>
         <head>
-          <title>Informe financiero — ${period}</title>
+          <title>Informe financiero â€” ${period}</title>
           <meta charset="utf-8"/>
           <style>
             * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -85,21 +96,24 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
         </head>
         <body>
           <h1>Informe Financiero</h1>
-          <div class="sub">Período: ${period} · Moneda: ${currency !== 'all' ? currency : 'Todas'} · Generado: ${today}</div>
+          <div class="sub">PerÃ­odo: ${period} Â· Moneda: ${currency !== 'all' ? currency : 'Todas'} Â· Generado: ${today}</div>
 
-          <div class="stats">
-            <div class="stat stat-income"><div class="stat-val green">${formatCurrency(income, currency === 'all' ? 'ARS' : currency)}</div><div class="stat-lbl">Ingresos</div></div>
-            <div class="stat stat-expense"><div class="stat-val red">${formatCurrency(expenses, currency === 'all' ? 'ARS' : currency)}</div><div class="stat-lbl">Gastos</div></div>
-            <div class="stat stat-balance"><div class="stat-val ${balance >= 0 ? 'green' : 'red'}">${formatCurrency(balance, currency === 'all' ? 'ARS' : currency)}</div><div class="stat-lbl">Balance</div></div>
-          </div>
+          ${statsByCurrency.map(stats => `
+            ${currencies.length > 1 ? `<div style="font-size:11px;font-weight:700;color:#64748B;margin:12px 0 4px;">${stats.currency}</div>` : ''}
+            <div class="stats">
+              <div class="stat stat-income"><div class="stat-val green">${formatCurrency(stats.income, stats.currency)}</div><div class="stat-lbl">Ingresos</div></div>
+              <div class="stat stat-expense"><div class="stat-val red">${formatCurrency(stats.expenses, stats.currency)}</div><div class="stat-lbl">Gastos</div></div>
+              <div class="stat stat-balance"><div class="stat-val ${stats.balance >= 0 ? 'green' : 'red'}">${formatCurrency(stats.balance, stats.currency)}</div><div class="stat-lbl">Balance</div></div>
+            </div>
+          `).join('')}
 
           <div class="saving">
-            <span style="font-weight:700;">Tasa de ahorro del período</span>
+            <span style="font-weight:700;">Tasa de ahorro del perÃ­odo</span>
             <span style="font-weight:900;color:${savingRate >= 20 ? '#059669' : '#D97706'};font-size:16px;">${savingRate}%</span>
           </div>
 
           ${topCats.length > 0 ? `
-          <h2>Top categorías de gastos</h2>
+          <h2>Top categorÃ­as de gastos</h2>
           <div class="cats">
             ${topCats.map(([name, data]) => {
               const pct = totalExp > 0 ? (data.amount / totalExp) * 100 : 0
@@ -108,29 +122,29 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
                 <div class="cat-dot" style="background:${data.color}"></div>
                 <div class="cat-name">${name}</div>
                 <div class="cat-bar-bg"><div class="cat-bar" style="width:${pct.toFixed(0)}%;background:${data.color}"></div></div>
-                <div class="cat-amt">${formatCurrency(data.amount, 'ARS')}</div>
+                <div class="cat-amt">${formatCurrency(data.amount, data.currency)}</div>
               </div>`
             }).join('')}
           </div>
           ` : ''}
 
-          <h2>Últimas ${recentTx.length} transacciones</h2>
+          <h2>Ãšltimas ${recentTx.length} transacciones</h2>
           <table class="tx-table">
-            <thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th style="text-align:right">Monto</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>DescripciÃ³n</th><th>CategorÃ­a</th><th style="text-align:right">Monto</th></tr></thead>
             <tbody>
               ${recentTx.map(tx => `
               <tr>
                 <td>${tx.date.substring(0, 10)}</td>
                 <td>${tx.description}</td>
-                <td>${tx.category_name ?? '—'}</td>
+                <td>${tx.category_name ?? 'â€”'}</td>
                 <td style="text-align:right;color:${tx.type === 'income' ? '#059669' : '#E11D48'};font-weight:700;">
-                  ${tx.type === 'income' ? '+' : '−'}${formatCurrency(tx.amount, tx.currency)}
+                  ${tx.type === 'income' ? '+' : 'âˆ’'}${formatCurrency(tx.amount, tx.currency)}
                 </td>
               </tr>`).join('')}
             </tbody>
           </table>
 
-          <div class="footer">Generado por Equals · finanzas personales · ${today}</div>
+          <div class="footer">Generado por Equals Â· finanzas personales Â· ${today}</div>
         </body>
       </html>
     `)
@@ -154,13 +168,13 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
         >
           <div>
             <h2 className="font-extrabold text-base" style={{ color: 'var(--text-primary)' }}>
-              Informe del período
+              Informe del perÃ­odo
             </h2>
             <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{period}</p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors hover:bg-slate-100"
+            className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors hover:bg-white/8"
             style={{ color: 'var(--text-muted)' }}
           >
             <X size={16} />
@@ -170,17 +184,26 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
         {/* Vista previa del resumen */}
         <div className="p-6 space-y-4">
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: 'Ingresos',  value: income,   color: 'var(--income-600)',  bg: 'var(--income-50)',  icon: TrendingUp },
-              { label: 'Gastos',    value: expenses, color: 'var(--expense-600)', bg: 'var(--expense-50)', icon: TrendingDown },
-              { label: 'Balance',   value: balance,  color: balance >= 0 ? 'var(--income-600)' : 'var(--expense-600)', bg: 'var(--brand-50)', icon: Wallet },
-            ].map(s => (
-              <div key={s.label} className="rounded-2xl p-3 text-center" style={{ background: s.bg }}>
-                <p className="text-base font-extrabold tabular-nums" style={{ color: s.color }}>
-                  {formatCurrency(s.value, currency === 'all' ? 'ARS' : currency)}
-                </p>
-                <p className="text-xs mt-0.5 font-semibold" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+          <div className="space-y-2">
+            {statsByCurrency.map(stats => (
+              <div key={stats.currency}>
+                {currencies.length > 1 && (
+                  <p className="text-[10px] font-bold mb-1" style={{ color: 'var(--text-faint)' }}>{stats.currency}</p>
+                )}
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: 'Ingresos', value: stats.income,   color: 'var(--income-600)',  bg: 'var(--income-50)'  },
+                    { label: 'Gastos',   value: stats.expenses, color: 'var(--expense-600)', bg: 'var(--expense-50)' },
+                    { label: 'Balance',  value: stats.balance,  color: stats.balance >= 0 ? 'var(--income-600)' : 'var(--expense-600)', bg: 'var(--brand-50)' },
+                  ].map(s => (
+                    <div key={s.label} className="rounded-2xl p-3 text-center" style={{ background: s.bg }}>
+                      <p className="text-base font-extrabold tabular-nums" style={{ color: s.color }}>
+                        {formatCurrency(s.value, stats.currency)}
+                      </p>
+                      <p className="text-xs mt-0.5 font-semibold" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
@@ -198,10 +221,10 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
             </span>
           </div>
 
-          {/* Top categorías */}
+          {/* Top categorÃ­as */}
           {topCats.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>Top categorías de gastos</p>
+              <p className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>Top categorÃ­as de gastos</p>
               {topCats.slice(0, 3).map(([name, data]) => {
                 const pct = totalExp > 0 ? (data.amount / totalExp) * 100 : 0
                 return (
@@ -221,16 +244,16 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
           )}
 
           <p className="text-xs text-center" style={{ color: 'var(--text-faint)' }}>
-            El informe incluye {transactions.length} transacciones · generado {today}
+            El informe incluye {transactions.length} transacciones Â· generado {today}
           </p>
         </div>
 
-        {/* Botón imprimir */}
+        {/* BotÃ³n imprimir */}
         <div className="px-6 pb-6">
           <button
             onClick={handlePrint}
             className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white font-extrabold transition-all hover:opacity-90 active:scale-[0.98]"
-            style={{ background: 'var(--grad-brand)', boxShadow: 'var(--shadow-brand)' }}
+            style={{ background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)', boxShadow: 'var(--shadow-brand)' }}
           >
             <Printer size={18} /> Exportar / Imprimir PDF
           </button>
@@ -239,3 +262,5 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
     </div>
   )
 }
+
+

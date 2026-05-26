@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useMemo } from 'react'
 import { useCountUp } from '@/hooks/useCountUp'
@@ -13,14 +13,14 @@ interface HealthScoreProps {
 }
 
 function getLabel(score: number): { text: string; color: string; bg: string; icon: typeof ShieldCheck } {
-  if (score >= 80) return { text: 'Excelente',  color: '#10B981', bg: '#ECFDF5', icon: Trophy }
-  if (score >= 60) return { text: 'Muy bueno',  color: '#6366F1', bg: '#EEF2FF', icon: ShieldCheck }
-  if (score >= 40) return { text: 'En progreso',color: '#F59E0B', bg: '#FFFBEB', icon: TrendingUp }
-  return             { text: 'Por mejorar', color: '#F43F5E', bg: '#FFF1F2', icon: AlertCircle }
+  if (score >= 80) return { text: 'Excelente',  color: '#16a34a', bg: 'rgba(78,222,163,0.10)',  icon: Trophy }
+  if (score >= 60) return { text: 'Muy bueno',  color: '#d0bcff', bg: 'rgba(208,188,255,0.10)', icon: ShieldCheck }
+  if (score >= 40) return { text: 'En progreso',color: '#ffb869', bg: 'rgba(255,184,105,0.10)', icon: TrendingUp }
+  return             { text: 'Por mejorar', color: '#e11d48', bg: 'rgba(255,180,171,0.10)', icon: AlertCircle }
 }
 
 function scoreArc(score: number) {
-  // SVG arc: 0–100 mapped to a semicircle (180°)
+  // SVG arc: 0â€“100 mapped to a semicircle (180Â°)
   const r = 54
   const cx = 64
   const cy = 64
@@ -47,10 +47,10 @@ export function HealthScore({ income, expenses, transactionCount, categoryCount,
     const savingRate = income > 0 ? ((income - expenses) / income) * 100 : 0
     const savingPts = Math.max(0, Math.min(30, savingRate * 1.5))
 
-    // 3. Actividad (20 pts): más de 10 transacciones
+    // 3. Actividad (20 pts): mÃ¡s de 10 transacciones
     const activityPts = Math.min(20, transactionCount * 2)
 
-    // 4. Diversidad de categorías (10 pts)
+    // 4. Diversidad de categorÃ­as (10 pts)
     const diversityPts = Math.min(10, categoryCount * 2)
 
     return Math.round(balancePts + savingPts + activityPts + diversityPts)
@@ -66,15 +66,14 @@ export function HealthScore({ income, expenses, transactionCount, categoryCount,
     return (
       <div
         className="rounded-2xl p-5 animate-shimmer"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', height: 160 }}
+        style={{ height: 160, border: '1px solid var(--border)' }}
       />
     )
   }
 
   return (
     <div
-      className="rounded-2xl p-5 flex flex-col"
-      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
+      className="glass-card rounded-2xl p-5 flex flex-col"
     >
       {/* Cabecera */}
       <div className="flex items-center justify-between mb-4">
@@ -118,7 +117,7 @@ export function HealthScore({ income, expenses, transactionCount, categoryCount,
               />
             )}
           </svg>
-          {/* Número central */}
+          {/* NÃºmero central */}
           <div className="absolute inset-x-0 bottom-0 flex flex-col items-center">
             <span className="text-3xl font-extrabold tabular-nums leading-none" style={{ color: label.color }}>
               {animatedScore}
@@ -141,7 +140,7 @@ export function HealthScore({ income, expenses, transactionCount, categoryCount,
                 className="h-full rounded-full transition-all duration-1000"
                 style={{
                   width: `${Math.min(savingRate, 100)}%`,
-                  background: savingRate >= 20 ? 'var(--grad-income)' : 'var(--grad-expense)',
+                  background: savingRate >= 20 ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' : 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
                 }}
               />
             </div>
@@ -158,13 +157,20 @@ export function HealthScore({ income, expenses, transactionCount, categoryCount,
                 className="h-full rounded-full transition-all duration-1000"
                 style={{
                   width: `${Math.min(transactionCount * 10, 100)}%`,
-                  background: 'var(--grad-brand)',
+                  background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)',
                 }}
               />
             </div>
           </div>
         </div>
       </div>
+      <p className="text-[11px] mt-3 leading-relaxed"
+        style={{ color: 'var(--text-faint)', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+        Este puntaje combina balance positivo (40%), tasa de ahorro (30%), actividad (20%) y diversidad de categorías (10%).
+      </p>
     </div>
   )
 }
+
+
+

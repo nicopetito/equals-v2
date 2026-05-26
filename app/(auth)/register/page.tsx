@@ -68,7 +68,7 @@ export default function RegisterPage() {
         <div className="flex flex-col items-center mb-8">
           <div
             className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 shadow-lg"
-            style={{ background: 'var(--grad-brand)', boxShadow: 'var(--shadow-brand)' }}
+            style={{ background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)', boxShadow: 'var(--shadow-brand)' }}
           >
             <Zap size={24} className="text-white" fill="white" />
           </div>

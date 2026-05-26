@@ -11,9 +11,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, label, error, options, id, ...props }, ref) => {
     const selectId = id ?? label?.toLowerCase().replace(/\s+/g, '-')
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1">
         {label && (
-          <label htmlFor={selectId} className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <label htmlFor={selectId} className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
             {label}
           </label>
         )}
@@ -21,14 +21,17 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           ref={ref}
           id={selectId}
           className={cn(
-            'w-full rounded-xl bg-white border text-sm px-4 py-3 transition-all duration-200',
-            'focus:outline-none focus:ring-2 focus:border-indigo-400 appearance-none cursor-pointer',
-            error
-              ? 'border-rose-300 focus:ring-rose-200 focus:border-rose-400'
-              : 'border-[var(--border)] focus:ring-indigo-100',
+            'w-full rounded-xl text-sm px-3.5 py-2.5 transition-all duration-150',
+            'focus:outline-none focus:ring-2 appearance-none cursor-pointer',
+            error ? 'focus:ring-red-200' : 'focus:ring-violet-200 focus:border-violet-400',
             className
           )}
-          style={{ color: 'var(--text-primary)', boxShadow: 'var(--shadow-xs)' }}
+          style={{
+            background: 'var(--bg-card)',
+            border: `1px solid ${error ? '#FCA5A5' : 'var(--border)'}`,
+            color: 'var(--text-primary)',
+            boxShadow: 'var(--shadow-xs)',
+          }}
           {...props}
         >
           {options.map(opt => (

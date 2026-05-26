@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -22,11 +22,11 @@ interface Step {
   checkCondition: boolean
 }
 
-// ── Confetti CSS puro ─────────────────────────────────────────────────────────
+// â”€â”€ Confetti CSS puro â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Confetti() {
   const pieces = Array.from({ length: 32 }, (_, i) => i)
-  const colors = ['#6366F1','#10B981','#F59E0B','#F43F5E','#0EA5E9','#8B5CF6','#EC4899']
+  const colors = ['#a078ff','#059669','#ffb869','#DC2626','#adc6ff','#d0bcff','#c4b5fd']
 
   return (
     <div className="fixed inset-0 pointer-events-none z-[60] overflow-hidden">
@@ -63,7 +63,7 @@ function Confetti() {
   )
 }
 
-// ── Componente principal ──────────────────────────────────────────────────────
+// â”€â”€ Componente principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function Onboarding() {
   const router   = useRouter()
@@ -77,7 +77,7 @@ export function Onboarding() {
   const [confetti, setConfetti] = useState(false)
   const [done, setDone]         = useState(false)
 
-  // Mostrar onboarding si el usuario no lo completó
+  // Mostrar onboarding si el usuario no lo completÃ³
   useEffect(() => {
     if (!user?.id) return
     const completed = localStorage.getItem(DONE_KEY(user.id))
@@ -88,34 +88,34 @@ export function Onboarding() {
     {
       id: 'wallet',
       icon: <CreditCard size={28} />,
-      title: 'Creá tu primera billetera',
-      description: 'Registrá tu efectivo, cuenta bancaria o billetera virtual para empezar a llevar el control.',
+      title: 'CreÃ¡ tu primera billetera',
+      description: 'RegistrÃ¡ tu efectivo, cuenta bancaria o billetera virtual para empezar a llevar el control.',
       cta: 'Ir a Billeteras',
       href: '/wallets',
       color: '#F59E0B',
-      bg: '#FFFBEB',
+      bg: 'rgba(255,184,105,0.10)',
       checkCondition: wallets.length > 0,
     },
     {
       id: 'transaction',
       icon: <TrendingDown size={28} />,
-      title: 'Registrá tu primer movimiento',
-      description: 'Anotá un gasto o ingreso. Podés categorizar y asignarlo a una billetera.',
+      title: 'RegistrÃ¡ tu primer movimiento',
+      description: 'AnotÃ¡ un gasto o ingreso. PodÃ©s categorizar y asignarlo a una billetera.',
       cta: 'Ir a Transacciones',
       href: '/transactions',
-      color: '#10B981',
-      bg: '#ECFDF5',
+      color: '#059669',
+      bg: 'rgba(78,222,163,0.10)',
       checkCondition: transactions.length > 0,
     },
     {
       id: 'goal',
       icon: <Target size={28} />,
-      title: 'Creá tu primer objetivo',
-      description: '¿Ahorrás para un viaje, un auto o tu fondo de emergencia? Definí tu meta y seguí el progreso.',
+      title: 'CreÃ¡ tu primer objetivo',
+      description: 'Â¿AhorrÃ¡s para un viaje, un auto o tu fondo de emergencia? DefinÃ­ tu meta y seguÃ­ el progreso.',
       cta: 'Ir a Objetivos',
       href: '/goals',
-      color: '#F43F5E',
-      bg: '#FFF1F2',
+      color: '#DC2626',
+      bg: 'rgba(255,180,171,0.10)',
       checkCondition: goals.length > 0,
     },
   ]
@@ -163,15 +163,15 @@ export function Onboarding() {
               className="h-full transition-all duration-500"
               style={{
                 width: `${(progress / steps.length) * 100}%`,
-                background: 'var(--grad-brand)',
+                background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)',
               }}
             />
           </div>
 
-          {/* Botón cerrar */}
+          {/* BotÃ³n cerrar */}
           <button
             onClick={dismiss}
-            className="absolute top-4 right-4 w-8 h-8 rounded-xl flex items-center justify-center transition-colors hover:bg-slate-100 z-10"
+            className="absolute top-4 right-4 w-8 h-8 rounded-xl flex items-center justify-center transition-colors hover:bg-white/8 z-10"
             style={{ color: 'var(--text-muted)' }}
           >
             <X size={16} />
@@ -182,12 +182,12 @@ export function Onboarding() {
             {/* Encabezado de bienvenida (solo primer paso) */}
             {stepIdx === 0 && (
               <div className="mb-6 text-center">
-                <span className="text-4xl block mb-2">👋</span>
+                <span className="text-4xl block mb-2">ðŸ‘‹</span>
                 <h2 className="text-2xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
-                  ¡Bienvenido a Equals!
+                  Â¡Bienvenido a Equals!
                 </h2>
                 <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-                  Completá estos 3 pasos para empezar a controlar tus finanzas
+                  CompletÃ¡ estos 3 pasos para empezar a controlar tus finanzas
                 </p>
               </div>
             )}
@@ -203,9 +203,9 @@ export function Onboarding() {
                     height: i === stepIdx ? 28 : 22,
                     borderRadius: '50%',
                     background: s.checkCondition
-                      ? 'var(--grad-income)'
+                      ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
                       : i === stepIdx
-                        ? 'var(--grad-brand)'
+                        ? 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)'
                         : 'var(--bg-subtle)',
                     border: i === stepIdx && !s.checkCondition ? '2px solid var(--brand-500)' : 'none',
                   }}
@@ -245,7 +245,7 @@ export function Onboarding() {
                   className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold px-3 py-1.5 rounded-full"
                   style={{ background: 'var(--income-50)', color: 'var(--income-600)' }}
                 >
-                  <Check size={14} strokeWidth={3} /> ¡Completado!
+                  <Check size={14} strokeWidth={3} /> Â¡Completado!
                 </div>
               )}
             </div>
@@ -269,11 +269,11 @@ export function Onboarding() {
                 className="flex-1 py-3.5 rounded-2xl font-extrabold text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-[0.98]"
                 style={
                   allDone
-                    ? { background: 'var(--grad-income)', color: 'white', boxShadow: 'var(--shadow-income)' }
+                    ? { background: 'linear-gradient(135deg, #059669 0%, #047857 100%)', color: 'white', boxShadow: 'var(--shadow-income)' }
                     : { background: 'var(--bg-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }
                 }
               >
-                {allDone ? '¡Listo para empezar! 🎉' : currentStep.checkCondition ? 'Continuar' : 'Omitir'}
+                {allDone ? 'Â¡Listo para empezar! ðŸŽ‰' : currentStep.checkCondition ? 'Continuar' : 'Omitir'}
                 {!allDone && <ChevronRight size={15} />}
               </button>
             </div>
@@ -288,3 +288,5 @@ export function Onboarding() {
     </>
   )
 }
+
+

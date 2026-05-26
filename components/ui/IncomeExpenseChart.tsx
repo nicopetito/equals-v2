@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useMemo } from 'react'
 import {
@@ -151,12 +151,12 @@ export function IncomeExpenseChart({ transactions, start, end, currency, loading
           <AreaChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="gradIncome" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#10B981" stopOpacity={0.18} />
-                <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                <stop offset="5%"  stopColor="#16a34a" stopOpacity={0.18} />
+                <stop offset="95%" stopColor="#16a34a" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="gradExpense" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#F43F5E" stopOpacity={0.18} />
-                <stop offset="95%" stopColor="#F43F5E" stopOpacity={0} />
+                <stop offset="5%"  stopColor="#e11d48" stopOpacity={0.18} />
+                <stop offset="95%" stopColor="#e11d48" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -178,20 +178,20 @@ export function IncomeExpenseChart({ transactions, start, end, currency, loading
             <Area
               type="monotone"
               dataKey="income"
-              stroke="#10B981"
+              stroke="#16a34a"
               strokeWidth={2.5}
               fill="url(#gradIncome)"
               dot={false}
-              activeDot={{ r: 5, fill: '#10B981', strokeWidth: 2, stroke: 'white' }}
+              activeDot={{ r: 5, fill: '#16a34a', strokeWidth: 2, stroke: 'white' }}
             />
             <Area
               type="monotone"
               dataKey="expenses"
-              stroke="#F43F5E"
+              stroke="#e11d48"
               strokeWidth={2.5}
               fill="url(#gradExpense)"
               dot={false}
-              activeDot={{ r: 5, fill: '#F43F5E', strokeWidth: 2, stroke: 'white' }}
+              activeDot={{ r: 5, fill: '#e11d48', strokeWidth: 2, stroke: 'white' }}
             />
           </AreaChart>
         </ResponsiveContainer>
@@ -199,3 +199,6 @@ export function IncomeExpenseChart({ transactions, start, end, currency, loading
     </div>
   )
 }
+
+
+

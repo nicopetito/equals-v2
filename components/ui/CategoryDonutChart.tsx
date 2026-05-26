@@ -1,9 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ComponentType } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Sector } from 'recharts'
 import type { TransactionWithDetails } from '@/types'
-import { formatCurrency } from '@/utils/format'
+import { formatCurrency, safeNumber } from '@/utils/format'
 
 interface Props {
   transactions: TransactionWithDetails[]
@@ -11,11 +11,11 @@ interface Props {
   loading?: boolean
 }
 
-const FALLBACK_COLORS = ['#6366F1','#10B981','#F59E0B','#F43F5E','#0EA5E9','#8B5CF6','#EC4899','#14B8A6']
+const FALLBACK_COLORS = ['#a078ff','#4edea3','#ffb869','#ffb4ab','#adc6ff','#d0bcff','#c4b5fd','#6d3bd7']
 
 type Mode = 'expense' | 'income'
 
-function buildSlices(transactions: TransactionWithDetails[], mode: Mode) {
+function buildSlices(transactions: TransactionWithDetails[], mode: Mode, currency: string) {
   const map = new Map<string, { amount: number; color: string }>()
   transactions
     .filter(t => t.type === mode)
@@ -23,7 +23,7 @@ function buildSlices(transactions: TransactionWithDetails[], mode: Mode) {
       const name  = t.category_name ?? 'Sin categoría'
       const color = t.category_color ?? '#94A3B8'
       const entry = map.get(name) ?? { amount: 0, color }
-      entry.amount += t.amount
+      entry.amount += safeNumber(t.amount)
       map.set(name, entry)
     })
 
@@ -37,6 +37,7 @@ function buildSlices(transactions: TransactionWithDetails[], mode: Mode) {
     value: data.amount,
     color: data.color !== '#94A3B8' ? data.color : FALLBACK_COLORS[i % FALLBACK_COLORS.length],
     pct: total > 0 ? (data.amount / total) * 100 : 0,
+    currency,
   }))
 
   if (rest.length > 0) {
@@ -46,14 +47,20 @@ function buildSlices(transactions: TransactionWithDetails[], mode: Mode) {
       value: otherAmt,
       color: '#CBD5E1',
       pct: total > 0 ? (otherAmt / total) * 100 : 0,
+      currency,
     })
   }
 
   return { slices, total }
 }
 
-function ActiveShape(props: any) {
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props
+interface ActiveShapeProps {
+  cx?: number; cy?: number; innerRadius?: number; outerRadius?: number
+  startAngle?: number; endAngle?: number; fill?: string
+}
+
+function ActiveShape(props: ActiveShapeProps) {
+  const { cx = 0, cy = 0, innerRadius = 0, outerRadius = 0, startAngle = 0, endAngle = 0, fill = 'transparent' } = props
   return (
     <Sector
       cx={cx} cy={cy}
@@ -69,7 +76,7 @@ function ActiveShape(props: any) {
 
 interface TooltipProps {
   active?: boolean
-  payload?: { name: string; value: number; payload: { color: string; pct: number } }[]
+  payload?: { name: string; value: number; payload: { color: string; pct: number; currency: string } }[]
 }
 
 function CustomTooltip({ active, payload }: TooltipProps) {
@@ -85,7 +92,7 @@ function CustomTooltip({ active, payload }: TooltipProps) {
         <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{d.name}</span>
       </div>
       <p className="tabular-nums font-extrabold text-base" style={{ color: d.payload.color }}>
-        {formatCurrency(d.value, 'ARS')}
+        {formatCurrency(d.value, d.payload.currency)}
       </p>
       <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
         {d.payload.pct.toFixed(1)}% del total
@@ -94,11 +101,13 @@ function CustomTooltip({ active, payload }: TooltipProps) {
   )
 }
 
+const TypedPie = Pie as ComponentType<{ [key: string]: unknown } & { activeIndex?: number }>
+
 export function CategoryDonutChart({ transactions, currency, loading }: Props) {
   const [activeIdx, setActiveIdx] = useState<number | undefined>(undefined)
   const [mode, setMode]           = useState<Mode>('expense')
 
-  const { slices, total } = useMemo(() => buildSlices(transactions, mode), [transactions, mode])
+  const { slices, total } = useMemo(() => buildSlices(transactions, mode, currency), [transactions, mode, currency])
 
   if (loading) {
     return (
@@ -180,14 +189,14 @@ export function CategoryDonutChart({ transactions, currency, loading }: Props) {
           <div className="relative shrink-0" style={{ width: 180, height: 180 }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie
+                <TypedPie
                   data={slices}
                   cx="50%" cy="50%"
                   innerRadius={58} outerRadius={80}
                   dataKey="value"
                   activeIndex={activeIdx}
                   activeShape={<ActiveShape />}
-                  onMouseEnter={(_, i) => setActiveIdx(i)}
+                  onMouseEnter={(_: unknown, i: number) => setActiveIdx(i)}
                   onMouseLeave={() => setActiveIdx(undefined)}
                   strokeWidth={2}
                   stroke="var(--bg-card)"
@@ -195,7 +204,7 @@ export function CategoryDonutChart({ transactions, currency, loading }: Props) {
                   {slices.map((s, i) => (
                     <Cell key={i} fill={s.color} />
                   ))}
-                </Pie>
+                </TypedPie>
                 <Tooltip content={<CustomTooltip />} />
               </PieChart>
             </ResponsiveContainer>

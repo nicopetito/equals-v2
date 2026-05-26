@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import { CheckCircle2, XCircle, Info, AlertTriangle, X } from 'lucide-react'
@@ -10,22 +10,22 @@ const STYLES: Record<Toast['type'], {
   success: {
     bg: 'var(--income-50)',   border: 'var(--income-100)',
     icon: CheckCircle2, iconColor: 'var(--income-500)',
-    bar: 'var(--grad-income)',
+    bar: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
   },
   error: {
     bg: 'var(--expense-50)',  border: 'var(--expense-100)',
     icon: XCircle,      iconColor: 'var(--expense-500)',
-    bar: 'var(--grad-expense)',
+    bar: 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
   },
   info: {
     bg: 'var(--sky-50)',      border: 'var(--sky-100)',
     icon: Info,         iconColor: 'var(--sky-500)',
-    bar: 'var(--grad-sky)',
+    bar: 'linear-gradient(135deg, #adc6ff 0%, #0566d9 100%)',
   },
   warning: {
     bg: 'var(--goal-50)',     border: 'var(--goal-100)',
     icon: AlertTriangle, iconColor: 'var(--goal-500)',
-    bar: 'var(--grad-goal)',
+    bar: 'linear-gradient(135deg, #ffb869 0%, #ca801e 100%)',
   },
 }
 
@@ -91,3 +91,5 @@ export function ToastContainer() {
     </div>
   )
 }
+
+
