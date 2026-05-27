@@ -91,57 +91,18 @@ export const refundService = {
     return parseRefund(data as Record<string, unknown>)
   },
 
-  async credit(params: {
+  async creditAtomic(params: {
     refundId: string
-    amount: number
-    currency: string
-    walletId: string
-    note: string | null
-    originalDescription: string
   }): Promise<void> {
     const supabase = getSupabase()
-    const user_id = await getUserId()
+    const user_id  = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
 
-    const now = new Date().toISOString()
-    const today = now.split('T')[0]
+    const { error } = await supabase.rpc('rpc_refund_credit', {
+      p_refund_id: params.refundId,
+    })
 
-    // Paso 1: crear income transaction — afecta balance via vista SQL wallet_current_balance
-    const { data: txData, error: txError } = await supabase
-      .from('transactions')
-      .insert([{
-        user_id,
-        description: `Reintegro: ${params.originalDescription}`,
-        amount: params.amount,
-        type: 'income',
-        currency: params.currency,
-        wallet_id: params.walletId,
-        date: today,
-        notes: params.note ?? null,
-      }])
-      .select()
-      .single()
-
-    if (txError) throw new Error(`No se pudo registrar la acreditación: ${txError.message}`)
-
-    // Paso 2: actualizar estado del reintegro
-    const { error: refundError } = await supabase
-      .from('refunds')
-      .update({
-        status: 'credited',
-        credited_at: now,
-        credited_transaction_id: txData.id,
-        updated_at: now,
-      })
-      .eq('id', params.refundId)
-      .eq('user_id', user_id)
-
-    if (refundError) {
-      console.error('[refund.credit] status update failed after income tx. tx_id:', txData.id, refundError.message)
-      throw new Error(
-        `El reintegro se acreditó en la billetera pero no se pudo actualizar su estado: ${refundError.message}`
-      )
-    }
+    if (error) throw new Error(error.message)
   },
 
   async cancel(refundId: string): Promise<void> {
@@ -157,6 +118,23 @@ export const refundService = {
       .eq('status', 'pending')
 
     if (error) throw new Error(`No se pudo cancelar el reintegro: ${error.message}`)
+  },
+
+  async cancelByWallet(walletId: string): Promise<number> {
+    const supabase = getSupabase()
+    const user_id = await getUserId()
+    if (!user_id) return 0
+
+    const { data, error } = await supabase
+      .from('refunds')
+      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      .eq('destination_wallet_id', walletId)
+      .eq('user_id', user_id)
+      .eq('status', 'pending')
+      .select('id')
+
+    if (error) throw new Error(`No se pudieron cancelar los reintegros: ${error.message}`)
+    return (data ?? []).length
   },
 
   async cancelByTransaction(transactionId: string): Promise<{ cancelled: number; credited: number }> {

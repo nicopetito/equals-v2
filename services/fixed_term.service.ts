@@ -42,12 +42,7 @@ export const fixedTermService = {
     return (data ?? []).map(parseFixedTerm)
   },
 
-  /**
-   * Crea un plazo fijo y descuenta el capital de la billetera origen como expense.
-   * Paso 1: insertar fixed_term
-   * Paso 2: registrar expense transaction en wallet
-   */
-  async create(params: {
+  async createAtomic(params: {
     name: string
     principal_amount: number
     currency: string
@@ -59,37 +54,28 @@ export const fixedTermService = {
     estimated_total: number
     wallet_id: string
     note?: string
-  }): Promise<FixedTerm> {
+  }): Promise<{ fixedTermId: string; transactionId: string }> {
     const supabase = getSupabase()
-    const user_id = await getUserId()
+    const user_id  = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
 
-    const { data: ft, error: ftError } = await supabase
-      .from('fixed_terms')
-      .insert([{ ...params, user_id, status: 'active', auto_reinvest: false }])
-      .select()
-      .single()
+    const { data, error } = await supabase.rpc('rpc_fixed_term_create', {
+      p_wallet_id:          params.wallet_id,
+      p_name:               params.name,
+      p_principal_amount:   params.principal_amount,
+      p_currency:           params.currency,
+      p_tna:                params.tna,
+      p_term_days:          params.term_days,
+      p_start_date:         params.start_date,
+      p_maturity_date:      params.maturity_date,
+      p_estimated_interest: params.estimated_interest,
+      p_estimated_total:    params.estimated_total,
+      p_note:               params.note ?? null,
+    })
 
-    if (ftError) throw new Error(`No se pudo crear el plazo fijo: ${ftError.message}`)
-
-    const { error: txError } = await supabase
-      .from('transactions')
-      .insert([{
-        user_id,
-        description: `Plazo fijo: ${params.name}`,
-        amount: params.principal_amount,
-        type: 'expense',
-        currency: params.currency,
-        wallet_id: params.wallet_id,
-        date: params.start_date,
-      }])
-
-    if (txError) {
-      console.error('[fixedTerm.create] wallet tx failed after ft insert:', txError.message)
-      throw new Error(`El plazo fijo se creó pero no se pudo descontar de la billetera: ${txError.message}`)
-    }
-
-    return parseFixedTerm(ft as Record<string, unknown>)
+    if (error) throw new Error(error.message)
+    const result = data as { fixed_term_id: string; transaction_id: string }
+    return { fixedTermId: result.fixed_term_id, transactionId: result.transaction_id }
   },
 
   async update(id: string, data: Partial<FixedTerm>): Promise<FixedTerm> {
@@ -109,143 +95,62 @@ export const fixedTermService = {
     return parseFixedTerm(updated as Record<string, unknown>)
   },
 
-  /**
-   * Retira el dinero al vencimiento: registra income transaction y marca como withdrawn.
-   * Paso 1: income tx en billetera destino
-   * Paso 2: actualizar estado del plazo fijo
-   */
-  async withdraw(params: {
+  async withdrawAtomic(params: {
     fixedTermId: string
-    fixedTermName: string
     walletId: string
     amount: number
     currency: string
   }): Promise<void> {
     const supabase = getSupabase()
-    const user_id = await getUserId()
+    const user_id  = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
 
-    const { error: txError } = await supabase
-      .from('transactions')
-      .insert([{
-        user_id,
-        description: `Retiro plazo fijo: ${params.fixedTermName}`,
-        amount: params.amount,
-        type: 'income',
-        currency: params.currency,
-        wallet_id: params.walletId,
-        date: new Date().toISOString().split('T')[0],
-      }])
+    const { error } = await supabase.rpc('rpc_fixed_term_withdraw', {
+      p_fixed_term_id: params.fixedTermId,
+      p_wallet_id:     params.walletId,
+      p_amount:        params.amount,
+      p_currency:      params.currency,
+    })
 
-    if (txError) throw new Error(`No se pudo registrar el retiro: ${txError.message}`)
-
-    const { error: ftError } = await supabase
-      .from('fixed_terms')
-      .update({ status: 'withdrawn', updated_at: new Date().toISOString() })
-      .eq('id', params.fixedTermId)
-      .eq('user_id', user_id)
-
-    if (ftError) {
-      console.error('[fixedTerm.withdraw] status update failed after income tx:', ftError.message)
-      throw new Error(`El retiro se registró pero no se pudo actualizar el estado: ${ftError.message}`)
-    }
+    if (error) throw new Error(error.message)
   },
 
-  /**
-   * Reinvierte al vencimiento:
-   * Paso 1: income tx (retiro del plazo viejo)
-   * Paso 2: marcar plazo viejo como reinvested
-   * Paso 3: insertar nuevo plazo fijo
-   * Paso 4: expense tx (descuento del nuevo capital)
-   */
-  async reinvest(params: {
-    oldFixedTermId: string
-    oldFixedTermName: string
-    walletId: string
-    oldTotal: number
-    newPrincipal: number
-    currency: string
-    tna: number
-    termDays: number
-    startDate: string
-    maturityDate: string
+  async reinvestAtomic(params: {
+    oldFixedTermId:    string
+    walletId:          string
+    oldTotal:          number
+    newPrincipal:      number
+    currency:          string
+    tna:               number
+    termDays:          number
+    startDate:         string
+    maturityDate:      string
     estimatedInterest: number
-    estimatedTotal: number
-    note?: string
-  }): Promise<FixedTerm> {
+    estimatedTotal:    number
+    note?:             string
+  }): Promise<{ newFixedTermId: string }> {
     const supabase = getSupabase()
-    const user_id = await getUserId()
+    const user_id  = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
-    const today = new Date().toISOString().split('T')[0]
 
-    // Paso 1: income tx del plazo viejo
-    const { error: incomeTxError } = await supabase
-      .from('transactions')
-      .insert([{
-        user_id,
-        description: `Retiro para renovar: ${params.oldFixedTermName}`,
-        amount: params.oldTotal,
-        type: 'income',
-        currency: params.currency,
-        wallet_id: params.walletId,
-        date: today,
-      }])
+    const { data, error } = await supabase.rpc('rpc_fixed_term_reinvest', {
+      p_old_fixed_term_id:  params.oldFixedTermId,
+      p_wallet_id:          params.walletId,
+      p_old_total:          params.oldTotal,
+      p_new_principal:      params.newPrincipal,
+      p_currency:           params.currency,
+      p_tna:                params.tna,
+      p_term_days:          params.termDays,
+      p_start_date:         params.startDate,
+      p_maturity_date:      params.maturityDate,
+      p_estimated_interest: params.estimatedInterest,
+      p_estimated_total:    params.estimatedTotal,
+      p_note:               params.note ?? null,
+    })
 
-    if (incomeTxError) throw new Error(`No se pudo registrar el retiro del plazo anterior: ${incomeTxError.message}`)
-
-    // Paso 2: marcar viejo como reinvested
-    const { error: oldFtError } = await supabase
-      .from('fixed_terms')
-      .update({ status: 'reinvested', updated_at: new Date().toISOString() })
-      .eq('id', params.oldFixedTermId)
-      .eq('user_id', user_id)
-
-    if (oldFtError) {
-      console.error('[fixedTerm.reinvest] old status update failed:', oldFtError.message)
-    }
-
-    // Paso 3: insertar nuevo plazo fijo
-    const { data: newFt, error: newFtError } = await supabase
-      .from('fixed_terms')
-      .insert([{
-        user_id,
-        name: params.oldFixedTermName,
-        principal_amount: params.newPrincipal,
-        currency: params.currency,
-        tna: params.tna,
-        term_days: params.termDays,
-        start_date: params.startDate,
-        maturity_date: params.maturityDate,
-        estimated_interest: params.estimatedInterest,
-        estimated_total: params.estimatedTotal,
-        wallet_id: params.walletId,
-        status: 'active',
-        auto_reinvest: false,
-        note: params.note ?? null,
-      }])
-      .select()
-      .single()
-
-    if (newFtError) throw new Error(`No se pudo crear el nuevo plazo fijo: ${newFtError.message}`)
-
-    // Paso 4: expense tx del nuevo capital
-    const { error: expenseTxError } = await supabase
-      .from('transactions')
-      .insert([{
-        user_id,
-        description: `Renovación plazo fijo: ${params.oldFixedTermName}`,
-        amount: params.newPrincipal,
-        type: 'expense',
-        currency: params.currency,
-        wallet_id: params.walletId,
-        date: params.startDate,
-      }])
-
-    if (expenseTxError) {
-      console.error('[fixedTerm.reinvest] expense tx failed:', expenseTxError.message)
-      throw new Error(`El plazo fijo se renovó pero no se pudo descontar de la billetera: ${expenseTxError.message}`)
-    }
-
-    return parseFixedTerm(newFt as Record<string, unknown>)
+    if (error) throw new Error(error.message)
+    const result = data as { new_fixed_term_id: string }
+    return { newFixedTermId: result.new_fixed_term_id }
   },
+
 }

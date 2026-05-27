@@ -130,7 +130,7 @@ export function ConversionModal({
     setSaving(true)
     setFormError(null)
     try {
-      await exchangeService.createConversion({
+      await exchangeService.createConversionAtomic({
         fromWalletId,
         toWalletId,
         fromAmount:    numericAmount,

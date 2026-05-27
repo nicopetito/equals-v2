@@ -195,17 +195,15 @@ export default function GoalsPage() {
     setMovSaving(true); setMovError(null)
     try {
       if (type === 'deposit') {
-        await goalsService.deposit({
+        await goalsService.depositAtomic({
           goalId: goal.id, goalName: goal.name, walletId: movForm.walletId,
-          amount, currency, currentAmount: curAmount,
-          targetAmount: safeNumber(goal.target_amount),
-          note: movForm.note || undefined,
+          amount, currency, note: movForm.note || undefined,
         })
         addToast('Depósito realizado', 'success')
       } else {
-        await goalsService.withdraw({
+        await goalsService.withdrawAtomic({
           goalId: goal.id, goalName: goal.name, walletId: movForm.walletId,
-          amount, currency, currentAmount: curAmount, note: movForm.note || undefined,
+          amount, currency, note: movForm.note || undefined,
         })
         addToast('Extracción realizada', 'success')
       }

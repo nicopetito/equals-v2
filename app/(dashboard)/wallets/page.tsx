@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Pencil, Trash2, CreditCard, TrendingUp, Wifi, SlidersHorizontal } from 'lucide-react'
 import { useWallets } from '@/hooks/useWallets'
 import { walletsService } from '@/services/wallets.service'
+import { refundService } from '@/services/refund.service'
 import { useToast } from '@/components/providers/ToastProvider'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -153,6 +154,9 @@ export default function WalletsPage() {
   const [metas, setMetas]         = useState<Record<string, WalletMeta>>({})
   const [saving, setSaving]       = useState(false)
   const [deleting, setDeleting]   = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string; name: string; transactionCount: number; activeFixedTerms: number; pendingRefunds: number
+  } | null>(null)
   const [error, setError]         = useState<string | null>(null)
 
   const [reconcileOpen, setReconcileOpen]     = useState(false)
@@ -231,13 +235,34 @@ export default function WalletsPage() {
     } finally { setReconciling(false) }
   }
 
-  async function handleDelete(id: string, name: string) {
+  async function handleDeleteClick(id: string, name: string) {
     setDeleting(id)
     try {
-      await walletsService.delete(id)
-      addToast(`Billetera "${name}" eliminada`, 'info')
+      const impact = await walletsService.getDeleteImpact(id)
+      setDeleteTarget({ id, name, ...impact })
+    } catch {
+      addToast('Error al verificar el impacto del borrado', 'error')
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setDeleting(deleteTarget.id)
+    try {
+      if (deleteTarget.pendingRefunds > 0) {
+        await refundService.cancelByWallet(deleteTarget.id)
+      }
+      await walletsService.delete(deleteTarget.id)
+      addToast(`Billetera "${deleteTarget.name}" eliminada`, 'info')
+      setDeleteTarget(null)
       refetch()
-    } finally { setDeleting(null) }
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error al eliminar', 'error')
+    } finally {
+      setDeleting(null)
+    }
   }
 
   const providerOptions = [
@@ -407,7 +432,7 @@ export default function WalletsPage() {
                         <SlidersHorizontal size={11} />
                       </button>
                       <button
-                        onClick={() => wallet.id && handleDelete(wallet.id, wallet.name)}
+                        onClick={() => wallet.id && handleDeleteClick(wallet.id, wallet.name)}
                         disabled={deleting === wallet.id}
                         className="w-7 h-7 rounded-lg flex items-center justify-center text-white transition-colors"
                         style={{ background: 'rgba(255,255,255,0.17)' }}
@@ -675,6 +700,56 @@ export default function WalletsPage() {
             </div>
           )
         })()}
+      </Modal>
+
+      {/* Delete confirmation modal */}
+      <Modal
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title="Eliminar billetera"
+      >
+        {deleteTarget && (
+          <div className="space-y-4">
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+              ¿Eliminar la billetera <strong>"{deleteTarget.name}"</strong>? Esta acción no se puede deshacer.
+            </p>
+
+            <div className="rounded-xl p-4 space-y-2" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}>
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Impacto</p>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                {deleteTarget.transactionCount} transacción{deleteTarget.transactionCount !== 1 ? 'es' : ''} perderán su referencia de billetera
+              </p>
+
+              {deleteTarget.activeFixedTerms > 0 && (
+                <div className="rounded-lg px-3 py-2" style={{ background: 'var(--expense-50)', border: '1px solid var(--expense-100)' }}>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--expense-600)' }}>
+                    {deleteTarget.activeFixedTerms} plazo{deleteTarget.activeFixedTerms !== 1 ? 's' : ''} fijo{deleteTarget.activeFixedTerms !== 1 ? 's' : ''} activo{deleteTarget.activeFixedTerms !== 1 ? 's' : ''} quedarán sin billetera asignada
+                  </p>
+                </div>
+              )}
+
+              {deleteTarget.pendingRefunds > 0 && (
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  {deleteTarget.pendingRefunds} reintegro{deleteTarget.pendingRefunds !== 1 ? 's' : ''} pendiente{deleteTarget.pendingRefunds !== 1 ? 's' : ''} serán cancelados automáticamente
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <Button variant="secondary" onClick={() => setDeleteTarget(null)} className="flex-1">
+                Cancelar
+              </Button>
+              <Button
+                variant="danger"
+                onClick={confirmDelete}
+                loading={!!deleting}
+                className="flex-1"
+              >
+                Eliminar
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )

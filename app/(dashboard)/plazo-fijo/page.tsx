@@ -264,7 +264,7 @@ export default function FixedTermPage() {
 
     setSaving(true)
     try {
-      await fixedTermService.create({
+      await fixedTermService.createAtomic({
         name:               newForm.name.trim(),
         principal_amount:   principal,
         currency:           newForm.currency,
@@ -296,12 +296,11 @@ export default function FixedTermPage() {
 
     setActioning(true)
     try {
-      await fixedTermService.withdraw({
-        fixedTermId:   actionItem.id,
-        fixedTermName: actionItem.name,
-        walletId:      withdrawForm.wallet_id,
+      await fixedTermService.withdrawAtomic({
+        fixedTermId: actionItem.id,
+        walletId:    withdrawForm.wallet_id,
         amount,
-        currency:      actionItem.currency,
+        currency:    actionItem.currency,
       })
       await refetch()
       setActionItem(null)
@@ -323,19 +322,18 @@ export default function FixedTermPage() {
 
     setActioning(true)
     try {
-      await fixedTermService.reinvest({
-        oldFixedTermId:   actionItem.id,
-        oldFixedTermName: actionItem.name,
-        walletId:         actionItem.wallet_id,
-        oldTotal:         actionItem.estimated_total,
-        newPrincipal:     reinvestCapital,
-        currency:         actionItem.currency,
-        tna:              reinvestTna,
-        termDays:         reinvestDays,
-        startDate:        reinvestNewStart,
-        maturityDate:     reinvestNewEnd,
+      await fixedTermService.reinvestAtomic({
+        oldFixedTermId:    actionItem.id,
+        walletId:          actionItem.wallet_id,
+        oldTotal:          actionItem.estimated_total,
+        newPrincipal:      reinvestCapital,
+        currency:          actionItem.currency,
+        tna:               reinvestTna,
+        termDays:          reinvestDays,
+        startDate:         reinvestNewStart,
+        maturityDate:      reinvestNewEnd,
         estimatedInterest: reinvestCalc.interest,
-        estimatedTotal:   reinvestCalc.total,
+        estimatedTotal:    reinvestCalc.total,
       })
       await refetch()
       setActionItem(null)

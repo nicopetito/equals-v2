@@ -81,6 +81,31 @@ export const recurringService = {
     const user_id = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
 
+    // Stamp generated transactions before the FK becomes NULL (trazabilidad)
+    const { data: rt } = await supabase
+      .from('recurring_transactions')
+      .select('description')
+      .eq('id', id)
+      .eq('user_id', user_id)
+      .single()
+
+    if (rt?.description) {
+      const { data: txs } = await supabase
+        .from('transactions')
+        .select('id')
+        .eq('recurring_id', id)
+        .eq('user_id', user_id)
+        .is('notes', null)
+
+      if (txs && txs.length > 0) {
+        await supabase
+          .from('transactions')
+          .update({ notes: `Generado por recurrente: ${rt.description}` })
+          .in('id', txs.map((t: { id: string }) => t.id))
+          .eq('user_id', user_id)
+      }
+    }
+
     const { error } = await supabase
       .from('recurring_transactions')
       .delete()
@@ -109,5 +134,15 @@ export const recurringService = {
     })
     const next = nextDateAfter(item.next_date, item.cadence)
     await recurringService.update(item.id!, { next_date: next })
+  },
+
+  async executeAtomic(recurringId: string, walletId: string): Promise<{ transaction_id: string; next_date: string }> {
+    const supabase = getSupabase()
+    const { data, error } = await supabase.rpc('rpc_recurring_execute', {
+      p_recurring_id: recurringId,
+      p_wallet_id:    walletId,
+    })
+    if (error) throw new Error(error.message)
+    return data as { transaction_id: string; next_date: string }
   },
 }

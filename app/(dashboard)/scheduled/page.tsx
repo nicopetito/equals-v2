@@ -232,7 +232,7 @@ export default function ScheduledPage() {
     }
     setExecuting(prev => new Set([...prev, item.id!]))
     try {
-      await recurringService.execute(item, walletId)
+      await recurringService.executeAtomic(item.id!, walletId)
       addToast(`${item.type === 'expense' ? 'Pago' : 'Cobro'} registrado correctamente`, 'success')
       setExecModal(null)
       load()

@@ -80,6 +80,31 @@ export const walletsService = {
     return data
   },
 
+  async getDeleteImpact(id: string): Promise<{
+    transactionCount: number
+    activeFixedTerms: number
+    pendingRefunds: number
+  }> {
+    const supabase = getSupabase()
+    const user_id = await getUserId()
+    if (!user_id) throw new Error('Not authenticated')
+
+    const [txResult, ftResult, refundResult] = await Promise.all([
+      supabase.from('transactions').select('id', { count: 'exact', head: true })
+        .eq('wallet_id', id).eq('user_id', user_id),
+      supabase.from('fixed_terms').select('id', { count: 'exact', head: true })
+        .eq('wallet_id', id).eq('user_id', user_id).in('status', ['active', 'matured']),
+      supabase.from('refunds').select('id', { count: 'exact', head: true })
+        .eq('destination_wallet_id', id).eq('user_id', user_id).eq('status', 'pending'),
+    ])
+
+    return {
+      transactionCount: txResult.count ?? 0,
+      activeFixedTerms: ftResult.count ?? 0,
+      pendingRefunds:   refundResult.count ?? 0,
+    }
+  },
+
   async delete(id: string): Promise<void> {
     const supabase = getSupabase()
     const user_id = await getUserId()

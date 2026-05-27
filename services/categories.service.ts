@@ -74,6 +74,20 @@ export const categoriesService = {
     return data
   },
 
+  async getBudgetCount(id: string): Promise<number> {
+    const supabase = getSupabase()
+    const user_id = await getUserId()
+    if (!user_id) return 0
+
+    const { count } = await supabase
+      .from('budgets')
+      .select('id', { count: 'exact', head: true })
+      .eq('category_id', id)
+      .eq('user_id', user_id)
+
+    return count ?? 0
+  },
+
   async delete(id: string): Promise<void> {
     const supabase = getSupabase()
     const user_id = await getUserId()

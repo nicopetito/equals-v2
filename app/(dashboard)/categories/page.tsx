@@ -133,6 +133,13 @@ export default function CategoriesPage() {
   async function handleDelete(id: string) {
     setDeleting(id)
     try {
+      const budgetCount = await categoriesService.getBudgetCount(id)
+      if (budgetCount > 0) {
+        const ok = window.confirm(
+          `Esta categoría tiene ${budgetCount} presupuesto${budgetCount > 1 ? 's' : ''} asociado${budgetCount > 1 ? 's' : ''} que también se eliminarán. ¿Continuar?`
+        )
+        if (!ok) { setDeleting(null); return }
+      }
       await categoriesService.delete(id)
       refetch()
       addToast('Categoría eliminada', 'info')

@@ -153,7 +153,7 @@ export default function DollarPage() {
     setSaving(true)
     setFormError(null)
     try {
-      await exchangeService.createConversion({
+      await exchangeService.createConversionAtomic({
         fromWalletId,
         toWalletId,
         fromAmount:   numericAmount,

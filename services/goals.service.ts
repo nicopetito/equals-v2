@@ -109,171 +109,59 @@ export const goalsService = {
   },
 
   /**
-   * Deposita dinero desde una billetera hacia un objetivo.
-   * Operación en 3 pasos secuenciales (sin RPC):
-   *   1. Inserta transacción expense → reduce saldo de la billetera
-   *   2. Actualiza current_amount del objetivo
-   *   3. Registra movimiento en goal_movements (no crítico)
-   * TODO: migrar a Supabase RPC para atomicidad completa
+   * Versión atómica de deposit via Supabase RPC.
+   * Requiere la función rpc_goal_deposit en la base de datos.
+   * Un único CALL: si cualquier paso falla, todo se revierte automáticamente.
    */
-  async deposit(params: {
+  async depositAtomic(params: {
     goalId: string
     goalName: string
     walletId: string
     amount: number
     currency: string
-    currentAmount: number
-    targetAmount?: number
     note?: string
-  }): Promise<void> {
+  }): Promise<{ transactionId: string; newAmount: number; isCompleted: boolean }> {
     const supabase = getSupabase()
-    const user_id = await getUserId()
+    const user_id  = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
 
-    const { goalId, goalName, walletId, amount, currency, currentAmount, targetAmount, note } = params
-    if (amount <= 0) throw new Error('El monto debe ser mayor a 0')
+    const { data, error } = await supabase.rpc('rpc_goal_deposit', {
+      p_goal_id:   params.goalId,
+      p_wallet_id: params.walletId,
+      p_amount:    params.amount,
+      p_currency:  params.currency,
+      p_goal_name: params.goalName,
+      p_note:      params.note ?? null,
+    })
 
-    const today = new Date().toISOString().split('T')[0]
-
-    // Paso 1: registrar transacción para reducir el saldo de la billetera
-    const { data: txData, error: txError } = await supabase
-      .from('transactions')
-      .insert([{
-        user_id,
-        description: `Aporte a objetivo: ${goalName}`,
-        amount,
-        type: 'expense',
-        currency,
-        wallet_id: walletId,
-        date: today,
-      }])
-      .select()
-      .single()
-
-    if (txError) throw new Error(`No se pudo registrar la transacción: ${txError.message}`)
-
-    // Paso 2: actualizar el acumulado del objetivo (y marcar completado si alcanza el objetivo)
-    const newAmount  = safeNumber(currentAmount) + amount
-    const nowReached = targetAmount && targetAmount > 0 && newAmount >= targetAmount
-    const goalUpdate = nowReached
-      ? { current_amount: newAmount, is_completed: true, completed_at: new Date().toISOString() }
-      : { current_amount: newAmount }
-
-    const { error: goalError } = await supabase
-      .from('goals')
-      .update(goalUpdate)
-      .eq('id', goalId)
-      .eq('user_id', user_id)
-
-    if (goalError) {
-      // TODO: revertir la transacción del paso 1 — pendiente RPC
-      console.error('[goals.deposit] goal update failed after tx. tx_id:', txData?.id, goalError.message)
-      throw new Error(`La transacción se registró pero el objetivo no se actualizó: ${goalError.message}`)
-    }
-
-    // Paso 3: historial (no crítico — falla silenciosamente con log)
-    const { error: movError } = await supabase
-      .from('goal_movements')
-      .insert([{
-        user_id,
-        goal_id: goalId,
-        type: 'deposit',
-        amount,
-        wallet_id: walletId,
-        description: note ?? null,
-        transaction_id: txData?.id ?? null,
-      }])
-
-    if (movError) {
-      console.warn('[goals.deposit] movement log failed (non-critical):', movError.message)
-    }
+    if (error) throw new Error(error.message)
+    const result = data as { transaction_id: string; new_amount: number; is_completed: boolean }
+    return { transactionId: result.transaction_id, newAmount: result.new_amount, isCompleted: result.is_completed }
   },
 
-  /**
-   * Extrae dinero de un objetivo hacia una billetera.
-   * Mismo flujo de 3 pasos que deposit, en reversa.
-   * TODO: migrar a Supabase RPC para atomicidad completa
-   */
-  async withdraw(params: {
+  async withdrawAtomic(params: {
     goalId: string
     goalName: string
     walletId: string
     amount: number
     currency: string
-    currentAmount: number
     note?: string
-  }): Promise<void> {
+  }): Promise<{ transactionId: string; newAmount: number }> {
     const supabase = getSupabase()
-    const user_id = await getUserId()
+    const user_id  = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
 
-    const { goalId, goalName, walletId, amount, currency, currentAmount, note } = params
-    if (amount <= 0) throw new Error('El monto debe ser mayor a 0')
-    if (amount > safeNumber(currentAmount)) throw new Error('Saldo insuficiente en el objetivo')
+    const { data, error } = await supabase.rpc('rpc_goal_withdraw', {
+      p_goal_id:   params.goalId,
+      p_wallet_id: params.walletId,
+      p_amount:    params.amount,
+      p_currency:  params.currency,
+      p_goal_name: params.goalName,
+      p_note:      params.note ?? null,
+    })
 
-    const today = new Date().toISOString().split('T')[0]
-
-    // Paso 1: registrar transacción para aumentar el saldo de la billetera
-    const { data: txData, error: txError } = await supabase
-      .from('transactions')
-      .insert([{
-        user_id,
-        description: `Retiro de objetivo: ${goalName}`,
-        amount,
-        type: 'income',
-        currency,
-        wallet_id: walletId,
-        date: today,
-      }])
-      .select()
-      .single()
-
-    if (txError) throw new Error(`No se pudo registrar la transacción: ${txError.message}`)
-
-    // Paso 2: reducir el acumulado del objetivo
-    const newAmount = safeNumber(currentAmount) - amount
-    const { error: goalError } = await supabase
-      .from('goals')
-      .update({ current_amount: Math.max(0, newAmount) })
-      .eq('id', goalId)
-      .eq('user_id', user_id)
-
-    if (goalError) {
-      // TODO: revertir la transacción del paso 1 — pendiente RPC
-      console.error('[goals.withdraw] goal update failed after tx. tx_id:', txData?.id, goalError.message)
-      throw new Error(`La transacción se registró pero el objetivo no se actualizó: ${goalError.message}`)
-    }
-
-    // Paso 3: historial (no crítico)
-    const { error: movError } = await supabase
-      .from('goal_movements')
-      .insert([{
-        user_id,
-        goal_id: goalId,
-        type: 'withdrawal',
-        amount,
-        wallet_id: walletId,
-        description: note ?? null,
-        transaction_id: txData?.id ?? null,
-      }])
-
-    if (movError) {
-      console.warn('[goals.withdraw] movement log failed (non-critical):', movError.message)
-    }
-  },
-
-  async addMovement(movement: Omit<GoalMovement, 'id' | 'created_at'>): Promise<GoalMovement> {
-    const supabase = getSupabase()
-    const user_id = await getUserId()
-    if (!user_id) throw new Error('Not authenticated')
-
-    const { data, error } = await supabase
-      .from('goal_movements')
-      .insert([{ ...movement, user_id }])
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
+    if (error) throw new Error(error.message)
+    const result = data as { transaction_id: string; new_amount: number }
+    return { transactionId: result.transaction_id, newAmount: result.new_amount }
   },
 }

@@ -5,9 +5,7 @@ import type {
   TransactionWithDetails,
   TransactionFilters,
   TransactionSort,
-  CategoryDistribution,
   MonthlyTrend,
-  DailyData,
 } from '@/types'
 
 function getSupabase() {
@@ -105,6 +103,10 @@ export const transactionsService = {
     const user_id = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
 
+    // Delete goal_movements first so the trigger recalculates goal.current_amount
+    await supabase.from('goal_movements').delete()
+      .eq('transaction_id', id).eq('user_id', user_id)
+
     const { error } = await supabase
       .from('transactions')
       .delete()
@@ -121,25 +123,14 @@ export const transactionsService = {
     const user_id = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
 
-    const CHUNK = 100
-    let success = 0
-    let errors = 0
+    if (transactions.length === 0) return { success: 0, errors: 0 }
 
-    for (let i = 0; i < transactions.length; i += CHUNK) {
-      const chunk = transactions.slice(i, i + CHUNK).map(tx => ({ ...tx, user_id }))
-      const { data, error } = await supabase
-        .from('transactions')
-        .insert(chunk)
-        .select()
+    const { data, error } = await supabase.rpc('rpc_transactions_batch_insert', {
+      p_transactions: transactions,
+    })
 
-      if (error) {
-        errors += chunk.length
-      } else {
-        success += (data ?? []).length
-      }
-    }
-
-    return { success, errors }
+    if (error) return { success: 0, errors: transactions.length }
+    return { success: (data as { inserted: number }).inserted, errors: 0 }
   },
 
   async getMonthlyTrends(months = 6, currency = 'ARS'): Promise<MonthlyTrend[]> {

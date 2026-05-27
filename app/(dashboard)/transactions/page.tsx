@@ -254,18 +254,7 @@ export default function TransactionsPage() {
     }
     setCreditingId(refund.id)
     try {
-      const originalTx = refund.original_transaction_id
-        ? transactions.find(t => t.id === refund.original_transaction_id)
-        : null
-
-      await refundService.credit({
-        refundId: refund.id,
-        amount: refund.amount,
-        currency: refund.currency,
-        walletId: refund.destination_wallet_id,
-        note: refund.note,
-        originalDescription: originalTx?.description ?? 'Gasto',
-      })
+      await refundService.creditAtomic({ refundId: refund.id })
 
       addToast(`Reintegro de ${formatCurrency(refund.amount, refund.currency)} acreditado`, 'success')
       refetch()

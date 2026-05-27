@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/client'
-import type { Transaction } from '@/types'
 
 export interface ExchangePayload {
   fromWalletId: string
@@ -24,85 +23,35 @@ async function getUserId(): Promise<string | null> {
 }
 
 export const exchangeService = {
-  async createConversion(payload: ExchangePayload): Promise<void> {
+  async createConversionAtomic(payload: ExchangePayload): Promise<void> {
     const supabase = getSupabase()
-    const user_id = await getUserId()
+    const user_id  = await getUserId()
     if (!user_id) throw new Error('No autenticado')
 
-    const {
-      fromWalletId, toWalletId, fromAmount, toAmount,
-      fromCurrency, toCurrency, exchangeRate,
-      exchangeType, operationType, date,
-    } = payload
-
-    const conversion_id = crypto.randomUUID()
-
-    const notes = JSON.stringify({
-      conversion_id,
-      exchange_rate: exchangeRate,
-      exchange_type: exchangeType,
-      operation: operationType,
-      from_wallet_id: fromWalletId,
-      to_wallet_id: toWalletId,
-      from_amount: fromAmount,
-      from_currency: fromCurrency,
-      to_amount: toAmount,
-      to_currency: toCurrency,
-    })
+    const { fromWalletId, toWalletId, fromAmount, toAmount,
+            fromCurrency, toCurrency, exchangeRate,
+            exchangeType, operationType, date } = payload
 
     const rateFormatted = new Intl.NumberFormat('es-AR', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     }).format(exchangeRate)
-
     const description = `Conversión ${fromCurrency} → ${toCurrency} · ${exchangeType} ${operationType} $${rateFormatted}`
 
-    const expenseTx: Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'updated_at'> = {
-      description,
-      amount: fromAmount,
-      type: 'expense',
-      currency: fromCurrency,
-      wallet_id: fromWalletId,
-      date,
-      notes,
-    }
+    const { error } = await supabase.rpc('rpc_exchange_conversion', {
+      p_from_wallet_id: fromWalletId,
+      p_to_wallet_id:   toWalletId,
+      p_from_amount:    fromAmount,
+      p_to_amount:      toAmount,
+      p_from_currency:  fromCurrency,
+      p_to_currency:    toCurrency,
+      p_exchange_rate:  exchangeRate,
+      p_exchange_type:  exchangeType,
+      p_operation_type: operationType,
+      p_date:           date,
+      p_description:    description,
+    })
 
-    const { data: leg1, error: err1 } = await supabase
-      .from('transactions')
-      .insert([{ ...expenseTx, user_id }])
-      .select()
-      .single()
-
-    if (err1) {
-      throw new Error(`No se pudo registrar el débito: ${err1.message}`)
-    }
-
-    const incomeTx: Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'updated_at'> = {
-      description,
-      amount: toAmount,
-      type: 'income',
-      currency: toCurrency,
-      wallet_id: toWalletId,
-      date,
-      notes,
-    }
-
-    const { error: err2 } = await supabase
-      .from('transactions')
-      .insert([{ ...incomeTx, user_id }])
-      .select()
-      .single()
-
-    if (err2) {
-      // Compensating: revert leg 1 to avoid leaving an orphan expense
-      // TODO: replace with a Supabase RPC for true atomicity
-      await supabase
-        .from('transactions')
-        .delete()
-        .eq('id', leg1.id)
-        .eq('user_id', user_id)
-
-      throw new Error(`No se pudo registrar el crédito y se revirtió el débito: ${err2.message}`)
-    }
+    if (error) throw new Error(error.message)
   },
 }
