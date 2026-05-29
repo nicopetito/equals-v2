@@ -81,14 +81,80 @@ export const transactionsService = {
     return data
   },
 
+  async checkEditImpact(id: string): Promise<{ creditedRefundCount: number; hasGoalMovement: boolean }> {
+    const supabase = getSupabase()
+    const user_id = await getUserId()
+    if (!user_id) return { creditedRefundCount: 0, hasGoalMovement: false }
+
+    const [refundResult, goalResult] = await Promise.all([
+      supabase
+        .from('refunds')
+        .select('id', { count: 'exact', head: true })
+        .eq('original_transaction_id', id)
+        .eq('user_id', user_id)
+        .eq('status', 'credited'),
+      supabase
+        .from('goal_movements')
+        .select('id', { count: 'exact', head: true })
+        .eq('transaction_id', id)
+        .eq('user_id', user_id),
+    ])
+
+    return {
+      creditedRefundCount: refundResult.count ?? 0,
+      hasGoalMovement: (goalResult.count ?? 0) > 0,
+    }
+  },
+
   async update(id: string, tx: Partial<Transaction>): Promise<Transaction> {
     const supabase = getSupabase()
     const user_id = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
 
+    // Service-layer guard: block financial field changes if credited refunds exist.
+    // Compare against the original values to avoid false positives when the form
+    // sends a full payload with unchanged financial fields.
+    const FINANCIAL_FIELDS = new Set(['amount', 'type', 'wallet_id', 'currency'])
+    const hasFinancialKeys = Object.keys(tx).some(k => FINANCIAL_FIELDS.has(k))
+
+    if (hasFinancialKeys) {
+      const { data: orig } = await supabase
+        .from('transactions')
+        .select('amount, type, wallet_id, currency')
+        .eq('id', id)
+        .eq('user_id', user_id)
+        .single()
+
+      const financiallyChanged = orig && (
+        ('amount'    in tx && safeNumber(tx.amount)    !== safeNumber(orig.amount))    ||
+        ('type'      in tx && tx.type      !== orig.type)      ||
+        ('wallet_id' in tx && tx.wallet_id !== orig.wallet_id) ||
+        ('currency'  in tx && tx.currency  !== orig.currency)
+      )
+
+      if (financiallyChanged) {
+        const { count } = await supabase
+          .from('refunds')
+          .select('id', { count: 'exact', head: true })
+          .eq('original_transaction_id', id)
+          .eq('user_id', user_id)
+          .eq('status', 'credited')
+
+        if ((count ?? 0) > 0) {
+          throw new Error(
+            'No se pueden modificar campos financieros: la transacción tiene reintegros acreditados. Revertí los reintegros primero.'
+          )
+        }
+      }
+    }
+
+    const COLUMNS = new Set(['description', 'amount', 'type', 'currency', 'crypto_type',
+      'category_id', 'wallet_id', 'date', 'is_recurring', 'recurring_id', 'notes', 'label'])
+    const updatePayload = Object.fromEntries(Object.entries(tx).filter(([k]) => COLUMNS.has(k)))
+
     const { data, error } = await supabase
       .from('transactions')
-      .update(tx)
+      .update(updatePayload)
       .eq('id', id)
       .eq('user_id', user_id)
       .select()
@@ -103,16 +169,21 @@ export const transactionsService = {
     const user_id = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
 
-    // Delete goal_movements first so the trigger recalculates goal.current_amount
-    await supabase.from('goal_movements').delete()
-      .eq('transaction_id', id).eq('user_id', user_id)
+    const { error } = await supabase.rpc('rpc_delete_transaction_cascade', {
+      p_transaction_id: id,
+    })
+    if (error) throw error
+  },
 
+  async assignLabel(ids: string[], label: string | null): Promise<void> {
+    const supabase = getSupabase()
+    const user_id = await getUserId()
+    if (!user_id) throw new Error('Not authenticated')
     const { error } = await supabase
       .from('transactions')
-      .delete()
-      .eq('id', id)
+      .update({ label })
+      .in('id', ids)
       .eq('user_id', user_id)
-
     if (error) throw error
   },
 

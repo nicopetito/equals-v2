@@ -16,6 +16,7 @@ export function useWallets() {
       const result = await walletsService.listWithBalance()
       setData(result)
     } catch (e) {
+      console.error('[useWallets] error:', e)
       setError(e instanceof Error ? e.message : 'Error loading wallets')
     } finally {
       setLoading(false)

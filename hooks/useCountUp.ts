@@ -9,6 +9,11 @@ export function useCountUp(target: number, duration = 900, decimals = 2): number
   const startValueRef = useRef(0)
 
   useEffect(() => {
+    if (duration <= 0) {
+      setValue(target)
+      return
+    }
+
     startValueRef.current = value
     startTimeRef.current = null
 

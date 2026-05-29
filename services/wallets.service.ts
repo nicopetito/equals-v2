@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import { safeNumber } from '@/utils/format'
-import type { Wallet, WalletWithBalance } from '@/types'
+import type { Wallet, WalletWithBalance, WalletDiagnostic } from '@/types'
 
 function getSupabase() {
   return createClient()
@@ -117,5 +117,21 @@ export const walletsService = {
       .eq('user_id', user_id)
 
     if (error) throw error
+  },
+
+  async diagnose(): Promise<WalletDiagnostic[]> {
+    const supabase = getSupabase()
+    const { data, error } = await supabase.rpc('rpc_wallet_diagnostics')
+    if (error) throw error
+    return (data ?? []).map((row: Record<string, unknown>) => ({
+      wallet_id:         row.wallet_id as string,
+      wallet_name:       row.wallet_name as string,
+      currency:          row.currency as string,
+      initial_balance:   safeNumber(row.initial_balance),
+      income_total:      safeNumber(row.income_total),
+      expense_total:     safeNumber(row.expense_total),
+      computed_balance:  safeNumber(row.computed_balance),
+      transaction_count: safeNumber(row.transaction_count),
+    }))
   },
 }

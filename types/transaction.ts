@@ -15,6 +15,7 @@ export interface Transaction {
   is_recurring?: boolean
   recurring_id?: string | null
   notes?: string | null
+  label?: string | null
   created_at?: string
   updated_at?: string
 }

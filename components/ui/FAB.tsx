@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState } from 'react'
 import { Plus, X, TrendingUp, TrendingDown } from 'lucide-react'
@@ -31,7 +31,7 @@ export function FAB() {
   const { addToast }         = useToast()
 
   const categoryOptions = [
-    { value: '', label: 'Sin categorÃ­a' },
+    { value: '', label: 'Sin categoría' },
     ...categories.map(c => ({ value: c.id!, label: c.name })),
   ]
   const walletOptions = [
@@ -47,7 +47,7 @@ export function FAB() {
 
   async function handleSave() {
     if (!form.description || !form.amount) {
-      setError('NecesitÃ¡s descripciÃ³n y monto.')
+      setError('Necesitás descripción y monto.')
       return
     }
     setSaving(true); setError(null)
@@ -59,12 +59,12 @@ export function FAB() {
       } as Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'updated_at'>
       await transactionsService.create(payload)
       addToast(
-        form.type === 'income' ? 'âœ“ Ingreso registrado' : 'âœ“ Gasto registrado',
+        form.type === 'income' ? '✓ Ingreso registrado' : '✓ Gasto registrado',
         'success'
       )
       setOpen(false)
     } catch {
-      setError('Error al guardar. IntentÃ¡ de nuevo.')
+      setError('Error al guardar. Intentá de nuevo.')
     } finally {
       setSaving(false)
     }
@@ -74,10 +74,10 @@ export function FAB() {
 
   return (
     <>
-      {/* BotÃ³n flotante â€” solo mobile */}
+      {/* Botón flotante — solo mobile */}
       <button
         onClick={openFAB}
-        aria-label="Nueva transacciÃ³n rÃ¡pida"
+        aria-label="Nueva transacción rápida"
         className="fixed bottom-24 right-4 z-40 flex md:hidden w-14 h-14 items-center justify-center rounded-full shadow-2xl transition-all active:scale-95 hover:scale-105"
         style={{
           background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)',
@@ -100,9 +100,7 @@ export function FAB() {
           {/* Panel */}
           <div
             className="glass-card relative w-full rounded-t-3xl sm:rounded-3xl sm:max-w-md p-6 space-y-4 animate-fade-in"
-            style={{
-              boxShadow: '0 24px 60px rgba(0,0,0,0.60)',
-            }}
+            style={{ boxShadow: '0 24px 60px rgba(0,0,0,0.60)' }}
           >
             {/* Handle bar */}
             <div className="w-10 h-1 rounded-full mx-auto mb-2" style={{ background: 'var(--border)' }} />
@@ -110,11 +108,11 @@ export function FAB() {
             {/* Cabecera */}
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-extrabold" style={{ color: 'var(--text-primary)' }}>
-                Registro rÃ¡pido
+                Registro rápido
               </h3>
               <button
                 onClick={() => setOpen(false)}
-                className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors hover:bg-white/8"
+                className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors hover:bg-black/5"
                 style={{ color: 'var(--text-muted)' }}
               >
                 <X size={16} />
@@ -152,10 +150,10 @@ export function FAB() {
             </div>
 
             <Input
-              label="DescripciÃ³n"
+              label="Descripción"
               value={form.description ?? ''}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              placeholder="Â¿QuÃ© fue este movimiento?"
+              placeholder="¿Qué fue este movimiento?"
               autoFocus
             />
 
@@ -177,7 +175,7 @@ export function FAB() {
 
             <div className="grid grid-cols-2 gap-3">
               <Select
-                label="CategorÃ­a"
+                label="Categoría"
                 value={form.category_id ?? ''}
                 onChange={e => setForm(f => ({ ...f, category_id: e.target.value || null }))}
                 options={categoryOptions}
@@ -202,7 +200,7 @@ export function FAB() {
               {saving
                 ? <span className="inline-flex items-center gap-2">
                     <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                    Guardandoâ€¦
+                    Guardando…
                   </span>
                 : `Guardar ${isIncome ? 'ingreso' : 'gasto'}`
               }
@@ -213,5 +211,3 @@ export function FAB() {
     </>
   )
 }
-
-

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { RotateCcw, ChevronUp, ChevronDown, Zap } from 'lucide-react'
 import { transactionsService } from '@/services/transactions.service'
 import { refundService } from '@/services/refund.service'
@@ -107,17 +107,18 @@ function RefundSection({
             <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
               Activar reintegro para este gasto
             </span>
-            <button
-              type="button"
+            <div
+              role="switch"
+              aria-checked={refundForm.enabled}
               onClick={() => onChange({ enabled: !refundForm.enabled })}
-              className="relative w-9 h-5 rounded-full transition-colors"
+              className="relative w-9 h-5 rounded-full transition-colors cursor-pointer"
               style={{ background: refundForm.enabled ? 'var(--brand-500)' : 'var(--border)' }}
             >
               <span
                 className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform"
                 style={{ transform: refundForm.enabled ? 'translateX(18px)' : 'translateX(2px)' }}
               />
-            </button>
+            </div>
           </div>
 
           {refundForm.enabled && (
@@ -239,13 +240,19 @@ export function NewTransactionModal({
   const [refundExpanded, setRefundExpanded] = useState(false)
   const [saveAsTemplate, setSaveAsTemplate] = useState(false)
   const [templateName, setTemplateName]     = useState('')
+  const [editImpact, setEditImpact]         = useState<{ creditedRefundCount: number; hasGoalMovement: boolean } | null>(null)
+  const [softConfirmStep, setSoftConfirmStep] = useState(false)
+  const softCheckBypassed                   = useRef(false)
 
   useEffect(() => {
+    softCheckBypassed.current = false
     if (open) {
       if (editing) {
         setForm({ ...editing })
+        transactionsService.checkEditImpact(editing.id!).then(setEditImpact).catch(() => {})
       } else {
         setForm({ type: 'expense', currency: 'ARS', date: new Date().toISOString().split('T')[0] })
+        setEditImpact(null)
       }
       setFormError(null)
       setRefundForm(DEFAULT_REFUND_FORM)
@@ -254,6 +261,8 @@ export function NewTransactionModal({
       setTemplateName('')
     }
   }, [open, editing])
+
+  const financialFieldsBlocked = (editImpact?.creditedRefundCount ?? 0) > 0
 
   const categoryOptions = [
     { value: '', label: 'Sin categoría' },
@@ -277,10 +286,30 @@ export function NewTransactionModal({
 
     setSaving(true)
     setFormError(null)
-    const payload = { ...form, category_id: form.category_id || null, wallet_id: form.wallet_id || null }
+    setSoftConfirmStep(false)
 
     try {
+      const payload = { ...form, category_id: form.category_id || null, wallet_id: form.wallet_id || null }
+
       if (editing?.id) {
+        if (financialFieldsBlocked) {
+          setFormError('Esta transacción tiene reintegros acreditados. No se pueden modificar campos financieros.')
+          setSaving(false)
+          return
+        }
+
+        // Soft-check: warn before changing date or category on a transaction with credited refunds
+        if (!softCheckBypassed.current && (editImpact?.creditedRefundCount ?? 0) > 0) {
+          const dateChanged     = form.date !== editing.date
+          const categoryChanged = (form.category_id ?? null) !== (editing.category_id ?? null)
+          if (dateChanged || categoryChanged) {
+            setSoftConfirmStep(true)
+            setSaving(false)
+            return
+          }
+        }
+        softCheckBypassed.current = false
+
         await transactionsService.update(editing.id, payload as Partial<Transaction>)
         addToast('Transacción actualizada', 'success')
       } else {
@@ -339,6 +368,11 @@ export function NewTransactionModal({
     }
   }
 
+  function handleSoftConfirm() {
+    softCheckBypassed.current = true
+    handleSave()
+  }
+
   return (
     <Modal open={open} onClose={onClose} title={editing ? 'Editar transacción' : 'Nueva transacción'}>
       <div className="space-y-2.5">
@@ -351,14 +385,36 @@ export function NewTransactionModal({
           </div>
         )}
 
+        {financialFieldsBlocked && (
+          <div
+            className="rounded-xl px-3 py-2.5 text-xs font-medium leading-relaxed"
+            style={{ background: 'var(--expense-50)', color: 'var(--expense-700)', border: '1px solid var(--expense-200)' }}
+          >
+            <span className="font-bold">Campos financieros bloqueados.</span>{' '}
+            Esta transacción tiene {editImpact!.creditedRefundCount} reintegro{editImpact!.creditedRefundCount > 1 ? 's' : ''} ya acreditado{editImpact!.creditedRefundCount > 1 ? 's' : ''} en tu billetera.
+            Solo podés editar descripción, fecha, categoría y notas. Para modificar monto, tipo, billetera o moneda, primero revertí los reintegros acreditados.
+          </div>
+        )}
+
+        {editImpact?.hasGoalMovement && (
+          <div
+            className="rounded-xl px-3 py-2.5 text-xs font-medium leading-relaxed"
+            style={{ background: 'rgba(109,59,215,0.06)', color: 'var(--brand-600)', border: '1px solid rgba(109,59,215,0.15)' }}
+          >
+            <span className="font-bold">Transacción vinculada a un objetivo.</span>{' '}
+            Si modificás el monto, el movimiento registrado en el objetivo no se actualiza automáticamente.
+          </div>
+        )}
+
         <div
           className="grid grid-cols-2 gap-1 p-1 rounded-xl"
-          style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-light)' }}
+          style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-light)', opacity: financialFieldsBlocked ? 0.5 : 1 }}
         >
           {(['expense', 'income'] as TransactionType[]).map(t => (
             <button
               key={t}
-              onClick={() => setForm(f => ({ ...f, type: t }))}
+              onClick={() => { if (!financialFieldsBlocked) setForm(f => ({ ...f, type: t })) }}
+              disabled={financialFieldsBlocked}
               className="py-1.5 rounded-lg font-semibold text-sm transition-all duration-150"
               style={form.type === t
                 ? {
@@ -395,12 +451,14 @@ export function NewTransactionModal({
             value={form.amount ?? ''}
             onChange={e => setForm(f => ({ ...f, amount: parseFloat(e.target.value) || 0 }))}
             required
+            disabled={financialFieldsBlocked}
           />
           <Select
             label="Moneda"
             value={form.currency ?? 'ARS'}
             onChange={e => setForm(f => ({ ...f, currency: e.target.value as Currency }))}
             options={CURRENCY_OPTS}
+            disabled={financialFieldsBlocked}
           />
         </div>
 
@@ -424,6 +482,7 @@ export function NewTransactionModal({
             value={form.wallet_id ?? ''}
             onChange={e => setForm(f => ({ ...f, wallet_id: e.target.value || null }))}
             options={walletOptions}
+            disabled={financialFieldsBlocked}
           />
         </div>
 
@@ -456,17 +515,15 @@ export function NewTransactionModal({
                   Guardar como transacción rápida
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={e => { e.stopPropagation(); setSaveAsTemplate(v => !v) }}
-                className="relative w-9 h-5 rounded-full transition-colors"
+              <div
+                className="relative w-9 h-5 rounded-full transition-colors pointer-events-none"
                 style={{ background: saveAsTemplate ? 'var(--brand-500)' : 'var(--border)' }}
               >
                 <span
                   className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform"
                   style={{ transform: saveAsTemplate ? 'translateX(18px)' : 'translateX(2px)' }}
                 />
-              </button>
+              </div>
             </button>
             {saveAsTemplate && (
               <div className="px-3.5 pb-3.5 border-t" style={{ borderColor: 'var(--border)' }}>
@@ -480,6 +537,29 @@ export function NewTransactionModal({
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {softConfirmStep && (
+          <div
+            className="rounded-xl p-3 space-y-2.5"
+            style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.30)' }}
+          >
+            <p className="text-xs font-semibold leading-relaxed" style={{ color: '#92400e' }}>
+              ¿Confirmar cambio de fecha o categoría?
+            </p>
+            <p className="text-xs leading-relaxed" style={{ color: '#a16207' }}>
+              Esta transacción tiene reintegros acreditados. Cambiar la fecha o categoría puede
+              afectar reportes, presupuestos y estadísticas. El balance no se ve afectado.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="secondary" onClick={() => setSoftConfirmStep(false)} className="w-full" size="sm">
+                Cancelar
+              </Button>
+              <Button onClick={handleSoftConfirm} loading={saving} className="w-full" size="sm">
+                Confirmar de todos modos
+              </Button>
+            </div>
           </div>
         )}
 

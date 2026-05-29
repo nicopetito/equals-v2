@@ -7,15 +7,17 @@ import { authService } from '@/services/auth.service'
 interface AuthContextValue {
   user: User | null
   loading: boolean
-  signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string) => Promise<void>
-  signOut: () => Promise<void>
+  signIn:         (email: string, password: string) => Promise<void>
+  signUp:         (email: string, password: string, fullName?: string) => Promise<void>
+  signOut:        () => Promise<void>
+  resetPassword:  (email: string) => Promise<void>
+  updatePassword: (newPassword: string) => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser]       = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -37,8 +39,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user)
   }
 
-  async function signUp(email: string, password: string) {
-    await authService.signUp(email, password)
+  async function signUp(email: string, password: string, fullName?: string) {
+    await authService.signUp(email, password, fullName)
   }
 
   async function signOut() {
@@ -46,8 +48,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
+  async function resetPassword(email: string) {
+    await authService.resetPassword(email)
+  }
+
+  async function updatePassword(newPassword: string) {
+    await authService.updatePassword(newPassword)
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut, resetPassword, updatePassword }}>
       {children}
     </AuthContext.Provider>
   )

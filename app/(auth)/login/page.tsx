@@ -6,13 +6,19 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { LogIn, Zap, Shield, TrendingUp, Target } from 'lucide-react'
+import { AuthSidebar } from '@/components/auth/AuthSidebar'
+import { LogIn, Zap } from 'lucide-react'
 
-const FEATURES = [
-  { icon: TrendingUp, label: 'Seguí tus ingresos y gastos', color: '#4edea3' },
-  { icon: Target,     label: 'Alcanzá tus objetivos de ahorro', color: '#ffb869' },
-  { icon: Shield,     label: 'Datos seguros y privados', color: '#d0bcff' },
-]
+function humanizeAuthError(error: unknown): string {
+  const msg = error instanceof Error ? error.message.toLowerCase() : ''
+  if (msg.includes('invalid login credentials') || msg.includes('invalid_credentials'))
+    return 'Email o contraseña incorrectos. Verificá tus datos e intentá de nuevo.'
+  if (msg.includes('email not confirmed'))
+    return 'Tu email no está confirmado. Revisá tu casilla y hacé click en el link de activación.'
+  if (msg.includes('rate limit') || msg.includes('too many'))
+    return 'Demasiados intentos. Esperá unos minutos e intentá de nuevo.'
+  return 'Ocurrió un error inesperado. Intentá de nuevo en unos segundos.'
+}
 
 export default function LoginPage() {
   const [email, setEmail]       = useState('')
@@ -29,98 +35,51 @@ export default function LoginPage() {
     try {
       await signIn(email, password)
       router.push('/dashboard')
-    } catch {
-      setError('Email o contraseña incorrectos. Verificá tus datos e intentá de nuevo.')
+    } catch (err) {
+      setError(humanizeAuthError(err))
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div
-      className="min-h-screen flex"
-      style={{ background: 'var(--bg-base)' }}
-    >
-      {/* Panel izquierdo — ilustración / marca (solo desktop) */}
-      <div
-        className="hidden lg:flex flex-col justify-between w-2/5 p-12"
-        style={{ background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)', position: 'relative', overflow: 'hidden' }}
-      >
-        {/* Orb decorativo */}
-        <div
-          className="absolute top-0 right-0 w-96 h-96 rounded-full pointer-events-none"
-          style={{ background: 'rgba(255,255,255,0.08)', transform: 'translate(30%, -30%)' }}
-        />
-        <div
-          className="absolute bottom-0 left-0 w-64 h-64 rounded-full pointer-events-none"
-          style={{ background: 'rgba(255,255,255,0.06)', transform: 'translate(-30%, 30%)' }}
-        />
-
-        {/* Logo */}
-        <div className="relative flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-            <Zap size={20} className="text-white" fill="white" />
-          </div>
-          <span className="text-white text-2xl font-extrabold">Equals</span>
-        </div>
-
-        {/* Mensaje central */}
-        <div className="relative space-y-8">
-          <div>
-            <h2 className="text-4xl font-extrabold text-white leading-tight mb-4">
-              Tomá el control de tu dinero
-            </h2>
-            <p className="text-white/75 text-lg leading-relaxed">
-              Gestioná tus finanzas personales de forma simple, visual y segura. Para todas las edades.
-            </p>
-          </div>
-          <div className="space-y-3">
-            {FEATURES.map(f => (
-              <div key={f.label} className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/20">
-                  <f.icon size={15} className="text-white" />
-                </div>
-                <span className="text-white/90 text-sm font-medium">{f.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <p className="relative text-white/50 text-xs">
-          © 2025 Equals · Finanzas personales
-        </p>
-      </div>
+    <div className="flex min-h-screen">
+      <AuthSidebar />
 
       {/* Panel derecho — formulario */}
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
+
           {/* Logo mobile */}
-          <div className="flex items-center gap-3 mb-8 lg:hidden">
+          <div className="flex items-center gap-3 mb-8 lg:hidden enter-1">
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)', boxShadow: 'var(--shadow-brand)' }}
             >
               <Zap size={18} className="text-white" fill="white" />
             </div>
-            <span className="text-2xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
-              Equals
+            <span className="text-2xl font-extrabold" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}>
+              Equal
             </span>
           </div>
 
           {/* Encabezado */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
+          <div className="mb-8 enter-1">
+            <h1
+              className="text-3xl font-extrabold"
+              style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}
+            >
               Bienvenido de vuelta
             </h1>
             <p className="mt-1.5 text-base" style={{ color: 'var(--text-muted)' }}>
-              Ingresá a tu cuenta para continuar
+              Ingresá con tu cuenta de Equal para continuar.
             </p>
           </div>
 
           {/* Formulario */}
           <form
             onSubmit={handleSubmit}
-            className="space-y-5 rounded-3xl p-7"
+            className="space-y-5 rounded-3xl p-7 enter-2"
             style={{
               background: 'var(--bg-card)',
               border: '1px solid var(--border)',
@@ -129,6 +88,7 @@ export default function LoginPage() {
           >
             {error && (
               <div
+                role="alert"
                 className="rounded-xl px-4 py-3 text-sm font-medium flex items-start gap-2"
                 style={{ background: 'var(--expense-50)', color: 'var(--expense-600)', border: '1px solid var(--expense-100)' }}
               >
@@ -136,6 +96,7 @@ export default function LoginPage() {
                 {error}
               </div>
             )}
+
             <Input
               label="Email"
               type="email"
@@ -145,28 +106,41 @@ export default function LoginPage() {
               required
               autoComplete="email"
             />
-            <Input
-              label="Contraseña"
-              type="password"
-              placeholder="Tu contraseña"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-            />
+
+            <div className="space-y-1.5">
+              <Input
+                label="Contraseña"
+                type="password"
+                placeholder="Ingresá tu contraseña"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+              />
+              <div className="flex justify-end">
+                <Link
+                  href="/forgot-password"
+                  className="text-xs font-semibold transition-colors hover:underline"
+                  style={{ color: 'var(--brand-500)' }}
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
+            </div>
+
             <Button type="submit" loading={loading} className="w-full" size="lg">
               <LogIn size={18} /> Iniciar sesión
             </Button>
           </form>
 
-          <p className="text-center text-sm mt-5" style={{ color: 'var(--text-muted)' }}>
-            ¿No tenés cuenta?{' '}
+          <p className="text-center text-sm mt-5 enter-3" style={{ color: 'var(--text-muted)' }}>
+            ¿Todavía no tenés cuenta?{' '}
             <Link
               href="/register"
-              className="font-bold transition-colors"
+              className="font-bold transition-colors hover:underline"
               style={{ color: 'var(--brand-500)' }}
             >
-              Registrarte gratis
+              Crear cuenta gratis
             </Link>
           </p>
         </div>

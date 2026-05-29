@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, CreditCard, TrendingUp, Wifi, SlidersHorizontal } from 'lucide-react'
+import { Plus, Pencil, Trash2, CreditCard, TrendingUp, Wifi, SlidersHorizontal, Stethoscope } from 'lucide-react'
 import { useWallets } from '@/hooks/useWallets'
 import { walletsService } from '@/services/wallets.service'
 import { refundService } from '@/services/refund.service'
@@ -12,6 +12,7 @@ import { HelpButton } from '@/components/help/HelpButton'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { DiagnosticModal } from '@/components/wallets/DiagnosticModal'
 import { formatCurrency } from '@/utils/format'
 import { WALLET_PROVIDERS } from '@/types'
 import type { Wallet as WalletType, WalletWithBalance } from '@/types'
@@ -164,6 +165,8 @@ export default function WalletsPage() {
   const [reconcileTarget, setReconcileTarget] = useState('')
   const [reconciling, setReconciling]         = useState(false)
 
+  const [diagnosticOpen, setDiagnosticOpen] = useState(false)
+
   useEffect(() => {
     if (!wallets.length) return
     const loaded: Record<string, WalletMeta> = {}
@@ -311,6 +314,9 @@ export default function WalletsPage() {
 
         <div className="relative flex gap-2">
           <HelpButton section="wallets" />
+          <Button onClick={() => setDiagnosticOpen(true)} variant="secondary" size="sm">
+            <Stethoscope size={14} /> Diagnóstico
+          </Button>
           <Button onClick={openCreate} variant="hero-primary">
             <Plus size={14} /> Nueva billetera
           </Button>
@@ -751,6 +757,12 @@ export default function WalletsPage() {
           </div>
         )}
       </Modal>
+
+      <DiagnosticModal
+        open={diagnosticOpen}
+        onClose={() => setDiagnosticOpen(false)}
+        liveWallets={wallets}
+      />
     </div>
   )
 }

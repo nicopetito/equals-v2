@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -21,8 +21,6 @@ interface Step {
   bg: string
   checkCondition: boolean
 }
-
-// â”€â”€ Confetti CSS puro â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Confetti() {
   const pieces = Array.from({ length: 32 }, (_, i) => i)
@@ -63,8 +61,6 @@ function Confetti() {
   )
 }
 
-// â”€â”€ Componente principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
 export function Onboarding() {
   const router   = useRouter()
   const { user } = useAuth()
@@ -75,9 +71,7 @@ export function Onboarding() {
   const [visible, setVisible]   = useState(false)
   const [stepIdx, setStepIdx]   = useState(0)
   const [confetti, setConfetti] = useState(false)
-  const [done, setDone]         = useState(false)
 
-  // Mostrar onboarding si el usuario no lo completÃ³
   useEffect(() => {
     if (!user?.id) return
     const completed = localStorage.getItem(DONE_KEY(user.id))
@@ -88,8 +82,8 @@ export function Onboarding() {
     {
       id: 'wallet',
       icon: <CreditCard size={28} />,
-      title: 'CreÃ¡ tu primera billetera',
-      description: 'RegistrÃ¡ tu efectivo, cuenta bancaria o billetera virtual para empezar a llevar el control.',
+      title: 'Creá tu primera billetera',
+      description: 'Registrá tu efectivo, cuenta bancaria o billetera virtual para empezar a llevar el control.',
       cta: 'Ir a Billeteras',
       href: '/wallets',
       color: '#F59E0B',
@@ -99,8 +93,8 @@ export function Onboarding() {
     {
       id: 'transaction',
       icon: <TrendingDown size={28} />,
-      title: 'RegistrÃ¡ tu primer movimiento',
-      description: 'AnotÃ¡ un gasto o ingreso. PodÃ©s categorizar y asignarlo a una billetera.',
+      title: 'Registrá tu primer movimiento',
+      description: 'Anotá un gasto o ingreso. Podés categorizar y asignarlo a una billetera.',
       cta: 'Ir a Transacciones',
       href: '/transactions',
       color: '#059669',
@@ -110,8 +104,8 @@ export function Onboarding() {
     {
       id: 'goal',
       icon: <Target size={28} />,
-      title: 'CreÃ¡ tu primer objetivo',
-      description: 'Â¿AhorrÃ¡s para un viaje, un auto o tu fondo de emergencia? DefinÃ­ tu meta y seguÃ­ el progreso.',
+      title: 'Creá tu primer objetivo',
+      description: '¿Ahorrás para un viaje, un auto o tu fondo de emergencia? Definí tu meta y seguí el progreso.',
       cta: 'Ir a Objetivos',
       href: '/goals',
       color: '#DC2626',
@@ -148,7 +142,6 @@ export function Onboarding() {
     <>
       {confetti && <Confetti />}
 
-      {/* Overlay */}
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
         style={{ background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(6px)' }}
@@ -168,26 +161,28 @@ export function Onboarding() {
             />
           </div>
 
-          {/* BotÃ³n cerrar */}
+          {/* Botón cerrar */}
           <button
             onClick={dismiss}
-            className="absolute top-4 right-4 w-8 h-8 rounded-xl flex items-center justify-center transition-colors hover:bg-white/8 z-10"
+            className="absolute top-4 right-4 w-8 h-8 rounded-xl flex items-center justify-center transition-colors hover:bg-black/5 z-10"
             style={{ color: 'var(--text-muted)' }}
           >
             <X size={16} />
           </button>
 
-          {/* Contenido del paso actual */}
           <div className="p-8">
             {/* Encabezado de bienvenida (solo primer paso) */}
             {stepIdx === 0 && (
               <div className="mb-6 text-center">
-                <span className="text-4xl block mb-2">ðŸ‘‹</span>
-                <h2 className="text-2xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
-                  Â¡Bienvenido a Equals!
+                <span className="text-4xl block mb-2">👋</span>
+                <h2
+                  className="text-2xl font-extrabold"
+                  style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}
+                >
+                  ¡Bienvenido a Equal!
                 </h2>
                 <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-                  CompletÃ¡ estos 3 pasos para empezar a controlar tus finanzas
+                  Completá estos 3 pasos para empezar a controlar tus finanzas
                 </p>
               </div>
             )}
@@ -234,7 +229,10 @@ export function Onboarding() {
               >
                 {currentStep.icon}
               </div>
-              <h3 className="font-extrabold text-lg mb-1" style={{ color: 'var(--text-primary)' }}>
+              <h3
+                className="font-extrabold text-lg mb-1"
+                style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}
+              >
                 {currentStep.title}
               </h3>
               <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
@@ -245,7 +243,7 @@ export function Onboarding() {
                   className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold px-3 py-1.5 rounded-full"
                   style={{ background: 'var(--income-50)', color: 'var(--income-600)' }}
                 >
-                  <Check size={14} strokeWidth={3} /> Â¡Completado!
+                  <Check size={14} strokeWidth={3} /> ¡Completado!
                 </div>
               )}
             </div>
@@ -273,12 +271,11 @@ export function Onboarding() {
                     : { background: 'var(--bg-subtle)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }
                 }
               >
-                {allDone ? 'Â¡Listo para empezar! ðŸŽ‰' : currentStep.checkCondition ? 'Continuar' : 'Omitir'}
+                {allDone ? '¡Listo para empezar! 🎉' : currentStep.checkCondition ? 'Continuar' : 'Omitir'}
                 {!allDone && <ChevronRight size={15} />}
               </button>
             </div>
 
-            {/* Progreso en texto */}
             <p className="text-center text-xs mt-4" style={{ color: 'var(--text-faint)' }}>
               {progress} de {steps.length} pasos completados
             </p>
@@ -288,5 +285,3 @@ export function Onboarding() {
     </>
   )
 }
-
-

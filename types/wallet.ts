@@ -16,6 +16,17 @@ export interface WalletWithBalance extends Wallet {
   transaction_count: number
 }
 
+export interface WalletDiagnostic {
+  wallet_id: string
+  wallet_name: string
+  currency: string
+  initial_balance: number
+  income_total: number
+  expense_total: number
+  computed_balance: number
+  transaction_count: number
+}
+
 export interface WalletSummary {
   wallet_id: string
   wallet_name: string

@@ -6,6 +6,12 @@ import type { Transaction } from '@/types'
 type TxInput = Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'updated_at'>
 
 export async function seedDemoData(): Promise<void> {
+  // Guard: no crear wallets duplicadas si el usuario ya tiene
+  const existingWallets = await walletsService.listWithBalance()
+  if (existingWallets.length > 0) {
+    throw new Error('Ya tenés billeteras. Eliminá todas antes de cargar el ejemplo.')
+  }
+
   // 1. Categorías
   let categories = await categoriesService.list()
   if (categories.length === 0) {
@@ -16,9 +22,9 @@ export async function seedDemoData(): Promise<void> {
 
   // 2. Billeteras
   const [wBanco, wMP, wCash] = await Promise.all([
-    walletsService.create({ name: 'Cuenta corriente', provider: 'Banco',        currency: 'ARS', balance: 150000 }),
-    walletsService.create({ name: 'Digital',          provider: 'Mercado Pago', currency: 'ARS', balance: 85000  }),
-    walletsService.create({ name: 'Efectivo',         provider: 'Cash',         currency: 'ARS', balance: 20000  }),
+    walletsService.create({ name: 'Cuenta corriente', provider: 'Banco',        currency: 'ARS', balance: 0 }),
+    walletsService.create({ name: 'Digital',          provider: 'Mercado Pago', currency: 'ARS', balance: 0 }),
+    walletsService.create({ name: 'Efectivo',         provider: 'Cash',         currency: 'ARS', balance: 0 }),
   ])
 
   const B = wBanco.id!

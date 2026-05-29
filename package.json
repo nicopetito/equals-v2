@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "set NODE_PATH=%CD%\\node_modules && next dev",
+    "dev": "rd /s /q \"%LOCALAPPDATA%\\equal-v2-next\\dev\" 2>nul & rd /s /q \"%LOCALAPPDATA%\\equal-v2-next\\cache\" 2>nul & set NODE_PATH=%CD%\\node_modules && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

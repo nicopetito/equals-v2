@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className={`h-full ${sora.variable} ${inter.variable}`}>
-      <body className="h-full">
+      <body className="h-full" suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>

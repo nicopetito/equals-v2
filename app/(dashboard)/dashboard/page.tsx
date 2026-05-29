@@ -132,7 +132,10 @@ export default function DashboardPage() {
   async function handleSeed() {
     setSeeding(true)
     try { await seedDemoData(); await refetchTx(); await refetchWallets() }
-    catch (e) { console.error(e) } finally { setSeeding(false) }
+    catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error al cargar ejemplo'
+      addToast(msg, 'error')
+    } finally { setSeeding(false) }
   }
 
   async function handleUseTemplate(
@@ -258,7 +261,7 @@ export default function DashboardPage() {
             <p className="text-xl font-extrabold text-white" style={{ fontFamily: 'var(--font-sora)', letterSpacing: '-0.02em' }}>
               Tus finanzas
             </p>
-            <p className="text-[11px] text-white/55 mt-0.5">Resumen del perÃ­odo</p>
+            <p className="text-[11px] text-white/55 mt-0.5">Resumen del período</p>
           </div>
         </div>
         <div className="relative z-10 flex gap-2 shrink-0 flex-wrap justify-end">
@@ -283,13 +286,13 @@ export default function DashboardPage() {
       <div className="enter-2"><FilterBar period={period} setPeriod={setPeriod} currency={currency} setCurrency={v => setCurrency(v as Currency | 'all')} /></div>
 
       {/* â"€â"€ BANNER DEMO â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
-      {allTransactions.length === 0 && !loading && (
+      {allTransactions.length === 0 && wallets.length === 0 && !loading && (
         <div className="glass-card rounded-2xl px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
           style={{ boxShadow: CARD_SHADOW }}>
           <div>
-            <p className="text-sm font-bold" style={{ color: 'var(--brand-500)' }}>Tu cuenta estÃ¡ vacÃ­a</p>
+            <p className="text-sm font-bold" style={{ color: 'var(--brand-500)' }}>Tu cuenta está vacía</p>
             <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              CargÃ¡ datos de ejemplo para explorar el dashboard.
+              Cargá datos de ejemplo para explorar el dashboard.
             </p>
           </div>
           <Button variant="primary" size="sm" onClick={handleSeed} loading={seeding}>
@@ -492,7 +495,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between px-5 py-3.5"
           style={{ borderBottom: '1px solid var(--border-light)' }}>
           <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
-            Ãšltimas transacciones
+            Últimas transacciones
           </span>
           <button onClick={() => router.push('/transactions')}
             className="text-xs font-semibold flex items-center gap-1 px-3 py-1.5 rounded-xl transition-all"
@@ -503,7 +506,7 @@ export default function DashboardPage() {
           </button>
         </div>
         {recentTx.length === 0
-          ? <EmptyState title="Sin transacciones" description="No hay movimientos en este perÃ­odo." />
+          ? <EmptyState title="Sin transacciones" description="No hay movimientos en este período." />
           : <div>{recentTx.map((tx, i) => <TxRow key={tx.id} tx={tx} index={i} last={i === recentTx.length - 1} />)}</div>
         }
       </div>
@@ -514,7 +517,7 @@ export default function DashboardPage() {
         style={{ background: 'var(--bg-subtle)', border: '1px dashed var(--border)', color: 'var(--text-faint)' }}
         onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(173,198,255,0.28)'; e.currentTarget.style.color = 'var(--brand-500)'; e.currentTarget.style.background = 'rgba(173,198,255,0.04)' }}
         onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}>
-        <BarChart2 size={13} /> Ver estadÃ­sticas detalladas
+        <BarChart2 size={13} /> Ver estadísticas detalladas
       </button>
 
       <ReportModal open={reportOpen} onClose={() => setReportOpen(false)}
@@ -685,7 +688,7 @@ function QuickCategoryBreakdown({ transactions, type, currency }: {
   const byCategory = useMemo(() => {
     const map: Record<string, { amount: number; color: string }> = {}
     relevant.forEach(t => {
-      const name = t.category_name ?? 'Sin categorÃ­a'
+      const name = t.category_name ?? 'Sin categoría'
       if (!map[name]) map[name] = { amount: 0, color: t.category_color ?? (type === 'expense' ? 'var(--expense-500)' : 'var(--income-500)') }
       map[name].amount += t.amount
     })
@@ -708,7 +711,7 @@ function QuickCategoryBreakdown({ transactions, type, currency }: {
           <Icon size={11} style={{ color: accent }} />
         </div>
         <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
-          {label} por categorÃ­a
+          {label} por categoría
         </span>
         <span className="ml-auto text-[10px] font-semibold" style={{ color: 'var(--text-faint)' }}>
           {formatCurrency(total, currency)}

@@ -9,8 +9,12 @@ export const authService = {
     return data
   },
 
-  async signUp(email: string, password: string) {
-    const { data, error } = await supabase.auth.signUp({ email, password })
+  async signUp(email: string, password: string, fullName?: string) {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName?.trim() || '' } },
+    })
     if (error) throw error
     return data
   },
@@ -25,6 +29,17 @@ export const authService = {
       redirectTo: `${window.location.origin}/reset-password`,
     })
     if (error) throw error
+  },
+
+  async updatePassword(newPassword: string) {
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) throw error
+  },
+
+  async verifyOtp(email: string, token: string) {
+    const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' })
+    if (error) throw error
+    return data
   },
 
   async getUser() {
