@@ -9,11 +9,12 @@ import { CreditCard, TrendingDown, Target, Zap, X } from 'lucide-react'
 const ACTIONS = [
   {
     icon: CreditCard,
-    color: '#F59E0B',
-    bg: 'rgba(245,158,11,0.10)',
+    color: 'var(--brand-500)',
+    bg: 'var(--brand-50)',
     title: 'Agregá una billetera',
     desc: 'Registrá tu efectivo, cuenta bancaria o billetera virtual.',
     href: '/wallets',
+    primary: true,
   },
   {
     icon: TrendingDown,
@@ -22,6 +23,7 @@ const ACTIONS = [
     title: 'Registrá un movimiento',
     desc: 'Anotá un gasto o ingreso y empezá a ver tu situación financiera.',
     href: '/transactions',
+    primary: false,
   },
   {
     icon: Target,
@@ -30,6 +32,7 @@ const ACTIONS = [
     title: 'Definí un objetivo',
     desc: 'Ahorrá para un viaje, un fondo de emergencia o lo que sea.',
     href: '/goals',
+    primary: false,
   },
 ]
 
@@ -48,6 +51,7 @@ export function WelcomeModal() {
       (user.user_metadata?.full_name as string | undefined)?.split(' ')[0] ||
       user.email?.split('@')[0] ||
       ''
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUserName(name)
     setOpen(true)
   }, [user])
@@ -114,9 +118,12 @@ export function WelcomeModal() {
                 key={action.href}
                 onClick={() => dismiss(action.href)}
                 className="w-full flex items-center gap-3 rounded-2xl p-3.5 text-left transition-all duration-200 hover:-translate-y-px"
-                style={{ border: '1px solid var(--border)', background: 'var(--bg-subtle)' }}
-                onMouseEnter={e => { e.currentTarget.style.boxShadow = 'var(--shadow-md)' }}
-                onMouseLeave={e => { e.currentTarget.style.boxShadow = '' }}
+                style={action.primary
+                  ? { border: '1.5px solid var(--brand-200)', background: 'var(--brand-50)', boxShadow: '0 0 0 3px rgba(109,59,215,0.06)' }
+                  : { border: '1px solid var(--border)', background: 'var(--bg-subtle)' }
+                }
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = action.primary ? '0 4px 16px rgba(109,59,215,0.15)' : 'var(--shadow-md)' }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = action.primary ? '0 0 0 3px rgba(109,59,215,0.06)' : '' }}
               >
                 <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -125,14 +132,24 @@ export function WelcomeModal() {
                   <action.icon size={18} style={{ color: action.color }} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
-                    {action.title}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
+                      {action.title}
+                    </p>
+                    {action.primary && (
+                      <span
+                        className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                        style={{ background: 'var(--brand-100)', color: 'var(--brand-600)' }}
+                      >
+                        Paso 1
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
                     {action.desc}
                   </p>
                 </div>
-                <span className="text-base flex-shrink-0" style={{ color: 'var(--text-faint)' }}>→</span>
+                <span className="text-base flex-shrink-0" style={{ color: action.primary ? 'var(--brand-500)' : 'var(--text-faint)' }}>→</span>
               </button>
             ))}
           </div>

@@ -10,6 +10,7 @@ export function useCountUp(target: number, duration = 900, decimals = 2): number
 
   useEffect(() => {
     if (duration <= 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setValue(target)
       return
     }
@@ -23,7 +24,6 @@ export function useCountUp(target: number, duration = 900, decimals = 2): number
       if (!startTimeRef.current) startTimeRef.current = time
       const elapsed  = time - startTimeRef.current
       const progress = Math.min(elapsed / duration, 1)
-      // ease-out cubic
       const eased = 1 - Math.pow(1 - progress, 3)
       const current = startValueRef.current + (target - startValueRef.current) * eased
       const factor  = Math.pow(10, decimals)

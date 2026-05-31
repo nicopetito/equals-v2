@@ -5,30 +5,28 @@ import { transactionTemplateService } from '@/services/transaction_template.serv
 import type { TransactionTemplate, TransactionTemplateCreate } from '@/types'
 
 export function useTransactionTemplates() {
-  const [items, setItems] = useState<TransactionTemplate[]>([])
+  const [items, setItems]     = useState<TransactionTemplate[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]     = useState<string | null>(null)
+  const [rev, setRev]         = useState(0)
 
-  const refetch = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const result = await transactionTemplateService.list()
-      setItems(result)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al cargar plantillas')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  useEffect(() => {
+    let active = true
+    transactionTemplateService.list()
+      .then(r  => { if (active) setItems(r) })
+      .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Error al cargar plantillas') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [rev])
 
-  useEffect(() => { refetch() }, [refetch])
+  function refetch() { setError(null); setLoading(true); setRev(r => r + 1) }
 
   const createTemplate = useCallback(async (data: TransactionTemplateCreate): Promise<TransactionTemplate> => {
     const created = await transactionTemplateService.create(data)
-    await refetch()
+    refetch()
     return created
-  }, [refetch])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rev])
 
   const updateTemplate = useCallback(async (id: string, data: Partial<TransactionTemplateCreate>): Promise<TransactionTemplate> => {
     const updated = await transactionTemplateService.update(id, data)

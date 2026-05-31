@@ -192,7 +192,7 @@ function EventDots({
   if (visible.length === 0) return null
 
   return (
-    <div className="flex items-center gap-[3px] mt-1">
+    <div className="flex items-center gap-[3px]">
       {visible.map(dot => (
         <span key={dot.key}
           style={{ width: 4, height: 4, borderRadius: '50%', background: dot.color, flexShrink: 0 }} />
@@ -246,7 +246,9 @@ function DayCell({
         </span>
       )}
 
-      <EventDots dayData={dayData} filter={filter} taskCount={taskCount} />
+      <div className="mt-auto pt-0.5">
+        <EventDots dayData={dayData} filter={filter} taskCount={taskCount} />
+      </div>
     </div>
   )
 }
@@ -475,7 +477,7 @@ function TaskInput({
 }
 
 function DayPanel({
-  selected, dayData, tasks, filter, onClose, onAddTask, onToggleTask, onDeleteTask,
+  selected, dayData, tasks, onClose, onAddTask, onToggleTask, onDeleteTask,
 }: {
   selected: Date | null; dayData: DayData | null; tasks: CalendarTask[]
   filter: CalendarFilter; onClose: () => void
@@ -546,6 +548,7 @@ function DayPanel({
       </div>
 
       {/* Scrollable sections */}
+      <div style={{ position: 'relative' }}>
       <div style={{ maxHeight: 440, overflowY: 'auto' }}>
 
         {/* Financial events */}
@@ -608,6 +611,8 @@ function DayPanel({
           }
           <TaskInput onAdd={(text) => onAddTask(selectedKey, text)} />
         </div>
+      </div>
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 32, background: 'linear-gradient(transparent, var(--bg-card))', pointerEvents: 'none' }} />
       </div>
     </div>
   )

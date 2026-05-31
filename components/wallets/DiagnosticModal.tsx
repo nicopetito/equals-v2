@@ -49,7 +49,9 @@ export function DiagnosticModal({ open, onClose, liveWallets }: DiagnosticModalP
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (open) load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const hasDiscrepancy = rows.some(r => r.discrepancy > 0.001)

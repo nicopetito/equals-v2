@@ -11,29 +11,25 @@ export interface UseCalendarTasksReturn {
   addTask: (date: string, text: string) => Promise<void>
   toggleTask: (id: string, done: boolean) => Promise<void>
   deleteTask: (id: string) => Promise<void>
-  refetch: () => Promise<void>
+  refetch: () => void
 }
 
 export function useCalendarTasks(month: Date): UseCalendarTasksReturn {
   const from = format(startOfMonth(month), 'yyyy-MM-dd')
   const to   = format(endOfMonth(month),   'yyyy-MM-dd')
 
-  const [tasks, setTasks] = useState<CalendarTask[]>([])
+  const [tasks, setTasks]     = useState<CalendarTask[]>([])
   const [loading, setLoading] = useState(true)
+  const [rev, setRev]         = useState(0)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await calendarTasksService.listByMonth(from, to)
-      setTasks(data)
-    } catch {
-      // tasks are non-critical, silently fail
-    } finally {
-      setLoading(false)
-    }
-  }, [from, to])
-
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    let active = true
+    calendarTasksService.listByMonth(from, to)
+      .then(data => { if (active) setTasks(data) })
+      .catch(() => { /* tasks are non-critical, silently fail */ })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [from, to, rev])
 
   const tasksByDate = useMemo(() => {
     const map = new Map<string, CalendarTask[]>()
@@ -80,5 +76,7 @@ export function useCalendarTasks(month: Date): UseCalendarTasksReturn {
     }
   }, [tasks])
 
-  return { tasksByDate, loading, addTask, toggleTask, deleteTask, refetch: load }
+  function refetch() { setLoading(true); setRev(r => r + 1) }
+
+  return { tasksByDate, loading, addTask, toggleTask, deleteTask, refetch }
 }

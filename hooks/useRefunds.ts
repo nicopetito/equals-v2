@@ -1,49 +1,44 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { refundService } from '@/services/refund.service'
 import type { Refund } from '@/types'
 
 export function useRefunds() {
-  const [items, setItems] = useState<Refund[]>([])
+  const [items, setItems]     = useState<Refund[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]     = useState<string | null>(null)
+  const [rev, setRev]         = useState(0)
 
-  const refetch = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const result = await refundService.list()
-      setItems(result)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al cargar reintegros')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  useEffect(() => {
+    let active = true
+    refundService.list()
+      .then(r  => { if (active) setItems(r) })
+      .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Error al cargar reintegros') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [rev])
 
-  useEffect(() => { refetch() }, [refetch])
+  function refetch() { setError(null); setLoading(true); setRev(r => r + 1) }
 
   return { items, loading, error, refetch }
 }
 
 export function usePendingRefunds() {
-  const [items, setItems] = useState<Refund[]>([])
+  const [items, setItems]     = useState<Refund[]>([])
   const [loading, setLoading] = useState(true)
+  const [rev, setRev]         = useState(0)
 
-  const refetch = useCallback(async () => {
-    setLoading(true)
-    try {
-      const result = await refundService.listPending()
-      setItems(result)
-    } catch {
-      // silencioso — no crashear el dashboard si la tabla no existe aún
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  useEffect(() => {
+    let active = true
+    refundService.listPending()
+      .then(r  => { if (active) setItems(r) })
+      .catch(e => { console.error('[usePendingRefunds]', e) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [rev])
 
-  useEffect(() => { refetch() }, [refetch])
+  function refetch() { setLoading(true); setRev(r => r + 1) }
 
   return { items, loading, refetch }
 }

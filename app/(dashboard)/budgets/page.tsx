@@ -94,6 +94,11 @@ export default function BudgetsPage() {
     [allRefunds]
   )
 
+  const sinCategoriaIds = useMemo(
+    () => new Set((categories ?? []).filter(c => c.is_system).map(c => c.id!)),
+    [categories]
+  )
+
   const [modalOpen, setModalOpen] = useState(false)
   const [editing,   setEditing]   = useState<Budget | null>(null)
   const [form, setForm]           = useState<FormState>({
@@ -104,6 +109,7 @@ export default function BudgetsPage() {
 
   // ── month navigation ────────────────────────────────────────────────────────
 
+  /* eslint-disable react-hooks/preserve-manual-memoization */
   const prevMonth = useCallback(() => {
     if (month === 1) { setMonth(12); setYear(y => y - 1) }
     else setMonth(m => m - 1)
@@ -118,6 +124,7 @@ export default function BudgetsPage() {
     setMonth(now.getMonth() + 1)
     setYear(now.getFullYear())
   }, [now])
+  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   const isCurrentMonth = month === now.getMonth() + 1 && year === now.getFullYear()
 
@@ -150,6 +157,20 @@ export default function BudgetsPage() {
     }).length
     return { totalLimit, totalSpent, overallPct, overBudget }
   }, [budgets, spentByCategory])
+
+  // ── uncategorized expenses in current period ────────────────────────────────
+
+  const uncategorizedStats = useMemo(() => {
+    const pad  = (n: number) => String(n).padStart(2, '0')
+    const from = `${year}-${pad(month)}-01`
+    const to   = `${year}-${pad(month)}-31`
+    const txs  = allTx.filter(t =>
+      t.type === 'expense' &&
+      (!t.category_id || sinCategoriaIds.has(t.category_id)) &&
+      t.date >= from && t.date <= to
+    )
+    return { count: txs.length, total: txs.reduce((s, t) => s + safeNumber(t.amount), 0) }
+  }, [allTx, month, year, sinCategoriaIds])
 
   // ── category options for modal ──────────────────────────────────────────────
 
@@ -333,8 +354,7 @@ export default function BudgetsPage() {
           ].map((s, i) => (
             <div
               key={i}
-              className="flex flex-col gap-0.5 px-4 py-3 bg-card"
-              style={{ borderRight: i < 5 ? '1px solid var(--border)' : undefined }}
+              className="budget-strip-item flex flex-col gap-0.5 px-4 py-3 bg-card"
             >
               <span className="text-xs uppercase tracking-wide font-semibold" style={{ color: 'var(--text-muted)' }}>
                 {s.label}
@@ -359,6 +379,31 @@ export default function BudgetsPage() {
           year={year}
           refunds={allRefunds}
         />
+      )}
+
+      {/* UNCATEGORIZED BANNER */}
+      {uncategorizedStats.count > 0 && (
+        <div
+          className="flex items-center gap-3 rounded-2xl px-4 py-3"
+          style={{ background: '#FFFBEB', border: '1px solid #FDE68A' }}
+        >
+          <AlertTriangle size={16} style={{ color: '#D97706', flexShrink: 0 }} />
+          <div className="flex-1 min-w-0">
+            <span className="text-sm font-semibold" style={{ color: '#92400E' }}>
+              {uncategorizedStats.count} gasto{uncategorizedStats.count > 1 ? 's' : ''} sin categoría en {MONTH_NAMES[month - 1]} {year}
+            </span>
+            <span className="text-xs ml-2" style={{ color: '#B45309' }}>
+              — {formatCurrency(uncategorizedStats.total, 'ARS')} no asignados a ningún presupuesto
+            </span>
+          </div>
+          <a
+            href={`/transactions?no_category=true`}
+            className="text-xs font-bold whitespace-nowrap"
+            style={{ color: '#D97706', textDecoration: 'underline' }}
+          >
+            Ver gastos →
+          </a>
+        </div>
       )}
 
       {/* BUDGET LIST */}
@@ -420,11 +465,17 @@ export default function BudgetsPage() {
                   <div className="flex items-center gap-2 min-w-0">
                     <span
                       className="w-3 h-3 rounded-full shrink-0"
-                      style={{ background: budget.category_color ?? 'var(--brand-500)' }}
+                      style={{ background: budget.category_name ? (budget.category_color ?? 'var(--brand-500)') : '#9ca3af' }}
                     />
-                    <span className="font-bold text-sm truncate" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}>
-                      {budget.category_name ?? '—'}
-                    </span>
+                    {budget.category_name ? (
+                      <span className="font-bold text-sm truncate" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}>
+                        {budget.category_name}
+                      </span>
+                    ) : (
+                      <span className="font-bold text-sm truncate" style={{ color: '#9ca3af', fontFamily: 'var(--font-sora)', fontStyle: 'italic' }}>
+                        Categoría eliminada
+                      </span>
+                    )}
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0"
                       style={{ background: styles.bg, color: styles.text }}

@@ -36,6 +36,7 @@ export function TemplateConfirmModal({
   const [saving, setSaving]         = useState(false)
   const [error, setError]           = useState('')
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (template) {
       setCAmount(template.suggested_amount?.toString() ?? '')
@@ -46,6 +47,7 @@ export function TemplateConfirmModal({
       setError('')
     }
   }, [template])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (!template) return null
 

@@ -1,11 +1,8 @@
-﻿import { type LucideIcon, Inbox } from 'lucide-react'
-
-type IllustrationType = 'default' | 'wallets' | 'transactions' | 'goals' | 'categories' | 'scheduled' | 'dollar'
+﻿type IllustrationType = 'default' | 'wallets' | 'transactions' | 'goals' | 'categories' | 'scheduled' | 'dollar'
 
 interface EmptyStateProps {
   title?: string
   description?: string
-  icon?: LucideIcon
   action?: { label: string; onClick: () => void }
   type?: IllustrationType
 }
@@ -89,7 +86,6 @@ function Illustration({ type }: { type: IllustrationType }) {
 export function EmptyState({
   title = 'Sin datos',
   description = 'No hay registros para mostrar.',
-  icon: _Icon = Inbox,
   action,
   type = 'default',
 }: EmptyStateProps) {

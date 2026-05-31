@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend,
+  Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { format, parseISO, eachDayOfInterval, eachWeekOfInterval, startOfWeek } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -93,9 +93,12 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
 }
 
 export function IncomeExpenseChart({ transactions, start, end, currency, loading }: Props) {
+  const startKey = start.toISOString()
+  const endKey   = end.toISOString()
   const data = useMemo(
     () => buildChartData(transactions, start, end),
-    [transactions, start.toISOString(), end.toISOString()]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [transactions, startKey, endKey]
   )
 
   if (loading) {

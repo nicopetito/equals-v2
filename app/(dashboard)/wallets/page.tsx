@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { Plus, Pencil, Trash2, CreditCard, TrendingUp, Wifi, SlidersHorizontal, Stethoscope } from 'lucide-react'
 import { useWallets } from '@/hooks/useWallets'
 import { walletsService } from '@/services/wallets.service'
-import { refundService } from '@/services/refund.service'
 import { useToast } from '@/components/providers/ToastProvider'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -156,7 +155,7 @@ export default function WalletsPage() {
   const [saving, setSaving]       = useState(false)
   const [deleting, setDeleting]   = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{
-    id: string; name: string; transactionCount: number; activeFixedTerms: number; pendingRefunds: number
+    id: string; name: string; transactionCount: number; activeFixedTerms: number; pendingRefunds: number; currentBalance: number; recurringCount: number
   } | null>(null)
   const [error, setError]         = useState<string | null>(null)
 
@@ -171,6 +170,7 @@ export default function WalletsPage() {
     if (!wallets.length) return
     const loaded: Record<string, WalletMeta> = {}
     wallets.forEach(w => { if (w.id) loaded[w.id] = loadMeta(w.id) })
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMetas(loaded)
   }, [wallets])
 
@@ -252,11 +252,9 @@ export default function WalletsPage() {
 
   async function confirmDelete() {
     if (!deleteTarget) return
+    // All conditions must be clear — the modal already prevents reaching this point when blocked
     setDeleting(deleteTarget.id)
     try {
-      if (deleteTarget.pendingRefunds > 0) {
-        await refundService.cancelByWallet(deleteTarget.id)
-      }
       await walletsService.delete(deleteTarget.id)
       addToast(`Billetera "${deleteTarget.name}" eliminada`, 'info')
       setDeleteTarget(null)
@@ -416,7 +414,7 @@ export default function WalletsPage() {
                     >
                       {curr}
                     </span>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-200">
                       <button
                         onClick={() => openEdit(wallet)}
                         className="w-7 h-7 rounded-lg flex items-center justify-center text-white transition-colors"
@@ -714,48 +712,80 @@ export default function WalletsPage() {
         onClose={() => setDeleteTarget(null)}
         title="Eliminar billetera"
       >
-        {deleteTarget && (
-          <div className="space-y-4">
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              ¿Eliminar la billetera <strong>"{deleteTarget.name}"</strong>? Esta acción no se puede deshacer.
-            </p>
+        {deleteTarget && (() => {
+          const blockReasons: string[] = []
+          if (deleteTarget.transactionCount > 0)
+            blockReasons.push(`${deleteTarget.transactionCount} transacción${deleteTarget.transactionCount !== 1 ? 'es' : ''} asociada${deleteTarget.transactionCount !== 1 ? 's' : ''}`)
+          if (deleteTarget.currentBalance !== 0)
+            blockReasons.push(`saldo de ${formatCurrency(deleteTarget.currentBalance, '')} distinto de $0`)
+          if (deleteTarget.activeFixedTerms > 0)
+            blockReasons.push(`${deleteTarget.activeFixedTerms} plazo${deleteTarget.activeFixedTerms !== 1 ? 's' : ''} fijo${deleteTarget.activeFixedTerms !== 1 ? 's' : ''} activo${deleteTarget.activeFixedTerms !== 1 ? 's' : ''}`)
+          if (deleteTarget.pendingRefunds > 0)
+            blockReasons.push(`${deleteTarget.pendingRefunds} reintegro${deleteTarget.pendingRefunds !== 1 ? 's' : ''} pendiente${deleteTarget.pendingRefunds !== 1 ? 's' : ''}`)
+          if (deleteTarget.recurringCount > 0)
+            blockReasons.push(`${deleteTarget.recurringCount} operación${deleteTarget.recurringCount !== 1 ? 'es' : ''} programada${deleteTarget.recurringCount !== 1 ? 's' : ''} asignada${deleteTarget.recurringCount !== 1 ? 's' : ''}`)
 
-            <div className="rounded-xl p-4 space-y-2" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Impacto</p>
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                {deleteTarget.transactionCount} transacción{deleteTarget.transactionCount !== 1 ? 'es' : ''} perderán su referencia de billetera
-              </p>
+          const isBlocked = blockReasons.length > 0
 
-              {deleteTarget.activeFixedTerms > 0 && (
-                <div className="rounded-lg px-3 py-2" style={{ background: 'var(--expense-50)', border: '1px solid var(--expense-100)' }}>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--expense-600)' }}>
-                    {deleteTarget.activeFixedTerms} plazo{deleteTarget.activeFixedTerms !== 1 ? 's' : ''} fijo{deleteTarget.activeFixedTerms !== 1 ? 's' : ''} activo{deleteTarget.activeFixedTerms !== 1 ? 's' : ''} quedarán sin billetera asignada
+          return (
+            <div className="space-y-4">
+              {isBlocked ? (
+                <>
+                  <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--expense-50)', border: '1px solid var(--expense-100)' }}>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--expense-700, #b91c1c)' }}>
+                      No podés eliminar esta billetera porque tiene movimientos asociados.
+                    </p>
+                    <ul className="space-y-1">
+                      {blockReasons.map(r => (
+                        <li key={r} className="text-sm flex items-start gap-1.5" style={{ color: 'var(--expense-600)' }}>
+                          <span className="mt-0.5 shrink-0">•</span>
+                          <span>{r}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      Reasigná o eliminá esos movimientos antes de continuar.
+                    </p>
+                  </div>
+                  {deleteTarget.transactionCount > 0 && (
+                    <a
+                      href={`/transactions?wallet_id=${deleteTarget.id}`}
+                      className="block text-center text-sm font-semibold py-2 rounded-xl transition-all"
+                      style={{ background: 'var(--bg-subtle)', color: 'var(--brand-500)', border: '1px solid var(--border)' }}
+                    >
+                      Ver transacciones asociadas →
+                    </a>
+                  )}
+                  <Button variant="secondary" onClick={() => setDeleteTarget(null)} className="w-full">
+                    Cerrar
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    ¿Eliminar la billetera <strong>&ldquo;{deleteTarget.name}&rdquo;</strong>? Esta acción no se puede deshacer.
                   </p>
-                </div>
-              )}
-
-              {deleteTarget.pendingRefunds > 0 && (
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                  {deleteTarget.pendingRefunds} reintegro{deleteTarget.pendingRefunds !== 1 ? 's' : ''} pendiente{deleteTarget.pendingRefunds !== 1 ? 's' : ''} serán cancelados automáticamente
-                </p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Esta billetera no tiene transacciones, saldo, plazos fijos ni reintegros asociados. Es seguro eliminarla.
+                  </p>
+                  <div className="flex gap-3 pt-1">
+                    <Button variant="secondary" onClick={() => setDeleteTarget(null)} className="flex-1">
+                      Cancelar
+                    </Button>
+                    <Button
+                      variant="danger"
+                      onClick={confirmDelete}
+                      loading={!!deleting}
+                      className="flex-1"
+                    >
+                      Eliminar
+                    </Button>
+                  </div>
+                </>
               )}
             </div>
-
-            <div className="flex gap-3 pt-1">
-              <Button variant="secondary" onClick={() => setDeleteTarget(null)} className="flex-1">
-                Cancelar
-              </Button>
-              <Button
-                variant="danger"
-                onClick={confirmDelete}
-                loading={!!deleting}
-                className="flex-1"
-              >
-                Eliminar
-              </Button>
-            </div>
-          </div>
-        )}
+          )
+        })()}
       </Modal>
 
       <DiagnosticModal

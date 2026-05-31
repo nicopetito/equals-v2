@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/Button'
 import { AuthSidebar } from '@/components/auth/AuthSidebar'
 import { LogIn, Zap } from 'lucide-react'
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 function humanizeAuthError(error: unknown): string {
   const msg = error instanceof Error ? error.message.toLowerCase() : ''
   if (msg.includes('invalid login credentials') || msg.includes('invalid_credentials'))
@@ -31,6 +33,7 @@ export default function LoginPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
+    if (!EMAIL_RE.test(email)) { setError('Ingresá un email válido.'); return }
     setLoading(true)
     try {
       await signIn(email, password)

@@ -5,28 +5,26 @@ import { dollarService } from '@/services/dollar.service'
 import type { DollarRate } from '@/types'
 
 export function useDollar(refreshInterval = 60_000) {
-  const [data, setData] = useState<DollarRate[]>([])
+  const [data, setData]       = useState<DollarRate[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  async function load() {
-    setLoading(true)
-    setError(null)
-    try {
-      const rates = await dollarService.getRates()
-      setData(rates)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error fetching rates')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const [error, setError]     = useState<string | null>(null)
+  const [rev, setRev]         = useState(0)
 
   useEffect(() => {
-    load()
-    const interval = setInterval(load, refreshInterval)
+    let active = true
+    dollarService.getRates()
+      .then(rates => { if (active) { setData(rates); setError(null) } })
+      .catch(e    => { if (active) setError(e instanceof Error ? e.message : 'Error fetching rates') })
+      .finally(()  => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [rev])
+
+  useEffect(() => {
+    if (refreshInterval <= 0) return
+    const interval = setInterval(() => setRev(r => r + 1), refreshInterval)
     return () => clearInterval(interval)
   }, [refreshInterval])
 
-  return { data, loading, error, refetch: load }
+  function refetch() { setError(null); setLoading(true); setRev(r => r + 1) }
+  return { data, loading, error, refetch }
 }

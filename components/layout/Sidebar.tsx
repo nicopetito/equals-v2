@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Wallet, CreditCard, Tag,
   CalendarClock, Target, DollarSign, PiggyBank,
   LogOut, ChevronLeft, ChevronRight, X, Zap,
-  Upload, SlidersHorizontal, CalendarDays, Trophy, BarChart2,
+  Upload, SlidersHorizontal, CalendarDays, Trophy, BarChart2, Activity,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -69,6 +69,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { href: '/calendar',     label: 'Calendario',   icon: CalendarDays },
       { href: '/achievements', label: 'Logros',       icon: Trophy       },
       { href: '/import',       label: 'Importar CSV', icon: Upload       },
+      { href: '/health',       label: 'Salud del sistema', icon: Activity },
     ],
   },
 ]
@@ -79,9 +80,9 @@ function UserAvatar({ email }: { email: string }) {
     <div
       className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 select-none"
       style={{
-        background: 'rgba(109,59,215,0.10)',
-        color: '#6d3bd7',
-        border: '1px solid rgba(109,59,215,0.15)',
+        background: 'var(--brand-50)',
+        color: 'var(--brand-500)',
+        border: '1px solid var(--brand-100)',
         fontFamily: 'var(--font-sora)',
       }}
     >
@@ -229,6 +230,7 @@ export function Sidebar({ onClose, mobile = false }: SidebarProps) {
                     href={item.href}
                     onClick={onClose}
                     title={isCollapsed ? item.label : undefined}
+                    aria-label={isCollapsed ? item.label : undefined}
                     className={cn(
                       'relative flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[13px] font-medium transition-all duration-150 group overflow-hidden',
                       isCollapsed && 'justify-center px-0'
@@ -274,6 +276,7 @@ export function Sidebar({ onClose, mobile = false }: SidebarProps) {
                     {/* Tooltip collapsed */}
                     {isCollapsed && (
                       <span
+                        role="tooltip"
                         className="absolute left-full ml-3 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-50"
                         style={{
                           background: '#1A1F36',

@@ -42,6 +42,11 @@ export const authService = {
     return data
   },
 
+  async resendOtp(email: string) {
+    const { error } = await supabase.auth.resend({ type: 'signup', email })
+    if (error) throw error
+  },
+
   async getUser() {
     const { data: { user }, error } = await supabase.auth.getUser()
     if (error) return null

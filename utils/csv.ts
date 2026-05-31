@@ -184,12 +184,16 @@ export function parseCSV(content: string, separator?: string): { headers: string
 
 // ── Conversión de tipos ───────────────────────────────────────────────────────
 
-export function parseArgentineAmount(str: string): number {
-  if (!str) return 0
+// Retorna null cuando el valor no puede parsearse (vacío, texto, etc.).
+// Retorna null también para monto 0 ya que en contexto de importación bancaria indica fallo de parse.
+export function parseArgentineAmount(str: string): number | null {
+  if (!str || !str.trim()) return null
   // Limpiar símbolos de moneda, espacios y signos ANTES de detectar formato
   let cleaned = str.replace(/[$€£\s]/g, '').trim()
   const negative = cleaned.startsWith('-') || (cleaned.startsWith('(') && cleaned.endsWith(')'))
   cleaned = cleaned.replace(/^[-(]|[)]$/g, '').replace(/^[+]/, '')
+
+  if (!cleaned) return null
 
   // Detectar formato numérico
   // Formato argentino/europeo: 1.234,56 — coma decimal, punto de miles
@@ -206,8 +210,9 @@ export function parseArgentineAmount(str: string): number {
     cleaned = cleaned.replace(/[.,]/g, '')
   }
 
-  const amount = parseFloat(cleaned) || 0
-  return negative ? -Math.abs(amount) : Math.abs(amount)
+  const parsed = parseFloat(cleaned)
+  if (isNaN(parsed) || parsed === 0) return null
+  return negative ? -Math.abs(parsed) : Math.abs(parsed)
 }
 
 export function parseDateStr(str: string, format: DateFormat): string | null {
@@ -261,8 +266,21 @@ export function mapRowsToTransactions(rows: CsvRow[], mapping: ColumnMapping): P
     const rawDesc   = row[mapping.descriptionColumn] ?? ''
     const rawAmount = row[mapping.amountColumn] ?? ''
 
-    const dateStr = parseDateStr(rawDate, mapping.dateFormat)
     const amount  = parseArgentineAmount(rawAmount)
+
+    // Monto no parseable o cero → error (en extractos bancarios un monto 0 es casi siempre un fallo de parse)
+    if (amount === null) {
+      return {
+        date: '', description: rawDesc || '(sin descripción)', amount: 0,
+        type: 'expense' as const, currency: mapping.defaultCurrency,
+        wallet_id: mapping.defaultWalletId ?? null,
+        category_id: mapping.defaultCategoryId ?? null,
+        _index: i,
+        _error: `Monto inválido: "${rawAmount}"`,
+      }
+    }
+
+    const dateStr = parseDateStr(rawDate, mapping.dateFormat)
 
     if (!dateStr) {
       return {
@@ -272,17 +290,6 @@ export function mapRowsToTransactions(rows: CsvRow[], mapping: ColumnMapping): P
         category_id: mapping.defaultCategoryId ?? null,
         _index: i,
         _error: `Fecha inválida: "${rawDate}"`,
-      }
-    }
-
-    if (!rawDesc.trim()) {
-      return {
-        date: dateStr, description: '(sin descripción)', amount: Math.abs(amount),
-        type: 'expense' as const, currency: mapping.defaultCurrency,
-        wallet_id: mapping.defaultWalletId ?? null,
-        category_id: mapping.defaultCategoryId ?? null,
-        _index: i,
-        _error: 'Descripción vacía',
       }
     }
 

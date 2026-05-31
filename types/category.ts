@@ -5,6 +5,7 @@ export interface Category {
   type: 'income' | 'expense'
   color?: string
   icon?: string
+  is_system?: boolean
   created_at?: string
   updated_at?: string
 }

@@ -1,29 +1,25 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { walletsService } from '@/services/wallets.service'
 import type { WalletWithBalance } from '@/types'
 
 export function useWallets() {
-  const [data, setData] = useState<WalletWithBalance[]>([])
+  const [data, setData]       = useState<WalletWithBalance[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]     = useState<string | null>(null)
+  const [rev, setRev]         = useState(0)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const result = await walletsService.listWithBalance()
-      setData(result)
-    } catch (e) {
-      console.error('[useWallets] error:', e)
-      setError(e instanceof Error ? e.message : 'Error loading wallets')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  useEffect(() => {
+    let active = true
+    walletsService.listWithBalance()
+      .then(r  => { if (active) setData(r) })
+      .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Error loading wallets') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [rev])
 
-  useEffect(() => { load() }, [load])
+  function refetch() { setError(null); setLoading(true); setRev(r => r + 1) }
 
-  return { data, loading, error, refetch: load }
+  return { data, loading, error, refetch }
 }

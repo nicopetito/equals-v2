@@ -167,7 +167,6 @@ export function useCalendarData(
 
   useEffect(() => {
     let cancelled = false
-    setRecurringLoading(true)
     recurringService.list()
       .then(data => { if (!cancelled) setRecurring(data) })
       .catch(() => {})
@@ -177,7 +176,6 @@ export function useCalendarData(
 
   useEffect(() => {
     let cancelled = false
-    setRefundsLoading(true)
     refundService.list()
       .then(data => { if (!cancelled) setRefunds(data) })
       .catch(() => {})
@@ -210,10 +208,10 @@ export function useCalendarData(
       // Add to events array only when filter matches
       if (filter === 'all' || filter === tx.type) {
         day.transactions.push({
-          id:             tx.id ?? `${key}-${Math.random()}`,
+          id:             tx.id!,
           type:           'transaction',
           subtype:        tx.type,
-          label:          tx.description,
+          label:          tx.description ?? '',
           amount:         amt,
           currency:       tx.currency,
           color:          tx.type === 'income' ? EVENT_COLORS.income : EVENT_COLORS.expense,

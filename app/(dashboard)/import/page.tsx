@@ -332,35 +332,6 @@ function AutoDetectChecklist() {
   )
 }
 
-// ── ImportTips ────────────────────────────────────────────────────────────────
-
-function ImportTips() {
-  return (
-    <div
-      className="rounded-2xl p-4"
-      style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-light)' }}
-    >
-      <p className="text-[11px] font-bold mb-2.5" style={{ color: 'var(--text-muted)' }}>
-        Para mejores resultados
-      </p>
-      <div className="space-y-2">
-        {[
-          'Exportá el resumen en CSV desde la app de tu banco.',
-          'Asegurate de que incluya fecha, descripción y monto.',
-          'Vas a poder revisar todo antes de confirmar.',
-        ].map((tip, i) => (
-          <div key={i} className="flex items-start gap-2">
-            <span className="text-[10px] font-black mt-px shrink-0" style={{ color: 'var(--brand-400)' }}>
-              {i + 1}.
-            </span>
-            <span className="text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>{tip}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // ── ImportHistoryPanel ────────────────────────────────────────────────────────
 
 function ImportHistoryPanel({ history }: { history: ImportHistoryEntry[] }) {
@@ -840,12 +811,18 @@ export default function ImportPage() {
   function onDrop(e: React.DragEvent) {
     e.preventDefault(); setDragging(false)
     const file = e.dataTransfer.files[0]
-    if (file) processFile(file)
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { addToast('El archivo supera el límite de 5 MB', 'error'); return }
+      processFile(file)
+    }
   }
 
   function onFileInput(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (file) processFile(file)
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { addToast('El archivo supera el límite de 5 MB', 'error'); return }
+      processFile(file)
+    }
     e.target.value = ''
   }
 
@@ -866,13 +843,12 @@ export default function ImportPage() {
   // ── handleGoPreview ───────────────────────────────────────────────────────
 
   function handleGoPreview() {
-    if (!mapping.dateColumn)        { addToast('Seleccioná la columna de fecha', 'warning'); return }
-    if (!mapping.descriptionColumn) { addToast('Seleccioná la columna de descripción', 'warning'); return }
-    if (!mapping.amountColumn)      { addToast('Seleccioná la columna de monto', 'warning'); return }
+    if (!mapping.dateColumn)   { addToast('Seleccioná la columna de fecha', 'warning'); return }
+    if (!mapping.amountColumn) { addToast('Seleccioná la columna de monto', 'warning'); return }
 
     const fullMapping: ColumnMapping = {
       dateColumn:        mapping.dateColumn!,
-      descriptionColumn: mapping.descriptionColumn!,
+      descriptionColumn: mapping.descriptionColumn ?? '',
       amountColumn:      mapping.amountColumn!,
       typeColumn:        mapping.typeColumn,
       incomeKeyword:     mapping.incomeKeyword,
@@ -978,9 +954,32 @@ export default function ImportPage() {
 
     if (toImport.length === 0) { addToast('No hay filas válidas seleccionadas', 'warning'); return }
 
+    // Bloquear importación si alguna fila no tiene billetera asignada.
+    // Las transacciones sin billetera quedan huérfanas y no impactan ningún saldo.
+    const withoutWallet = toImport.filter(t => !t.wallet_id)
+    if (withoutWallet.length > 0) {
+      addToast(
+        `Seleccioná una billetera de destino antes de importar. ${withoutWallet.length} transacción${withoutWallet.length !== 1 ? 'es' : ''} sin billetera.`,
+        'error'
+      )
+      return
+    }
+
+    // Fallback automático de categoría para filas sin categoría asignada
+    const autoCategorizedCount = toImport.filter(t => !t.category_id).length
+    const resolvedRows = await Promise.all(
+      toImport.map(async (t) => {
+        if (t.category_id) return t
+        const catId = await categoriesService.getOrCreateSystemCategory(
+          t.type as 'income' | 'expense'
+        )
+        return { ...t, category_id: catId }
+      })
+    )
+
     setImporting(true)
     try {
-      const res = await transactionsService.createBatch(toImport)
+      const res = await transactionsService.createBatch(resolvedRows)
       const importState: ImportResultState = res.errors === 0 ? 'success' : res.success === 0 ? 'failure' : 'partial'
       setResult({ ...res, state: importState })
       setStep('done')
@@ -1010,6 +1009,12 @@ export default function ImportPage() {
 
         markImportUsed(user.id)
         addToast(`✓ ${res.success} transacciones importadas`, 'success')
+        if (autoCategorizedCount > 0) {
+          addToast(
+            `${autoCategorizedCount} transacción${autoCategorizedCount !== 1 ? 'es' : ''} sin categoría asignada → categorizadas como "Sin categoría"`,
+            'info'
+          )
+        }
       }
       if (res.errors > 0) addToast(`${res.errors} filas con error`, 'warning')
     } catch {
@@ -1564,7 +1569,7 @@ export default function ImportPage() {
               </span>
             </div>
 
-            <div className="max-h-[480px] overflow-y-auto divide-y" style={{ borderColor: 'var(--border-light)' }}>
+            <div className="max-h-[60vh] overflow-y-auto divide-y" style={{ borderColor: 'var(--border-light)' }}>
               {filteredParsed.map(row => {
                 const hasError = !!row._error
                 const isSel    = selected.has(row._index)
@@ -1693,7 +1698,7 @@ export default function ImportPage() {
 
           {/* Sticky action footer */}
           <div
-            className="sticky bottom-0 flex items-center gap-3 rounded-2xl px-4 py-3 z-10"
+            className="sticky bottom-24 md:bottom-0 flex items-center gap-3 rounded-2xl px-4 py-3 z-10"
             style={{
               background: 'rgba(255,255,255,0.96)',
               backdropFilter: 'blur(8px)',

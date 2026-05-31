@@ -73,6 +73,9 @@ export default function CategoriesPage() {
   const [error, setError]         = useState<string | null>(null)
   const [search, setSearch]       = useState('')
   const [filter, setFilter]       = useState<FilterType>('all')
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string; name: string; transactionCount: number; budgetCount: number
+  } | null>(null)
 
   // ── Derived data ──────────────────────────────────────────────────────────────
   const totalIncome  = useMemo(() => categories.filter(c => c.type === 'income').length,  [categories])
@@ -131,18 +134,29 @@ export default function CategoriesPage() {
   }
 
   async function handleDelete(id: string) {
+    const cat = categories.find(c => c.id === id)
+    if (!cat) return
     setDeleting(id)
     try {
-      const budgetCount = await categoriesService.getBudgetCount(id)
-      if (budgetCount > 0) {
-        const ok = window.confirm(
-          `Esta categoría tiene ${budgetCount} presupuesto${budgetCount > 1 ? 's' : ''} asociado${budgetCount > 1 ? 's' : ''} que también se eliminarán. ¿Continuar?`
-        )
-        if (!ok) { setDeleting(null); return }
-      }
-      await categoriesService.delete(id)
+      const impact = await categoriesService.getDeleteImpact(id)
+      setDeleteTarget({ id, name: cat.name, ...impact })
+    } catch {
+      addToast('Error al verificar el impacto del borrado', 'error')
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  async function confirmDeleteCategory() {
+    if (!deleteTarget) return
+    setDeleting(deleteTarget.id)
+    try {
+      await categoriesService.delete(deleteTarget.id)
+      setDeleteTarget(null)
       refetch()
       addToast('Categoría eliminada', 'info')
+    } catch {
+      addToast('Error al eliminar la categoría', 'error')
     } finally {
       setDeleting(null)
     }
@@ -585,6 +599,70 @@ export default function CategoriesPage() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* ── Delete confirmation modal ─────────────────────────────────────────── */}
+      <Modal
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title="Eliminar categoría"
+      >
+        {deleteTarget && (() => {
+          const isBlocked = deleteTarget.transactionCount > 0
+
+          return (
+            <div className="space-y-4">
+              {isBlocked ? (
+                <>
+                  <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--expense-50)', border: '1px solid var(--expense-100)' }}>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--expense-700, #b91c1c)' }}>
+                      No podés eliminar esta categoría porque tiene transacciones asociadas.
+                    </p>
+                    <p className="text-sm" style={{ color: 'var(--expense-600)' }}>
+                      {deleteTarget.transactionCount} transacción{deleteTarget.transactionCount !== 1 ? 'es' : ''} usan la categoría <strong>{deleteTarget.name}</strong>.
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      Reasigná esas transacciones a otra categoría antes de eliminarla.
+                    </p>
+                  </div>
+                  <a
+                    href={`/transactions?category_id=${deleteTarget.id}`}
+                    className="block text-center text-sm font-semibold py-2 rounded-xl transition-all"
+                    style={{ background: 'var(--bg-subtle)', color: 'var(--brand-500)', border: '1px solid var(--border)' }}
+                  >
+                    Ver transacciones de esta categoría →
+                  </a>
+                  <Button variant="secondary" onClick={() => setDeleteTarget(null)} className="w-full">
+                    Cerrar
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    ¿Eliminar la categoría <strong>&ldquo;{deleteTarget.name}&rdquo;</strong>?
+                    {deleteTarget.budgetCount > 0 && (
+                      <> Esta acción también eliminará {deleteTarget.budgetCount} presupuesto{deleteTarget.budgetCount !== 1 ? 's' : ''} asociado{deleteTarget.budgetCount !== 1 ? 's' : ''}.</>
+                    )}
+                    {' '}Esta acción no se puede deshacer.
+                  </p>
+                  <div className="flex gap-3 pt-1">
+                    <Button variant="secondary" onClick={() => setDeleteTarget(null)} className="flex-1">
+                      Cancelar
+                    </Button>
+                    <Button
+                      variant="danger"
+                      onClick={confirmDeleteCategory}
+                      loading={!!deleting}
+                      className="flex-1"
+                    >
+                      Eliminar
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })()}
       </Modal>
     </div>
   )

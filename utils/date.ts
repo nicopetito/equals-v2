@@ -18,7 +18,7 @@ export function formatMonthLabel(monthStr: string): string {
   return `${months[date.getMonth()]} ${year}`
 }
 
-export type Period = '7_days' | '30_days' | '90_days' | 'this_month' | 'last_month' | 'this_year'
+export type Period = '7_days' | '30_days' | '90_days' | 'this_month' | 'last_month' | 'this_year' | 'all_time'
 
 export function getDateRangeForPeriod(period: Period): { start: Date; end: Date } {
   const today = new Date()
@@ -46,16 +46,20 @@ export function getDateRangeForPeriod(period: Period): { start: Date; end: Date 
     case 'this_year':
       start = startOfYear(today)
       break
+    case 'all_time':
+      start = new Date(2000, 0, 1)
+      break
   }
 
   return { start, end }
 }
 
 export const PERIOD_OPTIONS: { value: Period; label: string }[] = [
-  { value: '7_days', label: 'Últimos 7 días' },
-  { value: '30_days', label: 'Últimos 30 días' },
-  { value: '90_days', label: 'Últimos 90 días' },
+  { value: '7_days',    label: 'Últimos 7 días' },
+  { value: '30_days',   label: 'Últimos 30 días' },
+  { value: '90_days',   label: 'Últimos 90 días' },
   { value: 'this_month', label: 'Este mes' },
   { value: 'last_month', label: 'Mes pasado' },
-  { value: 'this_year', label: 'Este año' },
+  { value: 'this_year',  label: 'Este año' },
+  { value: 'all_time',   label: 'Histórico' },
 ]

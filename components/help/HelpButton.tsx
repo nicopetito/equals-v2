@@ -40,6 +40,7 @@ export function HelpButton({ section, variant = 'glass' }: HelpButtonProps) {
   useEffect(() => {
     const seen = getSeenSections()
     if (!seen.includes(section)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpen(true)
     }
   }, [section])

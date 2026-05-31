@@ -283,3 +283,15 @@ body {
   font-size: 0.75rem;
   font-weight: 600;
 }
+
+/* Budget summary strip — responsive right borders across 2/3/6-column grid */
+.budget-strip-item { border-right: 1px solid var(--border); }
+.budget-strip-item:nth-child(2n) { border-right: none; }
+@media (min-width: 640px) {
+  .budget-strip-item:nth-child(2n) { border-right: 1px solid var(--border); }
+  .budget-strip-item:nth-child(3n) { border-right: none; }
+}
+@media (min-width: 1024px) {
+  .budget-strip-item:nth-child(3n) { border-right: 1px solid var(--border); }
+  .budget-strip-item:last-child    { border-right: none; }
+}

@@ -88,6 +88,27 @@ export const categoriesService = {
     return count ?? 0
   },
 
+  async getDeleteImpact(id: string): Promise<{
+    transactionCount: number
+    budgetCount: number
+  }> {
+    const supabase = getSupabase()
+    const user_id = await getUserId()
+    if (!user_id) throw new Error('Not authenticated')
+
+    const [txResult, budgetResult] = await Promise.all([
+      supabase.from('transactions').select('id', { count: 'exact', head: true })
+        .eq('category_id', id).eq('user_id', user_id),
+      supabase.from('budgets').select('id', { count: 'exact', head: true })
+        .eq('category_id', id).eq('user_id', user_id),
+    ])
+
+    return {
+      transactionCount: txResult.count ?? 0,
+      budgetCount:      budgetResult.count ?? 0,
+    }
+  },
+
   async delete(id: string): Promise<void> {
     const supabase = getSupabase()
     const user_id = await getUserId()
@@ -102,9 +123,33 @@ export const categoriesService = {
     if (error) throw error
   },
 
+  async getOrCreateSystemCategory(type: 'income' | 'expense'): Promise<string> {
+    const supabase = getSupabase()
+    const user_id = await getUserId()
+    if (!user_id) throw new Error('Not authenticated')
+
+    const { data } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('user_id', user_id)
+      .eq('name', 'Sin categoría')
+      .eq('type', type)
+      .eq('is_system', true)
+      .maybeSingle()
+
+    if (data?.id) return data.id
+
+    const created = await categoriesService.create({
+      name: 'Sin categoría', type, color: '#9ca3af', icon: 'tag', is_system: true,
+    })
+    return created.id!
+  },
+
   async seedDefaults(): Promise<void> {
     for (const cat of DEFAULT_CATEGORIES) {
       await categoriesService.create(cat)
     }
+    await categoriesService.getOrCreateSystemCategory('expense')
+    await categoriesService.getOrCreateSystemCategory('income')
   },
 }

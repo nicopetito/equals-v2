@@ -119,6 +119,10 @@ export const recurringService = {
     await recurringService.update(id, { active })
   },
 
+  /**
+   * @deprecated No usar. Dos llamadas a BD separadas — si la segunda falla, la transacción
+   * queda creada sin que next_date avance. Usar executeAtomic() en su lugar.
+   */
   async execute(item: RecurringTransactionWithDetails, walletId: string): Promise<void> {
     await transactionsService.create({
       description: item.description,

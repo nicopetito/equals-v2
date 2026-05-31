@@ -138,6 +138,7 @@ export default function ScheduledPage() {
     finally { setLoading(false) }
   }, [])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load() }, [load])
 
   const stats = useMemo(() => {
@@ -243,7 +244,13 @@ export default function ScheduledPage() {
     }
   }
 
+  const walletIds = useMemo(() => new Set((wallets ?? []).map(w => w.id!)), [wallets])
+
   function handleExecute(item: RecurringTransactionWithDetails) {
+    if (item.wallet_id && !walletIds.has(item.wallet_id)) {
+      addToast('No se puede ejecutar: la billetera asignada ya no existe. Editá la operación para reasignar una billetera válida.', 'error')
+      return
+    }
     if (item.wallet_id) {
       doExecute(item, item.wallet_id)
     } else {
@@ -379,7 +386,7 @@ export default function ScheduledPage() {
           <p className="text-sm">Cargando operaciones…</p>
         </div>
       ) : items.length === 0 ? (
-        <EmptyState icon={CalendarClock} title="No tenés operaciones programadas"
+        <EmptyState type="scheduled" title="No tenés operaciones programadas"
           description="Registrá pagos fijos como sueldo, alquiler o suscripciones para no olvidar ningún movimiento recurrente."
           action={{ label: '+ Nueva operación', onClick: openCreate }} />
       ) : filtered.length === 0 ? (
@@ -399,6 +406,7 @@ export default function ScheduledPage() {
               onDelete={handleDelete}
               onExecute={handleExecute}
               isExecuting={executing.has(item.id ?? '')}
+              hasInvalidWallet={!!(item.wallet_id && !walletIds.has(item.wallet_id))}
             />
           ))}
         </div>
@@ -525,9 +533,11 @@ interface ScheduledCardProps {
   onDelete: (item: RecurringTransactionWithDetails) => void
   onExecute: (item: RecurringTransactionWithDetails) => void
   isExecuting?: boolean
+  hasInvalidWallet?: boolean
 }
 
-function ScheduledCard({ item, onEdit, onToggle, onDelete, onExecute, isExecuting }: ScheduledCardProps) {
+function ScheduledCard({ item, onEdit, onToggle, onDelete, onExecute, isExecuting, hasInvalidWallet }: ScheduledCardProps) {
+  const [confirmDel, setConfirmDel] = useState(false)
   const isIncome  = item.type === 'income'
   const cadence   = CADENCE_INFO[item.cadence ?? 'monthly'] ?? CADENCE_INFO.monthly
   const dueSoon   = item.active && isDueSoon(item.next_date)
@@ -563,6 +573,7 @@ function ScheduledCard({ item, onEdit, onToggle, onDelete, onExecute, isExecutin
         flexDirection: 'column',
         opacity: item.active ? 1 : 0.6,
         transition: 'box-shadow 0.18s ease, transform 0.18s ease',
+        willChange: 'transform',
       }}
       onMouseEnter={e => {
         e.currentTarget.style.boxShadow = 'var(--shadow-md)'
@@ -601,6 +612,11 @@ function ScheduledCard({ item, onEdit, onToggle, onDelete, onExecute, isExecutin
             <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '99px', background: cadence.bg, color: cadence.color }}>
               {cadence.label}
             </span>
+            {hasInvalidWallet && (
+              <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '99px', background: 'var(--expense-50)', color: 'var(--expense-600)', border: '1px solid var(--expense-200)' }}>
+                Billetera inválida
+              </span>
+            )}
           </div>
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -699,8 +715,8 @@ function ScheduledCard({ item, onEdit, onToggle, onDelete, onExecute, isExecutin
           <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>Sin recordatorio</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-          {/* Registrar pago / cobro — solo si activo y vencido */}
-          {item.active && isOverdue(item.next_date) && (
+          {/* Registrar pago / cobro — solo si activo y vencido y billetera válida */}
+          {item.active && isOverdue(item.next_date) && !hasInvalidWallet && (
             <button
               onClick={() => onExecute(item)}
               disabled={isExecuting}
@@ -737,12 +753,25 @@ function ScheduledCard({ item, onEdit, onToggle, onDelete, onExecute, isExecutin
             <Pencil size={13} />
           </button>
           {/* Eliminar */}
-          <button onClick={() => onDelete(item)} title="Eliminar"
-            style={{ width: '28px', height: '28px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', transition: 'background 0.15s, color 0.15s' }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--expense-50)'; e.currentTarget.style.color = 'var(--expense-500)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--text-muted)' }}>
-            <Trash2 size={13} />
-          </button>
+          {confirmDel ? (
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              <button onClick={() => onDelete(item)}
+                style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', background: 'var(--expense-500)', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                Sí
+              </button>
+              <button onClick={() => setConfirmDel(false)}
+                style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '6px', background: 'var(--bg-subtle)', color: 'var(--text-muted)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                No
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmDel(true)} title="Eliminar"
+              style={{ width: '28px', height: '28px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', transition: 'background 0.15s, color 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--expense-50)'; e.currentTarget.style.color = 'var(--expense-500)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'var(--text-muted)' }}>
+              <Trash2 size={13} />
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -81,6 +81,27 @@ export const refundService = {
     const user_id = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
 
+    // Validate refund cap: sum of pending+credited refunds + new amount <= original transaction amount
+    const [origTxResult, existingRefundsResult] = await Promise.all([
+      supabase.from('transactions').select('amount')
+        .eq('id', params.original_transaction_id).eq('user_id', user_id).maybeSingle(),
+      supabase.from('refunds').select('amount')
+        .eq('original_transaction_id', params.original_transaction_id)
+        .eq('user_id', user_id).in('status', ['pending', 'credited']),
+    ])
+
+    if (origTxResult.data) {
+      const origAmount   = safeNumber(origTxResult.data.amount)
+      const existingSum  = (existingRefundsResult.data ?? []).reduce(
+        (s: number, r: { amount: unknown }) => s + safeNumber(r.amount), 0
+      )
+      if (existingSum + params.amount > origAmount) {
+        throw new Error(
+          `El total de reintegros no puede superar el monto de la transacción original ($${origAmount.toFixed(2)}).`
+        )
+      }
+    }
+
     const { data, error } = await supabase
       .from('refunds')
       .insert([{ ...params, user_id, status: 'pending' }])
@@ -97,6 +118,34 @@ export const refundService = {
     const supabase = getSupabase()
     const user_id  = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
+
+    // Defensive cap check before crediting: ensure crediting this refund won't exceed original amount
+    const { data: refundRow } = await supabase
+      .from('refunds').select('amount, original_transaction_id')
+      .eq('id', params.refundId).eq('user_id', user_id).maybeSingle()
+
+    if (refundRow?.original_transaction_id) {
+      const [origTxResult, otherCreditedResult] = await Promise.all([
+        supabase.from('transactions').select('amount')
+          .eq('id', refundRow.original_transaction_id).eq('user_id', user_id).maybeSingle(),
+        supabase.from('refunds').select('amount')
+          .eq('original_transaction_id', refundRow.original_transaction_id)
+          .eq('user_id', user_id).eq('status', 'credited'),
+      ])
+
+      if (origTxResult.data) {
+        const origAmount     = safeNumber(origTxResult.data.amount)
+        const alreadyCredited = (otherCreditedResult.data ?? []).reduce(
+          (s: number, r: { amount: unknown }) => s + safeNumber(r.amount), 0
+        )
+        const thisAmount = safeNumber(refundRow.amount)
+        if (alreadyCredited + thisAmount > origAmount) {
+          throw new Error(
+            `El total de reintegros no puede superar el monto de la transacción original ($${origAmount.toFixed(2)}).`
+          )
+        }
+      }
+    }
 
     const { error } = await supabase.rpc('rpc_refund_credit', {
       p_refund_id: params.refundId,

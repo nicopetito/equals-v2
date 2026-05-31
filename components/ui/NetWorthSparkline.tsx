@@ -1,70 +1,38 @@
-﻿'use client'
+'use client'
 
 import { useMemo } from 'react'
-import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
-import { TrendingUp, TrendingDown } from 'lucide-react'
-import type { TransactionWithDetails } from '@/types'
+import { Wallet, Target, TrendingUp } from 'lucide-react'
+import type { WalletWithBalance, Goal, FixedTerm } from '@/types'
 import { formatCurrency } from '@/utils/format'
+import { calculateNetWorth } from '@/utils/finance'
 
 interface Props {
-  transactions: TransactionWithDetails[]
+  wallets: WalletWithBalance[]
+  goals: Goal[]
+  fixedTerms: FixedTerm[]
+  // Moneda específica a mostrar, o 'all' para mostrar el total de todas.
   currency: string
   loading?: boolean
 }
 
-interface TipProps {
-  active?: boolean
-  payload?: { value: number }[]
-  label?: string
-  currency: string
-}
-
-function SparkTooltip({ active, payload, label, currency }: TipProps) {
-  if (!active || !payload?.length) return null
-  return (
-    <div
-      className="rounded-xl px-3 py-2 text-xs"
-      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)' }}
-    >
-      <p className="font-semibold mb-0.5" style={{ color: 'var(--text-muted)' }}>{label}</p>
-      <p className="font-extrabold" style={{ color: 'var(--text-primary)' }}>
-        {formatCurrency(payload[0].value, currency)}
-      </p>
-    </div>
+export function NetWorthSparkline({ wallets, goals, fixedTerms, currency, loading }: Props) {
+  const netWorth = useMemo(
+    () => calculateNetWorth(wallets, goals, fixedTerms),
+    [wallets, goals, fixedTerms]
   )
-}
 
-export function NetWorthSparkline({ transactions, currency, loading }: Props) {
-  const { data, current, change } = useMemo(() => {
-    const map = new Map<string, number>()
-    transactions.forEach(tx => {
-      const month = tx.date.substring(0, 7)
-      const delta = tx.type === 'income' ? tx.amount : -tx.amount
-      map.set(month, (map.get(month) ?? 0) + delta)
-    })
+  const displayCur = currency === 'all' ? 'ARS' : currency
 
-    const sorted = Array.from(map.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-6)
+  // Breakdown para la moneda seleccionada; si no hay datos para esa moneda, ceros.
+  const breakdown = useMemo(() => {
+    if (currency === 'all') {
+      // Suma todos los totales por moneda en ARS equivalente (sin conversión — solo para mostrar ARS)
+      return netWorth['ARS'] ?? { liquid: 0, goals: 0, investments: 0, total: 0 }
+    }
+    return netWorth[currency] ?? { liquid: 0, goals: 0, investments: 0, total: 0 }
+  }, [netWorth, currency])
 
-    let cumulative = 0
-    const data = sorted.map(([month, delta]) => {
-      cumulative += delta
-      const [y, m] = month.split('-')
-      return {
-        label: format(new Date(Number(y), Number(m) - 1, 1), 'MMM', { locale: es }),
-        value: Math.round(cumulative),
-      }
-    })
-
-    const current = data.at(-1)?.value ?? 0
-    const prev    = data.at(-2)?.value ?? 0
-    const change  = prev !== 0 ? ((current - prev) / Math.abs(prev)) * 100 : 0
-
-    return { data, current, change }
-  }, [transactions])
+  const hasData = breakdown.total !== 0 || breakdown.liquid !== 0
 
   if (loading) {
     return (
@@ -75,72 +43,107 @@ export function NetWorthSparkline({ transactions, currency, loading }: Props) {
     )
   }
 
-  const positive      = current >= 0
-  const accentColor   = positive ? '#34d399' : '#f87171'
-  const textColor     = positive ? 'var(--income-600)' : 'var(--expense-600)'
-  const displayCur    = currency === 'all' ? 'ARS' : currency
+  const totalPositive = breakdown.total >= 0
+  const totalColor    = totalPositive ? 'var(--income-600)' : 'var(--expense-600)'
+
+  const hasInterest = breakdown.investmentsInterest > 0
+
+  const rows = [
+    {
+      label: 'Disponible',
+      value: breakdown.liquid,
+      icon: Wallet,
+      color: 'var(--brand-500)',
+      bg: 'var(--brand-50)',
+    },
+    ...(breakdown.goals > 0 ? [{
+      label: 'Objetivos',
+      value: breakdown.goals,
+      icon: Target,
+      color: 'var(--goal-600, #0284c7)',
+      bg: 'var(--goal-50, #f0f9ff)',
+    }] : []),
+    // When there's no interest, show a single "Inversiones" row with the principal.
+    // When there is interest, show capital and interest as separate rows.
+    ...(breakdown.investmentsEstimated > 0 && !hasInterest ? [{
+      label: 'Inversiones',
+      value: breakdown.investments,
+      icon: TrendingUp,
+      color: 'var(--income-600)',
+      bg: 'var(--income-50)',
+    }] : []),
+    ...(breakdown.investmentsEstimated > 0 && hasInterest ? [
+      {
+        label: 'Capital invertido',
+        value: breakdown.investments,
+        icon: TrendingUp,
+        color: 'var(--income-600)',
+        bg: 'var(--income-50)',
+      },
+      {
+        label: 'Interés estimado',
+        value: breakdown.investmentsInterest,
+        icon: TrendingUp,
+        color: 'var(--income-500)',
+        bg: 'var(--income-50)',
+      },
+    ] : []),
+  ]
 
   return (
     <div
-      className="rounded-2xl p-4 flex flex-col"
+      className="rounded-2xl p-4 flex flex-col gap-3"
       style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
     >
       {/* Header */}
-      <div className="flex items-start justify-between mb-1">
+      <div className="flex items-center justify-between">
         <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
-          Patrimonio estimado
+          Patrimonio actual
         </p>
-        {data.length >= 2 && (
-          <span
-            className="flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-lg"
-            style={{
-              background: change >= 0 ? 'var(--income-50)' : 'var(--expense-50)',
-              color:      change >= 0 ? 'var(--income-600)' : 'var(--expense-600)',
-            }}
-          >
-            {change >= 0 ? <TrendingUp size={9} /> : <TrendingDown size={9} />}
-            <span className="ml-0.5">{Math.abs(change).toFixed(0)}%</span>
-          </span>
-        )}
+        <span
+          className="text-[10px] font-bold px-1.5 py-0.5 rounded-lg"
+          style={{ background: 'var(--bg-subtle)', color: 'var(--text-faint)' }}
+        >
+          {displayCur}
+        </span>
       </div>
 
-      {/* Big number */}
-      <p className="text-xl font-extrabold tabular-nums leading-tight" style={{ color: textColor }}>
-        {formatCurrency(current, displayCur)}
+      {/* Total */}
+      <p
+        className="text-xl font-extrabold tabular-nums leading-none"
+        style={{ color: totalColor, fontFamily: 'var(--font-sora)' }}
+      >
+        {formatCurrency(breakdown.total, displayCur)}
       </p>
 
-      {/* Sparkline */}
-      {data.length > 1 ? (
-        <div className="mt-3 flex-1">
-          <ResponsiveContainer width="100%" height={64}>
-            <AreaChart data={data} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="nwGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor={accentColor} stopOpacity={0.22} />
-                  <stop offset="95%" stopColor={accentColor} stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
-              <Tooltip content={<SparkTooltip currency={displayCur} />} />
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke={accentColor}
-                strokeWidth={2}
-                fill="url(#nwGrad)"
-                dot={false}
-                activeDot={{ r: 3, fill: accentColor, strokeWidth: 2, stroke: 'white' }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+      {/* Desglose */}
+      {hasData ? (
+        <div className="space-y-2 pt-1" style={{ borderTop: '1px solid var(--border-light, var(--border))' }}>
+          {rows.map(row => (
+            <div key={row.label} className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <div
+                  className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+                  style={{ background: row.bg }}
+                >
+                  <row.icon size={11} style={{ color: row.color }} />
+                </div>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{row.label}</span>
+              </div>
+              <span
+                className="text-xs font-bold tabular-nums"
+                style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}
+              >
+                {formatCurrency(row.value, displayCur)}
+              </span>
+            </div>
+          ))}
         </div>
       ) : (
-        <p className="text-[10px] mt-3" style={{ color: 'var(--text-faint)' }}>
-          Aparecerá con más movimientos registrados
+        <p className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
+          Aparecerá cuando tengas billeteras, objetivos o inversiones registradas.
         </p>
       )}
     </div>
   )
 }
-
-
-

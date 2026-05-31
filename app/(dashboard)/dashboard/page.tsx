@@ -1,11 +1,11 @@
 ﻿'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   TrendingUp, TrendingDown, Wallet, ArrowUpRight, Plus,
   FileText, Sparkles, ChevronLeft, ChevronRight, BarChart2,
-  Zap, RotateCcw,
+  Zap, RotateCcw, AlertTriangle, Tag, ChevronDown,
 } from 'lucide-react'
 import { HelpButton } from '@/components/help/HelpButton'
 import { useTransactions } from '@/hooks/useTransactions'
@@ -35,6 +35,7 @@ import { formatDate, getDateRangeForPeriod, PERIOD_OPTIONS, type Period } from '
 import type { TransactionWithDetails, Currency, TransactionTemplate } from '@/types'
 import type { WalletWithBalance } from '@/types/wallet'
 import { AnimatedAmount } from '@/components/ui/AnimatedAmount'
+import { DashboardFilters } from '@/components/dashboard/DashboardFilters'
 
 // â"€â"€ Design tokens â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 // Usados de forma consistente en TODOS los componentes de esta pÃ¡gina.
@@ -55,58 +56,14 @@ function cardHoverOff(el: HTMLElement) {
 
 // â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
-const CURRENCIES: { value: Currency | 'all'; label: string }[] = [
-  { value: 'all', label: 'Todas' },
-  { value: 'ARS', label: 'ARS' },
-  { value: 'USD', label: 'USD' },
-  { value: 'EUR', label: 'EUR' },
-  { value: 'CRYPTO', label: 'CRYPTO' },
-]
-
 const WALLET_COLORS: Record<string, string> = {
   ARS: '#a078ff', USD: '#16a34a', EUR: '#adc6ff', CRYPTO: '#ffb869',
-}
-
-// â"€â"€ Filter Bar â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-function FilterBar({ period, setPeriod, currency, setCurrency }: {
-  period: Period; setPeriod: (v: Period) => void
-  currency: Currency | 'all'; setCurrency: (v: Currency | 'all') => void
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-2 rounded-2xl px-3 py-2"
-      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-      <div className="flex items-center gap-1 flex-wrap">
-        {PERIOD_OPTIONS.map(opt => (
-          <button key={opt.value} onClick={() => setPeriod(opt.value)}
-            className="px-3 py-1.5 text-xs font-semibold rounded-xl transition-all duration-150"
-            style={period === opt.value
-              ? { background: 'linear-gradient(135deg,#6d3bd7,#0566d9)', color: '#fff', boxShadow: '0 2px 8px rgba(109,59,215,0.35)' }
-              : { color: 'var(--text-muted)' }}
-            onMouseEnter={e => { if (period !== opt.value) e.currentTarget.style.color = 'var(--text-secondary)' }}
-            onMouseLeave={e => { if (period !== opt.value) e.currentTarget.style.color = 'var(--text-muted)' }}
-          >{opt.label}</button>
-        ))}
-      </div>
-      <div className="w-px self-stretch" style={{ background: 'var(--border)' }} />
-      <div className="flex items-center gap-1">
-        {CURRENCIES.map(opt => (
-          <button key={opt.value} onClick={() => setCurrency(opt.value)}
-            className="px-3 py-1.5 text-xs font-semibold rounded-xl transition-all duration-150"
-            style={currency === opt.value
-              ? { background: 'rgba(208,188,255,0.18)', color: 'var(--brand-500)', border: '1px solid rgba(208,188,255,0.25)' }
-              : { color: 'var(--text-muted)' }}
-            onMouseEnter={e => { if (currency !== opt.value) e.currentTarget.style.color = 'var(--text-secondary)' }}
-            onMouseLeave={e => { if (currency !== opt.value) e.currentTarget.style.color = 'var(--text-muted)' }}
-          >{opt.label}</button>
-        ))}
-      </div>
-    </div>
-  )
 }
 
 // â"€â"€ Page â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 export default function DashboardPage() {
   const [period, setPeriod]                   = useState<Period>('this_month')
+  const [alertsOpen, setAlertsOpen]           = useState(true)
   const [currency, setCurrency]               = useState<Currency | 'all'>('all')
   const [reportOpen, setReportOpen]           = useState(false)
   const [seeding, setSeeding]                 = useState(false)
@@ -183,22 +140,31 @@ export default function DashboardPage() {
   }
 
   const { start, end } = getDateRangeForPeriod(period)
+  const fromStr = format(start, 'yyyy-MM-dd')
+  const toStr   = format(end,   'yyyy-MM-dd')
 
   const filtered = useMemo(() => {
-    const fromStr = format(start, 'yyyy-MM-dd')
-    const toStr   = format(end,   'yyyy-MM-dd')
     return allTransactions.filter(t => {
       const dayStr = t.date.substring(0, 10)
       if (dayStr < fromStr || dayStr > toStr) return false
       if (currency !== 'all' && t.currency !== currency) return false
       return true
     })
-  }, [allTransactions, format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd'), currency])
+  }, [allTransactions, fromStr, toStr, currency])
+
+  // walletIds antes de los KPIs para poder excluir huérfanas de los cálculos
+  const walletIds = useMemo(() => new Set(wallets.map(w => w.id).filter(Boolean) as string[]), [wallets])
+
+  // Transacciones del período que tienen billetera válida — base para los KPIs financieros.
+  // Las huérfanas se muestran en el banner de alertas pero no distorsionan los números.
+  const kpiFiltered = useMemo(() =>
+    filtered.filter(t => !!(t.wallet_id && walletIds.has(t.wallet_id))),
+    [filtered, walletIds])
 
   const stats = useMemo(() => {
     if (currency === 'all') {
       const byCurrency: Record<string, { income: number; expenses: number; balance: number }> = {}
-      filtered.forEach(t => {
+      kpiFiltered.forEach(t => {
         if (!byCurrency[t.currency]) byCurrency[t.currency] = { income: 0, expenses: 0, balance: 0 }
         if (t.type === 'income') byCurrency[t.currency].income += t.amount
         else byCurrency[t.currency].expenses += t.amount
@@ -207,12 +173,12 @@ export default function DashboardPage() {
       if (!Object.keys(byCurrency).length) return { byCurrency: null, single: { income: 0, expenses: 0, balance: 0 } }
       return { byCurrency, single: null }
     }
-    const income   = filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-    const expenses = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+    const income   = kpiFiltered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+    const expenses = kpiFiltered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
     return { byCurrency: null, single: { income, expenses, balance: income - expenses } }
-  }, [filtered, currency])
+  }, [kpiFiltered, currency])
 
-  const savingsMetrics = useMemo(() => calculateSavingsMetrics(filtered), [filtered])
+  const savingsMetrics = useMemo(() => calculateSavingsMetrics(kpiFiltered), [kpiFiltered])
   const savingsRate    = savingsMetrics.savingsRate
 
   const walletByCurrency = useMemo(() =>
@@ -220,6 +186,21 @@ export default function DashboardPage() {
       if (w.currency) acc[w.currency] = (acc[w.currency] ?? 0) + (w.current_balance ?? 0)
       return acc
     }, {}), [wallets])
+
+  const orphanStats = useMemo(() => {
+    if (txLoading || walletsLoading) return null
+    const orphans = allTransactions.filter(t => !t.wallet_id || !walletIds.has(t.wallet_id))
+    if (!orphans.length) return null
+    const income   = orphans.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+    const expenses = orphans.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+    return { count: orphans.length, income, expenses }
+  }, [allTransactions, walletIds, txLoading, walletsLoading])
+
+  const uncategorizedStats = useMemo(() => {
+    if (txLoading) return null
+    const count = allTransactions.filter(t => !t.category_id).length
+    return count > 0 ? { count } : null
+  }, [allTransactions, txLoading])
 
   const netWorth = useMemo(
     () => calculateNetWorth(wallets, goals, fixedTerms),
@@ -283,7 +264,14 @@ export default function DashboardPage() {
       </div>
 
       {/* â"€â"€ FILTROS â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
-      <div className="enter-2"><FilterBar period={period} setPeriod={setPeriod} currency={currency} setCurrency={v => setCurrency(v as Currency | 'all')} /></div>
+      <div className="enter-2">
+        <DashboardFilters
+          selectedPeriod={period}
+          onPeriodChange={setPeriod}
+          selectedCurrency={currency}
+          onCurrencyChange={v => setCurrency(v as Currency | 'all')}
+        />
+      </div>
 
       {/* â"€â"€ BANNER DEMO â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
       {allTransactions.length === 0 && wallets.length === 0 && !loading && (
@@ -300,6 +288,115 @@ export default function DashboardPage() {
           </Button>
         </div>
       )}
+
+      {/* Panel de alertas (acordeón) */}
+      {(orphanStats || uncategorizedStats) && (
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
+        >
+          {/* Header colapsable */}
+          <button
+            onClick={() => setAlertsOpen(v => !v)}
+            className="w-full flex items-center gap-2.5 px-4 py-3 transition-colors"
+            style={{ borderBottom: alertsOpen ? '1px solid var(--border-light)' : 'none' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-subtle)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+          >
+            <div
+              className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: 'var(--expense-50)', border: '1px solid var(--expense-100)' }}
+            >
+              <AlertTriangle size={11} style={{ color: 'var(--expense-500)' }} />
+            </div>
+            <span className="text-sm font-bold flex-1 text-left" style={{ color: 'var(--text-primary)' }}>
+              Necesita atención
+            </span>
+            <span
+              className="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
+              style={{ background: 'var(--expense-50)', color: 'var(--expense-600)', border: '1px solid var(--expense-100)' }}
+            >
+              {(orphanStats ? 1 : 0) + (uncategorizedStats ? 1 : 0)}
+            </span>
+            <ChevronDown
+              size={14}
+              className="shrink-0 transition-transform duration-200"
+              style={{ color: 'var(--text-muted)', transform: alertsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            />
+          </button>
+
+          {/* Cards de alerta individuales */}
+          {alertsOpen && (
+            <div className="p-3 space-y-2">
+
+              {orphanStats && (
+                <div
+                  className="rounded-xl p-3.5 flex items-center gap-3"
+                  style={{ background: 'var(--expense-50)', border: '1px solid var(--expense-100)' }}
+                >
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: 'white', border: '1px solid var(--expense-150, var(--expense-200))' }}
+                  >
+                    <Wallet size={15} style={{ color: 'var(--expense-500)' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold" style={{ color: 'var(--expense-800, var(--expense-700))' }}>
+                      {orphanStats.count} movimiento{orphanStats.count !== 1 ? 's' : ''} sin billetera
+                    </p>
+                    <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--expense-600)' }}>
+                      No se incluyen en los KPIs ni en el saldo disponible.{' '}
+                      +{formatCurrency(orphanStats.income, 'ARS')} en ingresos · −{formatCurrency(orphanStats.expenses, 'ARS')} en gastos
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => router.push('/transactions?orphan=true')}
+                    className="text-xs font-semibold whitespace-nowrap shrink-0 px-2.5 py-1.5 rounded-lg transition-colors"
+                    style={{ background: 'white', color: 'var(--expense-600)', border: '1px solid var(--expense-200)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--expense-100)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'white' }}
+                  >
+                    Revisar →
+                  </button>
+                </div>
+              )}
+
+              {uncategorizedStats && (
+                <div
+                  className="rounded-xl p-3.5 flex items-center gap-3"
+                  style={{ background: 'var(--goal-50)', border: '1px solid var(--goal-100)' }}
+                >
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: 'white', border: '1px solid var(--goal-200)' }}
+                  >
+                    <Tag size={15} style={{ color: 'var(--goal-500)' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold" style={{ color: 'var(--goal-700)' }}>
+                      {uncategorizedStats.count} movimiento{uncategorizedStats.count !== 1 ? 's' : ''} sin categoría
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--goal-600)' }}>
+                      Sin categoría, los gráficos y reportes por rubro pueden estar incompletos.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => router.push('/transactions?no_category=true')}
+                    className="text-xs font-semibold whitespace-nowrap shrink-0 px-2.5 py-1.5 rounded-lg transition-colors"
+                    style={{ background: 'white', color: 'var(--goal-600)', border: '1px solid var(--goal-200)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--goal-100)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'white' }}
+                  >
+                    Revisar →
+                  </button>
+                </div>
+              )}
+
+            </div>
+          )}
+        </div>
+      )}
+
       {/* â"€â"€ BALANCE TOTAL + KPIs â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
       <div className="enter-3">
       {loading ? (
@@ -685,6 +782,7 @@ function QuickCategoryBreakdown({ transactions, type, currency }: {
   const relevant = transactions.filter(t => t.type === type)
   const total    = relevant.reduce((s, t) => s + t.amount, 0)
 
+  /* eslint-disable react-hooks/preserve-manual-memoization */
   const byCategory = useMemo(() => {
     const map: Record<string, { amount: number; color: string }> = {}
     relevant.forEach(t => {
@@ -694,6 +792,7 @@ function QuickCategoryBreakdown({ transactions, type, currency }: {
     })
     return Object.entries(map).sort(([,a],[,b]) => b.amount - a.amount).slice(0, 4)
   }, [relevant, type])
+  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   if (total === 0 || byCategory.length === 0) return null
 

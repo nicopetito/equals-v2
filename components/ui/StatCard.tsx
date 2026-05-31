@@ -20,7 +20,7 @@ const ACCENT = {
   neutral:  { icon: '#7B87A0', bg: '#F7F8FC', border: '#E4E7EF', text: '#3D4664' },
 }
 
-export function StatCard({ title, value, subtitle, icon: Icon, trend, variant = 'default', soft: _soft = false, loading }: StatCardProps) {
+export function StatCard({ title, value, subtitle, icon: Icon, trend, variant = 'default', loading }: StatCardProps) {
   const a = ACCENT[variant]
 
   if (loading) {
@@ -59,7 +59,7 @@ export function StatCard({ title, value, subtitle, icon: Icon, trend, variant = 
       </div>
 
       <div className="mt-3">
-        <p className="text-xl font-bold tabular-nums leading-tight"
+        <p className="text-base sm:text-xl font-bold tabular-nums leading-tight truncate"
           style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}>
           {value}
         </p>

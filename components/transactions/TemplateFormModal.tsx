@@ -86,6 +86,7 @@ export function TemplateFormModal({
   const [formError, setFormError] = useState<string | null>(null)
   const [refundExpanded, setRefundExpanded] = useState(false)
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
       if (editing) {
@@ -119,6 +120,7 @@ export function TemplateFormModal({
       setFormError(null)
     }
   }, [open, editing])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const categoryOptions = [
     { value: '', label: 'Sin categoría' },
@@ -130,15 +132,18 @@ export function TemplateFormModal({
   ]
   const walletOptionsRequired = wallets.map(w => ({ value: w.id ?? '', label: w.name }))
 
+  const _refundCap = parseFloat(form.refund_cap)
+  const _hasOptionalCap = form.refund_rule_type === 'percentage' && !isNaN(_refundCap) && _refundCap > 0
+  const _effectiveRuleType = _hasOptionalCap ? 'percentage_cap' : form.refund_rule_type
   const refundPreview = form.has_refund_rule
     ? calculateRefundAmount(
         safeNumber(form.suggested_amount),
-        form.refund_rule_type,
-        form.refund_rule_type !== 'fixed' ? (parseFloat(form.refund_pct) || 0) : null,
-        form.refund_rule_type === 'fixed'
+        _effectiveRuleType,
+        _effectiveRuleType !== 'fixed' ? (parseFloat(form.refund_pct) || 0) : null,
+        _effectiveRuleType === 'fixed'
           ? (parseFloat(form.refund_fixed) || 0)
-          : form.refund_rule_type === 'percentage_cap'
-          ? (parseFloat(form.refund_cap) || 0)
+          : _hasOptionalCap || _effectiveRuleType === 'percentage_cap'
+          ? (_refundCap || 0)
           : null,
       )
     : 0
@@ -161,14 +166,18 @@ export function TemplateFormModal({
     setSaving(true)
     setFormError(null)
 
+    const _cap = parseFloat(form.refund_cap)
+    const _hasCap = form.refund_rule_type === 'percentage' && !isNaN(_cap) && _cap > 0
+    const _effectiveType = _hasCap ? 'percentage_cap' : form.refund_rule_type
+
     const refundRule = form.has_refund_rule && form.type === 'expense' && form.refund_wallet_id
       ? {
-          rule_type: form.refund_rule_type,
-          percentage: form.refund_rule_type !== 'fixed' ? (parseFloat(form.refund_pct) || null) : null,
-          cap_amount: form.refund_rule_type === 'fixed'
+          rule_type: _effectiveType,
+          percentage: _effectiveType !== 'fixed' ? (parseFloat(form.refund_pct) || null) : null,
+          cap_amount: _effectiveType === 'fixed'
             ? (parseFloat(form.refund_fixed) || null)
-            : form.refund_rule_type === 'percentage_cap'
-            ? (parseFloat(form.refund_cap) || null)
+            : _hasCap || _effectiveType === 'percentage_cap'
+            ? (_cap || null)
             : null,
           expected_days: parseInt(form.refund_days) || 30,
           destination_wallet_id: form.refund_wallet_id,
@@ -440,13 +449,12 @@ export function TemplateFormModal({
                       value={form.refund_rule_type}
                       onChange={e => setForm(f => ({ ...f, refund_rule_type: e.target.value as RefundRuleType }))}
                       options={[
-                        { value: 'percentage',     label: 'Porcentaje del gasto' },
-                        { value: 'fixed',          label: 'Monto fijo' },
-                        { value: 'percentage_cap', label: 'Porcentaje con tope' },
+                        { value: 'percentage', label: 'Porcentaje del gasto' },
+                        { value: 'fixed',      label: 'Monto fijo' },
                       ]}
                     />
 
-                    {(form.refund_rule_type === 'percentage' || form.refund_rule_type === 'percentage_cap') && (
+                    {form.refund_rule_type === 'percentage' && (
                       <Input
                         label="Porcentaje (%)"
                         type="number"
@@ -471,16 +479,21 @@ export function TemplateFormModal({
                       />
                     )}
 
-                    {form.refund_rule_type === 'percentage_cap' && (
-                      <Input
-                        label="Tope máximo"
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        value={form.refund_cap}
-                        onChange={e => setForm(f => ({ ...f, refund_cap: e.target.value }))}
-                        placeholder="Ej: 2000"
-                      />
+                    {form.refund_rule_type === 'percentage' && (
+                      <div>
+                        <Input
+                          label="Tope máximo de reintegro (opcional)"
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={form.refund_cap}
+                          onChange={e => setForm(f => ({ ...f, refund_cap: e.target.value }))}
+                          placeholder="Ej: 5000"
+                        />
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                          Si el reintegro tiene un límite, Equal usará el menor valor entre el porcentaje calculado y este tope.
+                        </p>
+                      </div>
                     )}
 
                     <Input

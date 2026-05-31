@@ -42,7 +42,6 @@ function RefundSection({
   onToggleExpand,
   expenseAmount,
   expenseCurrency,
-  expenseDate,
   walletOptions,
 }: {
   form: RefundFormState
@@ -58,15 +57,17 @@ function RefundSection({
   const fix = parseFloat(refundForm.fixed_amount)
   const cap = parseFloat(refundForm.cap_amount)
 
-  const pctForCalc = refundForm.rule_type !== 'fixed' ? (isNaN(pct) ? 0 : pct) : null
-  const capForCalc = refundForm.rule_type === 'fixed'
+  const hasOptionalCap = refundForm.rule_type === 'percentage' && !isNaN(cap) && cap > 0
+  const effectiveRuleType = hasOptionalCap ? 'percentage_cap' : refundForm.rule_type
+  const pctForCalc = effectiveRuleType !== 'fixed' ? (isNaN(pct) ? 0 : pct) : null
+  const capForCalc = effectiveRuleType === 'fixed'
     ? (isNaN(fix) ? 0 : fix)
-    : refundForm.rule_type === 'percentage_cap'
+    : hasOptionalCap || effectiveRuleType === 'percentage_cap'
       ? (isNaN(cap) ? 0 : cap)
       : null
 
   const preview = refundForm.enabled
-    ? calculateRefundAmount(safeNumber(expenseAmount), refundForm.rule_type, pctForCalc, capForCalc)
+    ? calculateRefundAmount(safeNumber(expenseAmount), effectiveRuleType, pctForCalc, capForCalc)
     : 0
 
   const walletName = walletOptions.find(w => w.value === refundForm.destination_wallet_id)?.label
@@ -128,9 +129,8 @@ function RefundSection({
                 value={refundForm.rule_type}
                 onChange={e => onChange({ rule_type: e.target.value as RefundRuleType })}
                 options={[
-                  { value: 'percentage',     label: 'Porcentaje del gasto' },
-                  { value: 'fixed',          label: 'Monto fijo' },
-                  { value: 'percentage_cap', label: 'Porcentaje con tope' },
+                  { value: 'percentage', label: 'Porcentaje del gasto' },
+                  { value: 'fixed',      label: 'Monto fijo' },
                 ]}
               />
 
@@ -159,16 +159,21 @@ function RefundSection({
                 />
               )}
 
-              {refundForm.rule_type === 'percentage_cap' && (
-                <Input
-                  label="Tope máximo"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={refundForm.cap_amount}
-                  onChange={e => onChange({ cap_amount: e.target.value })}
-                  placeholder="Ej: 2000"
-                />
+              {refundForm.rule_type === 'percentage' && (
+                <div>
+                  <Input
+                    label="Tope máximo de reintegro (opcional)"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={refundForm.cap_amount}
+                    onChange={e => onChange({ cap_amount: e.target.value })}
+                    placeholder="Ej: 5000"
+                  />
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                    Si el reintegro tiene un límite, Equal usará el menor valor entre el porcentaje calculado y este tope.
+                  </p>
+                </div>
               )}
 
               <Input
@@ -244,6 +249,7 @@ export function NewTransactionModal({
   const [softConfirmStep, setSoftConfirmStep] = useState(false)
   const softCheckBypassed                   = useRef(false)
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     softCheckBypassed.current = false
     if (open) {
@@ -261,12 +267,15 @@ export function NewTransactionModal({
       setTemplateName('')
     }
   }, [open, editing])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const financialFieldsBlocked = (editImpact?.creditedRefundCount ?? 0) > 0
 
   const categoryOptions = [
     { value: '', label: 'Sin categoría' },
-    ...categories.map(c => ({ value: c.id ?? '', label: c.name })),
+    ...categories
+      .filter(c => c.type === form.type && !c.is_system)
+      .map(c => ({ value: c.id ?? '', label: c.name })),
   ]
   const walletOptions = [
     { value: '', label: 'Sin billetera' },
@@ -274,7 +283,12 @@ export function NewTransactionModal({
   ]
 
   async function handleSave() {
-    if (!form.description || !form.amount || !form.date) {
+    if (!form.wallet_id) {
+      setFormError('Seleccioná una billetera para registrar esta transacción.')
+      return
+    }
+
+    if (!form.amount || !form.date) {
       setFormError('Completá todos los campos obligatorios.')
       return
     }
@@ -439,7 +453,6 @@ export function NewTransactionModal({
           value={form.description ?? ''}
           onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
           placeholder="Ej: Supermercado, salario, alquiler…"
-          required
         />
 
         <div className="grid grid-cols-2 gap-3">
@@ -471,14 +484,19 @@ export function NewTransactionModal({
         />
 
         <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Select
+              label="Categoría"
+              value={form.category_id ?? ''}
+              onChange={e => setForm(f => ({ ...f, category_id: e.target.value || null }))}
+              options={categoryOptions}
+            />
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+              Si no elegís, se guarda como Sin categoría.
+            </p>
+          </div>
           <Select
-            label="Categoría"
-            value={form.category_id ?? ''}
-            onChange={e => setForm(f => ({ ...f, category_id: e.target.value || null }))}
-            options={categoryOptions}
-          />
-          <Select
-            label="Billetera"
+            label="Billetera *"
             value={form.wallet_id ?? ''}
             onChange={e => setForm(f => ({ ...f, wallet_id: e.target.value || null }))}
             options={walletOptions}

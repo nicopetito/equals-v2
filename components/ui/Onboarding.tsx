@@ -75,6 +75,7 @@ export function Onboarding() {
   useEffect(() => {
     if (!user?.id) return
     const completed = localStorage.getItem(DONE_KEY(user.id))
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!completed) setVisible(true)
   }, [user?.id])
 

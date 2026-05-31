@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import { safeNumber } from '@/utils/format'
+import { categoriesService } from '@/services/categories.service'
 import type {
   Transaction,
   TransactionWithDetails,
@@ -70,6 +71,15 @@ export const transactionsService = {
     const supabase = getSupabase()
     const user_id = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
+
+    if (!tx.wallet_id) {
+      throw new Error('Seleccioná una billetera para registrar esta transacción.')
+    }
+
+    if (!tx.category_id) {
+      const catId = await categoriesService.getOrCreateSystemCategory(tx.type)
+      tx = { ...tx, category_id: catId }
+    }
 
     const { data, error } = await supabase
       .from('transactions')
@@ -219,6 +229,7 @@ export const transactionsService = {
     if (error) throw error
 
     const map = new Map<string, { income: number; expenses: number; count: number }>()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(data ?? []).forEach((item: any) => {
       const key = item.month.substring(0, 7)
       const existing = map.get(key) ?? { income: 0, expenses: 0, count: 0 }

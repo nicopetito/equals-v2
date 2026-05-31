@@ -1,18 +1,26 @@
 import { safeNumber } from './format'
 import type { WalletWithBalance, Goal, FixedTerm, TransactionWithDetails, Refund } from '@/types'
 
-// Prefijos usados por goalsService.deposit() y goalsService.withdraw()
-// al crear las transacciones correspondientes. Deben mantenerse sincronizados
-// con goals.service.ts si esas descripciones cambian en el futuro.
+// Prefijos usados por RPCs al crear transacciones internas.
+// Deben mantenerse sincronizados con las migraciones de Supabase correspondientes.
 const GOAL_DEPOSIT_PREFIX    = 'Aporte a objetivo:'
 const GOAL_WITHDRAWAL_PREFIX = 'Retiro de objetivo:'
+// rpc_refund_credit genera: 'Reintegro: ' + descripción original
+export const REFUND_PREFIX = 'Reintegro:'
+
+// Detecta si una transacción es un reintegro acreditado por su prefijo de descripción.
+// Mientras no exista un campo `is_refund` en la tabla, esta es la forma de identificarlos.
+export function isRefundTransaction(tx: { type: string; description?: string | null }): boolean {
+  return tx.type === 'income' && (tx.description ?? '').startsWith(REFUND_PREFIX)
+}
 
 export interface SavingsMetrics {
-  income: number           // suma de todas las transacciones income (bruto, para KPIs)
-  expenses: number         // suma de todas las transacciones expense (bruto, para KPIs)
+  income: number           // suma de todas las transacciones income (bruto, para KPIs de display)
+  expenses: number         // suma de todas las transacciones expense (bruto, para KPIs de display)
   goalDeposits: number     // aportes a objetivos detectados (subconjunto de expenses)
   goalWithdrawals: number  // retiros de objetivos detectados (subconjunto de income)
-  realIncome: number       // income - goalWithdrawals (ingresos que no liberan ahorro previo)
+  refundIncome: number     // reintegros acreditados (subconjunto de income, no son ingresos reales)
+  realIncome: number       // income - goalWithdrawals - refundIncome
   consumerExpenses: number // expenses - goalDeposits (gasto real de consumo)
   netGoalFunding: number   // goalDeposits - goalWithdrawals (dinero neto reservado en objetivos)
   savingsRate: number | null // (realIncome - consumerExpenses) / realIncome * 100
@@ -23,6 +31,7 @@ export function calculateSavingsMetrics(transactions: TransactionWithDetails[]):
   let expenses = 0
   let goalDeposits = 0
   let goalWithdrawals = 0
+  let refundIncome = 0
 
   for (const tx of transactions) {
     const amount = safeNumber(tx.amount)
@@ -31,20 +40,22 @@ export function calculateSavingsMetrics(transactions: TransactionWithDetails[]):
     if (tx.type === 'income') {
       income += amount
       if (desc.startsWith(GOAL_WITHDRAWAL_PREFIX)) goalWithdrawals += amount
+      else if (desc.startsWith(REFUND_PREFIX)) refundIncome += amount
     } else if (tx.type === 'expense') {
       expenses += amount
       if (desc.startsWith(GOAL_DEPOSIT_PREFIX)) goalDeposits += amount
     }
   }
 
-  const realIncome       = income - goalWithdrawals
+  // realIncome excluye retiros de objetivos (plata que ya era ahorros) y reintegros (ajuste de gasto, no ingreso real)
+  const realIncome       = income - goalWithdrawals - refundIncome
   const consumerExpenses = expenses - goalDeposits
   const netGoalFunding   = goalDeposits - goalWithdrawals
   const savingsRate      = realIncome > 0
     ? Math.round(((realIncome - consumerExpenses) / realIncome) * 100)
     : null
 
-  return { income, expenses, goalDeposits, goalWithdrawals, realIncome, consumerExpenses, netGoalFunding, savingsRate }
+  return { income, expenses, goalDeposits, goalWithdrawals, refundIncome, realIncome, consumerExpenses, netGoalFunding, savingsRate }
 }
 
 // Construye un mapa transaction_id → monto total reembolsado y acreditado.
@@ -63,7 +74,13 @@ export function buildCreditedRefundMap(refunds: Refund[]): Map<string, number> {
 export interface NetWorthBreakdown {
   liquid: number
   goals: number
+  // investments = capital (principal_amount)
   investments: number
+  // investmentsInterest = interés estimado no realizado (estimated_total - principal_amount)
+  // Solo se incluye si el plazo fijo tiene estimated_total > principal_amount
+  investmentsInterest: number
+  // investmentsEstimated = investments + investmentsInterest (valor total estimado de plazo fijo)
+  investmentsEstimated: number
   total: number
 }
 
@@ -75,7 +92,11 @@ export function calculateNetWorth(
   const result: Record<string, NetWorthBreakdown> = {}
 
   const ensure = (currency: string) => {
-    if (!result[currency]) result[currency] = { liquid: 0, goals: 0, investments: 0, total: 0 }
+    if (!result[currency]) result[currency] = {
+      liquid: 0, goals: 0,
+      investments: 0, investmentsInterest: 0, investmentsEstimated: 0,
+      total: 0,
+    }
     return result[currency]
   }
 
@@ -96,10 +117,18 @@ export function calculateNetWorth(
   })
 
   fixedTerms.filter(ft => ft.status === 'active').forEach(ft => {
-    const val = safeNumber(ft.principal_amount)
+    const principal  = safeNumber(ft.principal_amount)
+    const estimated  = safeNumber(ft.estimated_total)
+    // Use estimated_total if it exists and is greater than principal; otherwise fall back to principal
+    const investVal  = estimated > principal ? estimated : principal
+    const interest   = Math.max(0, investVal - principal)
+
     const r = ensure(ft.currency)
-    r.investments += val
-    r.total += val
+    r.investments         += principal
+    r.investmentsInterest += interest
+    r.investmentsEstimated += investVal
+    // Total uses estimated value to reflect the best current projection
+    r.total += investVal
   })
 
   return result

@@ -2,10 +2,10 @@
 
 import { useState } from 'react'
 import {
-  Plus, Pencil, Trash2, Target, CheckCircle2, Calendar, Wallet,
+  Plus, Pencil, Trash2, Target, CheckCircle2, Calendar,
   Plane, Home, Car, Shield, GraduationCap, TrendingUp, Laptop,
   Heart, PiggyBank, Gift, ArrowDownCircle, ArrowUpCircle, Clock,
-  ChevronDown, ChevronUp, Sparkles,
+  Sparkles,
 } from 'lucide-react'
 import { PageHeader }    from '@/components/ui/PageHeader'
 import { HelpButton }   from '@/components/help/HelpButton'
@@ -94,6 +94,7 @@ export default function GoalsPage() {
   const [saving, setSaving]         = useState(false)
   const [formError, setFormError]   = useState<string | null>(null)
   const [deleting, setDeleting]     = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   // ── Modal depositar/extraer ───────────────────────────────────────────────
   const [movModal, setMovModal]     = useState<{ open: boolean; type: 'deposit' | 'withdraw'; goal: Goal | null }>
@@ -310,14 +311,32 @@ export default function GoalsPage() {
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)' }}>
               <Pencil size={14} />
             </button>
-            <button onClick={() => goal.id && handleDelete(goal.id)}
-              disabled={deleting === goal.id}
-              className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors"
-              style={{ color: 'var(--text-muted)' }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--expense-50)'; e.currentTarget.style.color = 'var(--expense-500)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)' }}>
-              <Trash2 size={14} />
-            </button>
+            {confirmDeleteId === goal.id ? (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => { setConfirmDeleteId(null); goal.id && handleDelete(goal.id) }}
+                  disabled={deleting === goal.id}
+                  className="text-white rounded-lg font-bold transition-opacity hover:opacity-90"
+                  style={{ fontSize: '11px', padding: '2px 8px', background: 'var(--expense-500)', border: 'none', cursor: 'pointer' }}>
+                  Sí
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteId(null)}
+                  className="rounded-lg font-semibold"
+                  style={{ fontSize: '11px', padding: '2px 8px', background: 'var(--bg-subtle)', color: 'var(--text-muted)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                  No
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => goal.id && setConfirmDeleteId(goal.id)}
+                disabled={deleting === goal.id}
+                className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors"
+                style={{ color: 'var(--text-muted)' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--expense-50)'; e.currentTarget.style.color = 'var(--expense-500)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)' }}>
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -435,7 +454,7 @@ export default function GoalsPage() {
           Cargando objetivos…
         </div>
       ) : goals.length === 0 ? (
-        <EmptyState type="goals" icon={Target}
+        <EmptyState type="goals"
           title="No tenés objetivos todavía"
           description="Definí una meta de ahorro para separar dinero sin confundirlo con tu saldo disponible. El progreso se calcula automáticamente."
           action={{ label: '+ Nuevo objetivo', onClick: openCreate }} />

@@ -1,28 +1,25 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { goalsService } from '@/services/goals.service'
 import type { Goal } from '@/types'
 
 export function useGoals() {
-  const [data, setData] = useState<Goal[]>([])
+  const [data, setData]       = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]     = useState<string | null>(null)
+  const [rev, setRev]         = useState(0)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const result = await goalsService.list()
-      setData(result)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error loading goals')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  useEffect(() => {
+    let active = true
+    goalsService.list()
+      .then(r  => { if (active) setData(r) })
+      .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Error loading goals') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [rev])
 
-  useEffect(() => { load() }, [load])
+  function refetch() { setError(null); setLoading(true); setRev(r => r + 1) }
 
-  return { data, loading, error, refetch: load }
+  return { data, loading, error, refetch }
 }

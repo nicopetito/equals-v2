@@ -84,24 +84,32 @@ export const walletsService = {
     transactionCount: number
     activeFixedTerms: number
     pendingRefunds: number
+    currentBalance: number
+    recurringCount: number
   }> {
     const supabase = getSupabase()
     const user_id = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
 
-    const [txResult, ftResult, refundResult] = await Promise.all([
+    const [txResult, ftResult, refundResult, balanceResult, recResult] = await Promise.all([
       supabase.from('transactions').select('id', { count: 'exact', head: true })
         .eq('wallet_id', id).eq('user_id', user_id),
       supabase.from('fixed_terms').select('id', { count: 'exact', head: true })
         .eq('wallet_id', id).eq('user_id', user_id).in('status', ['active', 'matured']),
       supabase.from('refunds').select('id', { count: 'exact', head: true })
-        .eq('destination_wallet_id', id).eq('user_id', user_id).eq('status', 'pending'),
+        .eq('destination_wallet_id', id).eq('user_id', user_id).in('status', ['pending', 'credited']),
+      supabase.from('wallet_current_balance').select('current_balance')
+        .eq('id', id).eq('user_id', user_id).maybeSingle(),
+      supabase.from('recurring_transactions').select('id', { count: 'exact', head: true })
+        .eq('wallet_id', id).eq('user_id', user_id),
     ])
 
     return {
       transactionCount: txResult.count ?? 0,
       activeFixedTerms: ftResult.count ?? 0,
       pendingRefunds:   refundResult.count ?? 0,
+      currentBalance:   safeNumber(balanceResult.data?.current_balance),
+      recurringCount:   recResult.count ?? 0,
     }
   },
 

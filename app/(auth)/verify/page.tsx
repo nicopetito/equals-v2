@@ -51,9 +51,9 @@ function VerifyContent() {
     if (!email) return
     setResendLoading(true)
     try {
-      await authService.signUp(email, '')
+      await authService.resendOtp(email)
     } catch {
-      // ignorar error — el reenvío puede fallar si el user ya existe pero aún no confirmó
+      // ignorar error de red — el cooldown igual se aplica
     } finally {
       setResendLoading(false)
       setResendCooldown(60)

@@ -26,19 +26,18 @@ export default function ResetPasswordPage() {
   const [error,      setError]      = useState<string | null>(null)
   const [loading,    setLoading]    = useState(false)
   const [success,    setSuccess]    = useState(false)
-  const [tokenValid, setTokenValid] = useState<boolean | null>(null)
+  // Lazy initializer: detecta el token de recuperación del hash sin setState en el effect
+  const [tokenValid, setTokenValid] = useState<boolean | null>(() => {
+    if (typeof window === 'undefined') return null
+    const hash = window.location.hash
+    return (hash.includes('type=recovery') || hash.includes('access_token')) ? true : null
+  })
   const { updatePassword } = useAuth()
   const router = useRouter()
 
   const strength = getPasswordStrength(password)
 
   useEffect(() => {
-    // Supabase inyecta el token de recuperación en el hash de la URL
-    const hash = window.location.hash
-    if (hash.includes('type=recovery') || hash.includes('access_token')) {
-      setTokenValid(true)
-    }
-
     const { data: { subscription } } = authService.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') setTokenValid(true)
     })

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import {
-  PiggyBank, Plus, TrendingUp, Calendar, Percent, Wallet,
+  PiggyBank, Plus, TrendingUp, Calendar, Wallet,
   RefreshCw, ArrowDownCircle, Clock, CheckCircle2, XCircle,
   ChevronRight, Calculator,
 } from 'lucide-react'
@@ -214,6 +214,7 @@ export default function FixedTermPage() {
   const simMatDate = sim.start_date && simDays > 0 ? addDays(sim.start_date, simDays) : ''
 
   // action modal derived
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const actionMatured = actionItem ? isEffectivelyMatured(actionItem) || actionItem.status === 'matured' : false
   const reinvestDays  = safeNumber(reinvestForm.term_days)
   const reinvestTna   = safeNumber(reinvestForm.tna || String(actionItem?.tna ?? 0))
@@ -242,6 +243,7 @@ export default function FixedTermPage() {
     setActionError(null)
   }
 
+  /* eslint-disable react-hooks/preserve-manual-memoization */
   const handleCreate = useCallback(async () => {
     setNewError(null)
     const principal = safeNumber(newForm.principal)
@@ -311,6 +313,7 @@ export default function FixedTermPage() {
       setActioning(false)
     }
   }, [actionItem, withdrawForm, refetch, addToast])
+  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   const handleReinvest = useCallback(async () => {
     if (!actionItem) return
@@ -449,7 +452,6 @@ export default function FixedTermPage() {
               {/* Empty state */}
               {items.length === 0 && (
                 <EmptyState
-                  icon={PiggyBank}
                   title="No tenés plazos fijos activos"
                   description="Simulá un rendimiento o registrá una inversión para seguir su evolución."
                   action={{ label: '+ Nuevo plazo fijo', onClick: openNew }}

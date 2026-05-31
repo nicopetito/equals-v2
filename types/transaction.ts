@@ -4,7 +4,7 @@ export type TransactionType = 'income' | 'expense'
 export interface Transaction {
   id?: string
   user_id?: string
-  description: string
+  description?: string
   amount: number
   type: TransactionType
   currency: Currency

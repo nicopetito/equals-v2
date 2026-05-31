@@ -6,7 +6,6 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { TransactionWithDetails } from '@/types'
 import { formatCurrency } from '@/utils/format'
-import { formatDate } from '@/utils/date'
 
 interface Props {
   open: boolean
@@ -34,7 +33,6 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
 
   const income   = statsByCurrency.reduce((s, st) => s + st.income, 0)
   const expenses = statsByCurrency.reduce((s, st) => s + st.expenses, 0)
-  const balance  = income - expenses
   const savingRate = income > 0 ? Math.round(((income - expenses) / income) * 100) : 0
 
   const catMap = new Map<string, { amount: number; color: string; currency: string }>()
@@ -91,6 +89,11 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
             .tx-table td { padding: 7px 8px; border-bottom: 1px solid #F1F5F9; }
             .saving { margin: 12px 0; padding: 10px 14px; border-radius: 10px; background: ${savingRate >= 20 ? '#ECFDF5' : '#FFFBEB'}; border: 1px solid ${savingRate >= 20 ? '#A7F3D0' : '#FDE68A'}; display: flex; justify-content: space-between; align-items: center; }
             .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #E2E8F0; font-size: 10px; color: #94A3B8; text-align: center; }
+            .stats { page-break-inside: avoid; }
+            .saving { page-break-inside: avoid; }
+            .cat-row { page-break-inside: avoid; }
+            tr { page-break-inside: avoid; }
+            h2 { page-break-after: avoid; }
           </style>
         </head>
         <body>

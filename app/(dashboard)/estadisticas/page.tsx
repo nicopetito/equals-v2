@@ -55,6 +55,8 @@ function getPrevDateRange(period: Period): { prevStart: Date; prevEnd: Date } {
       const prevYear = new Date(today.getFullYear() - 1, 0, 1)
       return { prevStart: startOfYear(prevYear), prevEnd: new Date(today.getFullYear() - 1, 11, 31) }
     }
+    case 'all_time':
+      return { prevStart: new Date(2000, 0, 1), prevEnd: today }
   }
 }
 
@@ -192,8 +194,10 @@ export default function EstadisticasPage() {
   const topExpCategories = useMemo(() => {
     const map: Record<string, { amount: number; count: number; color: string }> = {}
     filtered.filter(t => t.type === 'expense').forEach(t => {
-      const name = t.category_name ?? 'Sin categoría'
-      if (!map[name]) map[name] = { amount: 0, count: 0, color: t.category_color ?? '#ffb4ab' }
+      // category_id set but category_name null → the category was deleted
+      const name = t.category_name ?? (t.category_id ? 'Categoría eliminada' : 'Sin categoría')
+      const color = t.category_name ? (t.category_color ?? '#ffb4ab') : (t.category_id ? '#9ca3af' : '#ffb4ab')
+      if (!map[name]) map[name] = { amount: 0, count: 0, color }
       map[name].amount += safeNumber(t.amount)
       map[name].count++
     })
@@ -207,8 +211,9 @@ export default function EstadisticasPage() {
   const topIncCategories = useMemo(() => {
     const map: Record<string, { amount: number; count: number; color: string }> = {}
     filtered.filter(t => t.type === 'income').forEach(t => {
-      const name = t.category_name ?? 'Sin categoría'
-      if (!map[name]) map[name] = { amount: 0, count: 0, color: t.category_color ?? '#4edea3' }
+      const name = t.category_name ?? (t.category_id ? 'Categoría eliminada' : 'Sin categoría')
+      const color = t.category_name ? (t.category_color ?? '#4edea3') : (t.category_id ? '#9ca3af' : '#4edea3')
+      if (!map[name]) map[name] = { amount: 0, count: 0, color }
       map[name].amount += safeNumber(t.amount)
       map[name].count++
     })
@@ -227,12 +232,6 @@ export default function EstadisticasPage() {
     const max = Math.max(...totals)
     return totals.map((v, i) => ({ day: DAY_LABELS[i], value: v, pct: max > 0 ? (v / max) * 100 : 0 }))
   }, [filtered])
-
-  const walletByCurrency = useMemo(() =>
-    wallets.reduce<Record<string, number>>((acc, w) => {
-      if (w.currency) acc[w.currency] = (acc[w.currency] ?? 0) + safeNumber(w.current_balance)
-      return acc
-    }, {}), [wallets])
 
   const netWorth = useMemo(
     () => calculateNetWorth(wallets, goals, fixedTerms),
@@ -385,10 +384,26 @@ export default function EstadisticasPage() {
             {currency !== 'all' && (
               <div>
                 <SectionLabel
-                  title="Evolución del balance"
-                  desc="Balance acumulado de todas tus billeteras a lo largo del tiempo."
+                  title="Patrimonio actual"
+                  desc="Disponible en billeteras, objetivos e inversiones activas."
                 />
-                <NetWorthSparkline transactions={allTransactions} currency={currency} loading={loading} />
+                <NetWorthSparkline
+                  wallets={wallets}
+                  goals={goals}
+                  fixedTerms={fixedTerms}
+                  currency={currency}
+                  loading={loading}
+                />
+              </div>
+            )}
+            {currency === 'all' && Object.keys(netWorth).length === 0 && !loading && (
+              <div
+                className="glass-card rounded-2xl p-5 flex items-center justify-center"
+                style={{ minHeight: 80 }}
+              >
+                <p className="text-xs text-center" style={{ color: 'var(--text-faint)' }}>
+                  Registrá billeteras, objetivos o inversiones para ver tu patrimonio.
+                </p>
               </div>
             )}
             {currency === 'all' && Object.keys(netWorth).length > 0 && (
@@ -469,6 +484,12 @@ export default function EstadisticasPage() {
                     </span>
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cat.color }} />
                     <p className="flex-1 text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{cat.name}</p>
+                    {cat.name === 'Categoría eliminada' && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
+                        style={{ background: 'var(--bg-subtle)', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
+                        eliminada
+                      </span>
+                    )}
                     <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>{cat.count} mov.</span>
                     <span className="text-xs font-bold shrink-0 w-9 text-right tabular-nums"
                       style={{ color: 'var(--text-faint)' }}>{cat.pct.toFixed(0)}%</span>
@@ -505,6 +526,12 @@ export default function EstadisticasPage() {
                     </span>
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cat.color }} />
                     <p className="flex-1 text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{cat.name}</p>
+                    {cat.name === 'Categoría eliminada' && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
+                        style={{ background: 'var(--bg-subtle)', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
+                        eliminada
+                      </span>
+                    )}
                     <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>{cat.count} mov.</span>
                     <span className="text-xs font-bold shrink-0 w-9 text-right tabular-nums"
                       style={{ color: 'var(--text-faint)' }}>{cat.pct.toFixed(0)}%</span>
@@ -522,14 +549,14 @@ export default function EstadisticasPage() {
           )}
 
           {/* ── GASTOS POR DÍA DE SEMANA ─────────────────────────── */}
-          {spendingByDay && (
-            <div>
-              <SectionLabel
-                title="Gastos por día de la semana"
-                desc="Qué días de la semana concentran más gastos en el período."
-              />
+          <div>
+            <SectionLabel
+              title="Gastos por día de la semana"
+              desc="Qué días de la semana concentran más gastos en el período."
+            />
+            {spendingByDay ? (
               <div className="glass-card rounded-2xl p-5">
-                <div className="flex items-end justify-between gap-2" style={{ height: 96 }}>
+                <div className="flex items-end justify-between gap-2 h-24 sm:h-32">
                   {spendingByDay.map((bar) => (
                     <div key={bar.day} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
                       <div className="w-full rounded-t-lg transition-all duration-300"
@@ -545,8 +572,17 @@ export default function EstadisticasPage() {
                   ))}
                 </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <div
+                className="glass-card rounded-2xl p-5 flex items-center justify-center"
+                style={{ minHeight: 80 }}
+              >
+                <p className="text-xs text-center" style={{ color: 'var(--text-faint)' }}>
+                  Necesitás al menos 7 gastos en el período para ver este gráfico.
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* ── RESUMEN POR MONEDA ───────────────────────────────── */}
           {stats.byCurrency && Object.keys(stats.byCurrency).length > 1 && (

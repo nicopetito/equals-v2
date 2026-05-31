@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import {
   Plus, Search, TrendingUp, TrendingDown, Pencil, Trash2, Filter,
   ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, ChevronDown,
-  RotateCcw, CheckCircle, XCircle, CheckSquare, Square, MinusSquare, AlertTriangle, Tag,
+  RotateCcw, CheckCircle, XCircle, CheckSquare, Square, MinusSquare, AlertTriangle, Tag, Wallet,
 } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
@@ -74,7 +74,7 @@ function Chip({ selected, onClick, children }: {
   return (
     <button
       onClick={onClick}
-      className="px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all duration-150"
+      className="px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all duration-150 max-w-[160px] overflow-hidden text-ellipsis"
       style={selected
         ? { background: 'var(--grad-brand)', color: 'white', boxShadow: '0 2px 8px rgba(109,59,215,0.25)' }
         : { background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)' }
@@ -83,6 +83,14 @@ function Chip({ selected, onClick, children }: {
       {children}
     </button>
   )
+}
+
+function refundRuleLabel(refund: Refund): string | null {
+  if (refund.rule_type === 'percentage' && refund.percentage)
+    return `${refund.percentage}% del gasto`
+  if (refund.rule_type === 'percentage_cap' && refund.percentage && refund.cap_amount)
+    return `${refund.percentage}% con tope de ${formatCurrency(refund.cap_amount, refund.currency)}`
+  return null
 }
 
 function RefundRow({
@@ -102,6 +110,7 @@ function RefundRow({
 }) {
   const today = new Date().toISOString().split('T')[0]
   const isReady = !refund.expected_date || refund.expected_date <= today
+  const ruleLabel = refundRuleLabel(refund)
 
   return (
     <div
@@ -121,6 +130,11 @@ function RefundRow({
         <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
           {originalDescription}
         </p>
+        {ruleLabel && (
+          <span className="text-[11px]" style={{ color: 'var(--text-faint)' }}>
+            {ruleLabel}
+          </span>
+        )}
         <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
           {refund.expected_date && (
             <span className="text-[11px]" style={{ color: 'var(--text-faint)' }}>
@@ -192,18 +206,27 @@ function TransactionsPageInner() {
   const [filterType, setFilterType]       = useState<FilterType>('all')
   const [filterCategory, setFilterCategory] = useState<string>('all')
   const [filterWallet, setFilterWallet]   = useState<string>('all')
+  const [filterOrphan, setFilterOrphan]         = useState(false)
+  const [filterNoCategory, setFilterNoCategory] = useState(false)
 
-  // Pre-select wallet filter from URL param (set by DiagnosticModal "Ver transacciones")
+  // Pre-select filters from URL params
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    const walletId = searchParams.get('wallet_id')
+    const walletId   = searchParams.get('wallet_id')
+    const orphan     = searchParams.get('orphan')
+    const noCategory = searchParams.get('no_category') ?? searchParams.get('uncategorized')
+    const categoryId = searchParams.get('category_id')
     // const type       = searchParams.get('type')        // futuro
-    // const categoryId = searchParams.get('category_id') // futuro
     // const currency   = searchParams.get('currency')    // futuro
     // const from       = searchParams.get('from')        // futuro
     // const to         = searchParams.get('to')          // futuro
     // const search     = searchParams.get('search')      // futuro
-    if (walletId) setFilterWallet(walletId)
+    if (walletId)              { setFilterWallet(walletId);    setFilterOrphan(false); setFilterNoCategory(false) }
+    if (orphan === 'true')     { setFilterOrphan(true);        setFilterWallet('all'); setFilterNoCategory(false) }
+    if (noCategory === 'true') { setFilterNoCategory(true);    setFilterWallet('all'); setFilterOrphan(false) }
+    if (categoryId)            { setFilterCategory(categoryId); setFilterOrphan(false); setFilterNoCategory(false) }
   }, [searchParams])
+  /* eslint-enable react-hooks/set-state-in-effect */
   const [search, setSearch]               = useState('')
   const [modalOpen, setModalOpen]         = useState(false)
   const [editing, setEditing]             = useState<TransactionWithDetails | null>(null)
@@ -232,18 +255,31 @@ function TransactionsPageInner() {
     if (el) syncChipScroll(el)
   }, [categories, wallets])
 
+  const walletIds = useMemo(
+    () => new Set(wallets.map(w => w.id).filter(Boolean) as string[]),
+    [wallets]
+  )
+
   const { start, end } = getDateRangeForPeriod(period)
+  const startKey = start.toISOString()
+  const endKey   = end.toISOString()
   const filtered = useMemo(() =>
     transactions.filter(t => {
       const date = new Date(t.date)
       if (date < start || date > end) return false
       if (filterType !== 'all' && t.type !== filterType) return false
-      if (filterCategory !== 'all' && t.category_id !== filterCategory) return false
-      if (filterWallet !== 'all' && t.wallet_id !== filterWallet) return false
-      if (search && !t.description.toLowerCase().includes(search.toLowerCase())) return false
+      if (filterNoCategory) {
+        if (t.category_id) return false
+      } else if (filterCategory !== 'all' && t.category_id !== filterCategory) return false
+      if (filterOrphan) {
+        const isOrphan = !t.wallet_id || !walletIds.has(t.wallet_id)
+        if (!isOrphan) return false
+      } else if (filterWallet !== 'all' && t.wallet_id !== filterWallet) return false
+      if (search && !(t.description ?? '').toLowerCase().includes(search.toLowerCase())) return false
       return true
     }),
-  [transactions, start.toISOString(), end.toISOString(), filterType, filterCategory, filterWallet, search])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [transactions, startKey, endKey, filterType, filterCategory, filterWallet, filterOrphan, filterNoCategory, walletIds, search])
 
   const totals = useMemo(() => {
     const income   = filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
@@ -278,7 +314,7 @@ function TransactionsPageInner() {
       arr.push(tx)
       map.set(key, arr)
     }
-    let entries = Array.from(map.entries())
+    const entries = Array.from(map.entries())
     if (groupBy === 'type') entries.sort(([a]) => (a === 'income' ? -1 : 1))
     return entries.map(([key, txs]) => ({
       key,
@@ -603,14 +639,13 @@ function TransactionsPageInner() {
         <div className="relative flex items-center gap-1">
           <button
             onClick={() => chipRowRef.current?.scrollBy({ left: -140, behavior: 'smooth' })}
+            disabled={!chipScrolled}
             className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-150"
             style={{
               background: 'var(--bg-card)',
               border: '1px solid var(--border)',
               boxShadow: 'var(--shadow-sm)',
-              color: 'var(--text-muted)',
-              opacity: chipScrolled ? 1 : 0,
-              pointerEvents: chipScrolled ? 'auto' : 'none',
+              color: chipScrolled ? 'var(--text-muted)' : 'var(--border)',
             }}
           >
             <ChevronLeft size={13} />
@@ -619,7 +654,7 @@ function TransactionsPageInner() {
           <div
             ref={chipRowRef}
             className="flex gap-1.5 overflow-x-auto pb-0.5 flex-1"
-            style={{ scrollbarWidth: 'none', cursor: chipDrag.current.active ? 'grabbing' : 'grab' }}
+            style={{ scrollbarWidth: 'none', cursor: 'grab' }}
             onScroll={e => syncChipScroll(e.currentTarget)}
             onWheel={e => { if (chipRowRef.current) chipRowRef.current.scrollLeft += e.deltaY }}
             onMouseDown={e => {
@@ -633,6 +668,39 @@ function TransactionsPageInner() {
             onMouseUp={e => { chipDrag.current.active = false; e.currentTarget.style.cursor = 'grab' }}
             onMouseLeave={e => { chipDrag.current.active = false; e.currentTarget.style.cursor = 'grab' }}
           >
+            {/* Filtros de advertencia — al inicio para mayor visibilidad */}
+            <button
+              onClick={() => { setFilterOrphan(v => !v); setFilterWallet('all'); setFilterNoCategory(false) }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all duration-150"
+              style={filterOrphan
+                ? { background: 'var(--expense-100)', color: 'var(--expense-700)', border: '1px solid var(--expense-300)', boxShadow: '0 0 0 2px rgba(225,29,72,0.12)' }
+                : { background: 'var(--bg-card)', color: 'var(--expense-500)', border: '1px solid var(--expense-200)' }
+              }
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{ background: 'var(--expense-400)' }}
+              />
+              Sin billetera
+            </button>
+
+            <button
+              onClick={() => { setFilterNoCategory(v => !v); setFilterWallet('all'); setFilterOrphan(false) }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all duration-150"
+              style={filterNoCategory
+                ? { background: 'var(--goal-100)', color: 'var(--goal-700)', border: '1px solid var(--goal-300)', boxShadow: '0 0 0 2px rgba(5,102,217,0.10)' }
+                : { background: 'var(--bg-card)', color: 'var(--goal-600)', border: '1px solid var(--goal-200)' }
+              }
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{ background: 'var(--goal-400)' }}
+              />
+              Sin categoría
+            </button>
+
+            <div className="w-px self-stretch mx-0.5 shrink-0" style={{ background: 'var(--border)' }} />
+
             {TYPE_FILTERS.map(opt => (
               <Chip key={opt.value} selected={filterType === opt.value} onClick={() => setFilterType(opt.value)}>
                 {opt.label}
@@ -647,7 +715,7 @@ function TransactionsPageInner() {
               <Chip
                 key={c.id}
                 selected={filterCategory === c.id}
-                onClick={() => setFilterCategory(filterCategory === c.id ? 'all' : c.id!)}
+                onClick={() => { setFilterCategory(filterCategory === c.id ? 'all' : c.id!); setFilterNoCategory(false) }}
               >
                 {c.name}
               </Chip>
@@ -660,7 +728,7 @@ function TransactionsPageInner() {
                   <Chip
                     key={w.id}
                     selected={filterWallet === w.id}
-                    onClick={() => setFilterWallet(filterWallet === w.id ? 'all' : w.id!)}
+                    onClick={() => { setFilterWallet(filterWallet === w.id ? 'all' : w.id!); setFilterOrphan(false); setFilterNoCategory(false) }}
                   >
                     {w.name}
                   </Chip>
@@ -671,14 +739,13 @@ function TransactionsPageInner() {
 
           <button
             onClick={() => chipRowRef.current?.scrollBy({ left: 140, behavior: 'smooth' })}
+            disabled={!chipHasMore}
             className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-150"
             style={{
               background: 'var(--bg-card)',
               border: '1px solid var(--border)',
               boxShadow: 'var(--shadow-sm)',
-              color: 'var(--text-muted)',
-              opacity: chipHasMore ? 1 : 0,
-              pointerEvents: chipHasMore ? 'auto' : 'none',
+              color: chipHasMore ? 'var(--text-muted)' : 'var(--border)',
             }}
           >
             <ChevronRight size={13} />
@@ -738,7 +805,7 @@ function TransactionsPageInner() {
                 </button>
                 {showLabelDropdown && (
                   <div
-                    className="absolute bottom-full mb-1.5 left-0 z-20 rounded-xl p-2 min-w-52"
+                    className="absolute bottom-full mb-1.5 left-0 z-20 rounded-xl p-2 min-w-52 max-h-64 overflow-y-auto"
                     style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)' }}
                   >
                     <form
@@ -801,19 +868,82 @@ function TransactionsPageInner() {
         </div>
       )}
 
+      {/* ── Banner contextual por filtro activo ── */}
+      {filterOrphan && (
+        <div
+          className="rounded-2xl px-4 py-3 flex items-center gap-3"
+          style={{ background: 'var(--expense-50)', border: '1px solid var(--expense-200)' }}
+        >
+          <div
+            className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: 'var(--expense-100)', border: '1px solid var(--expense-200)' }}
+          >
+            <Wallet size={14} style={{ color: 'var(--expense-600)' }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold" style={{ color: 'var(--expense-700)' }}>
+              Movimientos sin billetera
+            </p>
+            <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--expense-600)' }}>
+              Aparecen en el resumen del período pero no afectan el saldo de tus billeteras. Asigná una billetera para corregirlo.
+            </p>
+          </div>
+          <button
+            onClick={() => setFilterOrphan(false)}
+            className="text-xs font-semibold shrink-0 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap"
+            style={{ color: 'var(--expense-600)', background: 'var(--expense-100)', border: '1px solid var(--expense-200)' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--expense-200)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--expense-100)' }}
+          >
+            Limpiar
+          </button>
+        </div>
+      )}
+
+      {filterNoCategory && (
+        <div
+          className="rounded-2xl px-4 py-3 flex items-center gap-3"
+          style={{ background: 'var(--goal-50)', border: '1px solid var(--goal-200)' }}
+        >
+          <div
+            className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: 'var(--goal-100)', border: '1px solid var(--goal-200)' }}
+          >
+            <Tag size={14} style={{ color: 'var(--goal-600)' }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold" style={{ color: 'var(--goal-700)' }}>
+              Movimientos sin categoría
+            </p>
+            <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--goal-600)' }}>
+              Sin categoría los gráficos y reportes por rubro estarán incompletos. Editá cada movimiento para clasificarlo.
+            </p>
+          </div>
+          <button
+            onClick={() => setFilterNoCategory(false)}
+            className="text-xs font-semibold shrink-0 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap"
+            style={{ color: 'var(--goal-600)', background: 'var(--goal-100)', border: '1px solid var(--goal-200)' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--goal-200)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--goal-100)' }}
+          >
+            Limpiar
+          </button>
+        </div>
+      )}
+
       {/* ── Transaction list ── */}
       <div
         className="rounded-2xl overflow-hidden"
         style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
       >
         {loading ? (
-          <div className="p-12 text-center" style={{ color: 'var(--text-muted)' }}>
+          <div role="status" aria-label="Cargando transacciones" className="p-12 text-center" style={{ color: 'var(--text-muted)' }}>
             <div className="w-7 h-7 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin mx-auto mb-3" />
             Cargando transacciones…
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState
-            icon={Filter}
+            type="transactions"
             title="Sin transacciones"
             description="No hay movimientos para el período y filtros seleccionados."
             action={{ label: '+ Nueva transacción', onClick: openCreate }}
@@ -822,7 +952,8 @@ function TransactionsPageInner() {
           <div>
             {groups.map(group => {
               const isGrouped       = groupBy !== 'none'
-              const isExpanded      = !isGrouped || expandedGroups.has(group.key)
+              const isSingleItem    = isGrouped && group.transactions.length === 1
+              const isExpanded      = !isGrouped || isSingleItem || expandedGroups.has(group.key)
               const groupIncome     = group.transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
               const groupExpense    = group.transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
               const groupBalance    = groupIncome - groupExpense
@@ -831,11 +962,15 @@ function TransactionsPageInner() {
               return (
                 <Fragment key={group.key}>
                   {/* ── Cabecera de grupo (acordeón) ── */}
-                  {isGrouped && (
+                  {isGrouped && !isSingleItem && (
                     <div
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={expandedGroups.has(group.key)}
                       className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors"
                       style={{ background: 'var(--bg-base)', borderBottom: '1px solid var(--border)' }}
                       onClick={() => toggleGroupExpand(group.key)}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroupExpand(group.key) } }}
                       onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-subtle)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-base)')}
                     >
@@ -910,7 +1045,7 @@ function TransactionsPageInner() {
                       >
                         {selectMode && (
                           <button
-                            onClick={e => { e.stopPropagation(); tx.id && toggleSelect(tx.id); setShowLabelDropdown(false) }}
+                            onClick={e => { e.stopPropagation(); if (tx.id) toggleSelect(tx.id); setShowLabelDropdown(false) }}
                             className="w-6 h-6 flex items-center justify-center shrink-0 transition-colors rounded-md"
                             style={{ color: isSelected ? 'var(--brand-500)' : 'var(--text-muted)' }}
                           >
@@ -974,6 +1109,32 @@ function TransactionsPageInner() {
                         </div>
                         {!selectMode && (
                           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                            {filterOrphan && (
+                              <button
+                                onClick={() => openEdit(tx)}
+                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition-colors shrink-0"
+                                style={{ background: 'var(--expense-50)', color: 'var(--expense-600)', border: '1px solid var(--expense-200)' }}
+                                onMouseEnter={e => { e.currentTarget.style.background = 'var(--expense-100)' }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'var(--expense-50)' }}
+                                title="Asignar billetera"
+                              >
+                                <Wallet size={11} />
+                                Asignar billetera
+                              </button>
+                            )}
+                            {filterNoCategory && (
+                              <button
+                                onClick={() => openEdit(tx)}
+                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition-colors shrink-0"
+                                style={{ background: 'var(--goal-50)', color: 'var(--goal-600)', border: '1px solid var(--goal-200)' }}
+                                onMouseEnter={e => { e.currentTarget.style.background = 'var(--goal-100)' }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'var(--goal-50)' }}
+                                title="Asignar categoría"
+                              >
+                                <Tag size={11} />
+                                Categorizar
+                              </button>
+                            )}
                             <button
                               onClick={() => openEdit(tx)}
                               className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"

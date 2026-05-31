@@ -44,10 +44,12 @@ export function ConversionModal({
 
   // Sync preselected rate when it changes or modal opens
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (preselectedRate) setSelectedRateKey(preselectedRate.currency)
   }, [preselectedRate])
 
   // Reset form when modal closes
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!open) {
       setAmount('')
@@ -60,6 +62,7 @@ export function ConversionModal({
       setSelectedRateKey(preselectedRate?.currency ?? '')
     }
   }, [open, preselectedRate])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // ── Computed ────────────────────────────────────────────────────────────────
 

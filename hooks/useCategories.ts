@@ -1,28 +1,25 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { categoriesService } from '@/services/categories.service'
 import type { Category } from '@/types'
 
 export function useCategories() {
-  const [data, setData] = useState<Category[]>([])
+  const [data, setData]       = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]     = useState<string | null>(null)
+  const [rev, setRev]         = useState(0)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const result = await categoriesService.list()
-      setData(result)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error loading categories')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  useEffect(() => {
+    let active = true
+    categoriesService.list()
+      .then(r  => { if (active) setData(r) })
+      .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Error loading categories') })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [rev])
 
-  useEffect(() => { load() }, [load])
+  function refetch() { setError(null); setLoading(true); setRev(r => r + 1) }
 
-  return { data, loading, error, refetch: load }
+  return { data, loading, error, refetch }
 }
