@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import { calculateRefundAmount } from '@/utils/refund'
+import { localDateStr } from '@/utils/date'
 import { formatCurrency } from '@/utils/format'
 import type { TransactionTemplate } from '@/types'
 import type { WalletWithBalance } from '@/types/wallet'
@@ -31,7 +32,7 @@ export function TemplateConfirmModal({
   const [amount, setCAmount]        = useState('')
   const [walletId, setWalletId]     = useState('')
   const [categoryId, setCategoryId] = useState('')
-  const [date, setDate]             = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate]             = useState(localDateStr())
   const [note, setNote]             = useState('')
   const [saving, setSaving]         = useState(false)
   const [error, setError]           = useState('')
@@ -42,7 +43,7 @@ export function TemplateConfirmModal({
       setCAmount(template.suggested_amount?.toString() ?? '')
       setWalletId(template.wallet_id ?? '')
       setCategoryId(template.category_id ?? '')
-      setDate(new Date().toISOString().split('T')[0])
+      setDate(localDateStr())
       setNote('')
       setError('')
     }

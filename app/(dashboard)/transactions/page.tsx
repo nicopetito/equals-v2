@@ -20,8 +20,10 @@ import { Modal } from '@/components/ui/Modal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { CategoryBadge } from '@/components/ui/CategoryBadge'
 import { formatCurrency } from '@/utils/format'
-import { formatDate, getDateRangeForPeriod, PERIOD_OPTIONS, type Period } from '@/utils/date'
+import { formatDateSmart, getDateRangeForPeriod, PERIOD_OPTIONS, type Period } from '@/utils/date'
 import type { TransactionWithDetails, TransactionType, Refund } from '@/types'
+import { AnimatePresence, motion } from 'motion/react'
+import { DURATION, EASE_OUT } from '@/utils/animations'
 
 type FilterType = 'all' | TransactionType
 type GroupBy = 'none' | 'date' | 'month' | 'category' | 'wallet' | 'type' | 'label'
@@ -50,7 +52,7 @@ function getGroupKey(tx: TransactionWithDetails, g: GroupBy): string {
 
 function getGroupLabel(key: string, g: GroupBy): string {
   switch (g) {
-    case 'date':  return formatDate(key)
+    case 'date':  return formatDateSmart(key)
     case 'month': {
       const [y, m] = key.split('-')
       return new Date(+y, +m - 1, 1)
@@ -74,7 +76,7 @@ function Chip({ selected, onClick, children }: {
   return (
     <button
       onClick={onClick}
-      className="px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all duration-150 max-w-[160px] overflow-hidden text-ellipsis"
+      className="px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all duration-150"
       style={selected
         ? { background: 'var(--grad-brand)', color: 'white', boxShadow: '0 2px 8px rgba(109,59,215,0.25)' }
         : { background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)' }
@@ -496,7 +498,7 @@ function TransactionsPageInner() {
 
       {/* ── Compact header ── */}
       <div
-        className="rounded-2xl px-5 py-4 flex items-center gap-4 relative overflow-hidden"
+        className="rounded-2xl px-4 py-4 sm:px-5 flex flex-col sm:flex-row sm:items-center gap-3 relative overflow-hidden"
         style={{
           background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)',
           boxShadow: '0 8px 24px -6px rgba(109,59,215,0.30)',
@@ -521,7 +523,7 @@ function TransactionsPageInner() {
           </p>
         </div>
 
-        <div className="relative z-10 shrink-0 flex gap-2">
+        <div className="relative z-10 flex gap-2 flex-wrap">
           <HelpButton section="transactions" />
           <button
             onClick={() => { setSelectMode(m => !m); setSelected(new Set()) }}
@@ -592,7 +594,7 @@ function TransactionsPageInner() {
       {/* ── Filters ── */}
       <div className="space-y-2">
         <div className="flex flex-wrap gap-2">
-          <div className="relative flex-1 min-w-48">
+          <div className="relative w-full sm:flex-1 sm:min-w-48">
             <Search
               size={15}
               className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
@@ -756,22 +758,25 @@ function TransactionsPageInner() {
       {/* ── Agrupar por (siempre visible) ── */}
       <div className="flex items-center justify-end gap-2">
         <span className="text-xs font-medium" style={{ color: 'var(--text-faint)' }}>Agrupar por</span>
-        <select
-          value={groupBy}
-          onChange={e => changeGroupBy(e.target.value as GroupBy)}
-          className="text-xs font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer focus:outline-none"
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
-        >
-          {GROUP_OPTIONS.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            value={groupBy}
+            onChange={e => changeGroupBy(e.target.value as GroupBy)}
+            className="text-xs font-semibold pl-2.5 pr-7 py-2 rounded-xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-200 appearance-none transition-all duration-150"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)', boxShadow: 'var(--shadow-xs)' }}
+          >
+            {GROUP_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <ChevronDown size={11} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
+        </div>
       </div>
 
       {/* ── Bulk action bar ── */}
       {selectMode && (
         <div
-          className="flex items-center gap-3 px-4 py-3 rounded-xl flex-wrap"
+          className="flex items-center gap-3 px-4 py-3 rounded-xl flex-wrap justify-between"
           style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-xs)' }}
         >
           <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
@@ -790,7 +795,7 @@ function TransactionsPageInner() {
             }
           </button>
           {selected.size > 0 && (
-            <div className="ml-auto flex items-center gap-2">
+            <div className="flex items-center gap-2">
               {/* Asignar etiqueta */}
               <div className="relative">
                 <button
@@ -1027,7 +1032,16 @@ function TransactionsPageInner() {
                   )}
 
                   {/* ── Filas del grupo ── */}
-                  {isExpanded && group.transactions.map((tx, i) => {
+                  <AnimatePresence>
+                  {isExpanded && (
+                  <motion.div
+                    key={`rows-${group.key}`}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto', transition: { duration: DURATION.normal, ease: EASE_OUT } }}
+                    exit={{ opacity: 0, height: 0, transition: { duration: DURATION.fast } }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                  {group.transactions.map((tx, i) => {
                     const isSelected = Boolean(tx.id && selected.has(tx.id))
                     const isLast = i === group.transactions.length - 1
                     return (
@@ -1066,7 +1080,7 @@ function TransactionsPageInner() {
                             {tx.description}
                           </p>
                           <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                            <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{formatDate(tx.date)}</span>
+                            <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{formatDateSmart(tx.date)}</span>
                             {tx.category_name && <CategoryBadge name={tx.category_name} color={tx.category_color} />}
                             {tx.wallet_name && (
                               <span
@@ -1108,7 +1122,7 @@ function TransactionsPageInner() {
                           </p>
                         </div>
                         {!selectMode && (
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity shrink-0">
                             {filterOrphan && (
                               <button
                                 onClick={() => openEdit(tx)}
@@ -1162,6 +1176,9 @@ function TransactionsPageInner() {
                       </div>
                     )
                   })}
+                  </motion.div>
+                  )}
+                  </AnimatePresence>
                 </Fragment>
               )
             })}

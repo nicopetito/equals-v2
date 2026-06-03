@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { formatCurrency, safeNumber } from '@/utils/format'
-import { formatDate } from '@/utils/date'
+import { formatDate, localDateStr } from '@/utils/date'
 import { RECURRING_CADENCES } from '@/types'
 import type { RecurringTransaction, RecurringTransactionWithDetails } from '@/types'
 
@@ -118,7 +118,7 @@ export default function ScheduledPage() {
   const [editing, setEditing]     = useState<RecurringTransactionWithDetails | null>(null)
   const [form, setForm]           = useState<FormState>({
     type: 'expense', currency: 'ARS', cadence: 'monthly',
-    next_date: new Date().toISOString().split('T')[0],
+    next_date: localDateStr(),
     active: true, email_reminder: false,
   })
   const [saving, setSaving]       = useState(false)
@@ -172,7 +172,7 @@ export default function ScheduledPage() {
     setEditing(null)
     setForm({
       type: 'expense', currency: 'ARS', cadence: 'monthly',
-      next_date: new Date().toISOString().split('T')[0],
+      next_date: localDateStr(),
       active: true, email_reminder: false,
     })
     setFormError(null)
@@ -277,7 +277,7 @@ export default function ScheduledPage() {
 
       {/* ─── Header ─── */}
       <div
-        className="rounded-2xl px-5 py-4 flex items-center gap-4 relative overflow-hidden"
+        className="rounded-2xl px-4 py-4 sm:px-5 flex flex-col sm:flex-row sm:items-center gap-3 relative overflow-hidden"
         style={{ background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)', boxShadow: '0 8px 24px -4px rgba(109,59,215,0.30)' }}
       >
         <div className="absolute inset-0 pointer-events-none opacity-10">
@@ -285,18 +285,20 @@ export default function ScheduledPage() {
             <path d="M0,60 Q200,20 400,50 T800,20 L800,80 L0,80 Z" fill="white" />
           </svg>
         </div>
-        <div className="relative z-10 w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(255,255,255,0.15)' }}>
-          <CalendarClock size={18} style={{ color: 'rgba(255,255,255,0.9)' }} />
+        <div className="relative z-10 flex items-center gap-3 flex-1 min-w-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(255,255,255,0.15)' }}>
+            <CalendarClock size={18} style={{ color: 'rgba(255,255,255,0.9)' }} />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-lg font-black tracking-tight leading-none" style={{ color: 'rgba(255,255,255,0.96)', fontFamily: 'var(--font-sora)' }}>
+              Operaciones programadas
+            </h1>
+            <p className="text-xs font-medium mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>
+              Gestioná ingresos y gastos fijos
+            </p>
+          </div>
         </div>
-        <div className="relative z-10 flex-1 min-w-0">
-          <h1 className="text-lg font-black tracking-tight leading-none" style={{ color: 'rgba(255,255,255,0.96)', fontFamily: 'var(--font-sora)' }}>
-            Operaciones programadas
-          </h1>
-          <p className="text-xs font-medium mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>
-            Gestioná ingresos y gastos fijos
-          </p>
-        </div>
-        <div className="relative z-10 shrink-0 flex gap-2">
+        <div className="relative z-10 flex gap-2 flex-wrap">
           <HelpButton section="scheduled" />
           <button
             onClick={openCreate}

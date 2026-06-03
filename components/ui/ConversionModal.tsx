@@ -7,6 +7,7 @@ import { Button }           from '@/components/ui/Button'
 import { Select }           from '@/components/ui/Select'
 import { exchangeService }  from '@/services/exchange.service'
 import { calculateExchange, formatCurrency, formatAmount, safeNumber } from '@/utils/format'
+import { localDateStr } from '@/utils/date'
 import { useToast }         from '@/components/providers/ToastProvider'
 import type { DollarRate, WalletWithBalance } from '@/types'
 
@@ -143,7 +144,7 @@ export function ConversionModal({
         exchangeRate:  effectiveRate,
         exchangeType:  selectedRateKey === 'Manual' ? 'Manual' : selectedRateKey,
         operationType,
-        date: new Date().toISOString().split('T')[0],
+        date: localDateStr(),
       })
       addToast('Conversión realizada exitosamente', 'success')
       onSuccess()

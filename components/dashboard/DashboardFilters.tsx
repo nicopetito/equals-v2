@@ -32,7 +32,7 @@ function FilterChip({
   return (
     <button
       onClick={onClick}
-      className="px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap shrink-0 transition-all duration-150"
+      className="px-3 py-2 text-xs font-semibold rounded-full whitespace-nowrap shrink-0 transition-all duration-150"
       style={active
         ? {
             background:  'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)',
@@ -79,38 +79,50 @@ export function DashboardFilters({
       }}
     >
       {/* Fila de períodos */}
-      <div
-        className="flex items-center gap-1 overflow-x-auto pb-0.5"
-        style={{ scrollbarWidth: 'none' }}
-      >
-        {periods.map(opt => (
-          <FilterChip
-            key={opt.value}
-            active={selectedPeriod === opt.value}
-            onClick={() => onPeriodChange(opt.value)}
-          >
-            {opt.label}
-          </FilterChip>
-        ))}
+      <div className="relative">
+        <div
+          className="flex items-center gap-1 overflow-x-auto pb-0.5"
+          style={{ scrollbarWidth: 'none' }}
+        >
+          {periods.map(opt => (
+            <FilterChip
+              key={opt.value}
+              active={selectedPeriod === opt.value}
+              onClick={() => onPeriodChange(opt.value)}
+            >
+              {opt.label}
+            </FilterChip>
+          ))}
+        </div>
+        <div
+          className="pointer-events-none absolute right-0 top-0 bottom-0 w-8"
+          style={{ background: 'linear-gradient(to right, transparent, var(--bg-card))' }}
+        />
       </div>
 
       {/* Separador */}
       <div className="my-2" style={{ height: 1, background: 'var(--border-light)' }} />
 
       {/* Fila de monedas */}
-      <div
-        className="flex items-center gap-1 overflow-x-auto pb-0.5"
-        style={{ scrollbarWidth: 'none' }}
-      >
-        {currencies.map(opt => (
-          <FilterChip
-            key={String(opt.value)}
-            active={selectedCurrency === opt.value}
-            onClick={() => onCurrencyChange(opt.value)}
-          >
-            {opt.label}
-          </FilterChip>
-        ))}
+      <div className="relative">
+        <div
+          className="flex items-center gap-1 overflow-x-auto pb-0.5"
+          style={{ scrollbarWidth: 'none' }}
+        >
+          {currencies.map(opt => (
+            <FilterChip
+              key={String(opt.value)}
+              active={selectedCurrency === opt.value}
+              onClick={() => onCurrencyChange(opt.value)}
+            >
+              {opt.label}
+            </FilterChip>
+          ))}
+        </div>
+        <div
+          className="pointer-events-none absolute right-0 top-0 bottom-0 w-8"
+          style={{ background: 'linear-gradient(to right, transparent, var(--bg-card))' }}
+        />
       </div>
     </div>
   )

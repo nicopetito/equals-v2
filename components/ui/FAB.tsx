@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { Plus, X, TrendingUp, TrendingDown } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import { modalOverlay, slideUp } from '@/utils/animations'
 import { transactionsService } from '@/services/transactions.service'
 import { useCategories } from '@/hooks/useCategories'
 import { useWallets } from '@/hooks/useWallets'
@@ -9,6 +11,7 @@ import { useToast } from '@/components/providers/ToastProvider'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import type { Transaction, Currency, TransactionType } from '@/types'
+import { localDateStr } from '@/utils/date'
 
 const CURRENCY_OPTS = [
   { value: 'ARS', label: 'ARS' }, { value: 'USD', label: 'USD' },
@@ -18,7 +21,7 @@ const CURRENCY_OPTS = [
 const defaultForm = (): Partial<Transaction> => ({
   type: 'expense',
   currency: 'ARS',
-  date: new Date().toISOString().split('T')[0],
+  date: localDateStr(),
 })
 
 export function FAB() {
@@ -78,7 +81,7 @@ export function FAB() {
       <button
         onClick={openFAB}
         aria-label="Nueva transacción rápida"
-        className="fixed bottom-24 right-4 z-40 flex md:hidden w-14 h-14 items-center justify-center rounded-full shadow-2xl transition-all active:scale-95 hover:scale-105"
+        className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] right-4 z-40 flex md:hidden w-14 h-14 items-center justify-center rounded-full shadow-2xl transition-all active:scale-95 hover:scale-105"
         style={{
           background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)',
           boxShadow: '0 8px 30px rgba(109,59,215,0.50)',
@@ -88,18 +91,27 @@ export function FAB() {
       </button>
 
       {/* Overlay + drawer quick-add */}
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center md:hidden">
+      <AnimatePresence>
+        {open && (
+        <motion.div
+          key="fab-panel-root"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center md:hidden"
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+        >
           {/* Backdrop */}
-          <div
+          <motion.div
+            variants={modalOverlay}
             className="absolute inset-0 backdrop-blur-md"
             style={{ background: 'rgba(10,12,16,0.70)' }}
             onClick={() => setOpen(false)}
           />
 
           {/* Panel */}
-          <div
-            className="glass-card relative w-full rounded-t-3xl sm:rounded-3xl sm:max-w-md p-6 space-y-4 animate-fade-in"
+          <motion.div
+            variants={slideUp}
+            className="glass-card relative w-full rounded-t-3xl sm:rounded-3xl sm:max-w-md p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] space-y-4"
             style={{ boxShadow: '0 24px 60px rgba(0,0,0,0.60)' }}
           >
             {/* Handle bar */}
@@ -112,7 +124,8 @@ export function FAB() {
               </h3>
               <button
                 onClick={() => setOpen(false)}
-                className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors hover:bg-black/5"
+                aria-label="Cerrar"
+                className="w-10 h-10 rounded-xl flex items-center justify-center transition-colors hover:bg-black/5"
                 style={{ color: 'var(--text-muted)' }}
               >
                 <X size={16} />
@@ -205,9 +218,10 @@ export function FAB() {
                 : `Guardar ${isIncome ? 'ingreso' : 'gasto'}`
               }
             </button>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        </motion.div>
+        )}
+      </AnimatePresence>
     </>
   )
 }

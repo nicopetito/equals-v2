@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { Plus, Pencil, Trash2, CreditCard, TrendingUp, Wifi, SlidersHorizontal, Stethoscope } from 'lucide-react'
 import { useWallets } from '@/hooks/useWallets'
 import { walletsService } from '@/services/wallets.service'
+import { transactionsService } from '@/services/transactions.service'
+import { categoriesService } from '@/services/categories.service'
 import { useToast } from '@/components/providers/ToastProvider'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -12,9 +14,11 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { DiagnosticModal } from '@/components/wallets/DiagnosticModal'
-import { formatCurrency } from '@/utils/format'
+import { formatCurrency, plural } from '@/utils/format'
 import { WALLET_PROVIDERS } from '@/types'
-import type { Wallet as WalletType, WalletWithBalance } from '@/types'
+import type { Wallet as WalletType, WalletWithBalance, Currency } from '@/types'
+import { motion } from 'motion/react'
+import { staggerContainer, staggerItem } from '@/utils/animations'
 
 const CURRENCY_OPTS = [
   { value: 'ARS', label: 'ARS' },
@@ -162,6 +166,7 @@ export default function WalletsPage() {
   const [reconcileOpen, setReconcileOpen]     = useState(false)
   const [reconcileWallet, setReconcileWallet] = useState<WalletWithBalance | null>(null)
   const [reconcileTarget, setReconcileTarget] = useState('')
+  const [reconcileMode, setReconcileMode]     = useState<'fix_initial' | 'adjustment'>('fix_initial')
   const [reconciling, setReconciling]         = useState(false)
 
   const [diagnosticOpen, setDiagnosticOpen] = useState(false)
@@ -216,6 +221,7 @@ export default function WalletsPage() {
   function openReconcile(w: WalletWithBalance) {
     setReconcileWallet(w)
     setReconcileTarget(String(w.current_balance ?? 0))
+    setReconcileMode('fix_initial')
     setReconcileOpen(true)
   }
 
@@ -223,18 +229,38 @@ export default function WalletsPage() {
     if (!reconcileWallet?.id) return
     const target = parseFloat(reconcileTarget)
     if (isNaN(target)) return
+    const diff = target - (reconcileWallet.current_balance ?? 0)
+    if (diff === 0) return
     setReconciling(true)
     try {
-      // Adjust initial_balance so that current_balance matches the target
-      // current_balance = initial_balance + transaction_total
-      // => new initial_balance = target - transaction_total
-      const newBalance = target - (reconcileWallet.transaction_total ?? 0)
-      await walletsService.update(reconcileWallet.id, { balance: newBalance })
+      const currency = (reconcileWallet.currency ?? 'ARS') as Currency
+      if (reconcileMode === 'fix_initial') {
+        await walletsService.fixInitialBalance(
+          reconcileWallet.id,
+          target,
+          currency,
+          reconcileWallet.transaction_total ?? 0,
+          reconcileWallet.initial_balance ?? 0,
+        )
+      } else {
+        const type = diff > 0 ? 'income' : 'expense'
+        const categoryId = await categoriesService.getOrCreateAjusteCategory(type)
+        await transactionsService.create({
+          type,
+          amount: Math.abs(diff),
+          currency,
+          description: 'Ajuste de conciliación',
+          wallet_id: reconcileWallet.id,
+          category_id: categoryId,
+          date: new Date().toISOString().slice(0, 10),
+          is_recurring: false,
+        })
+      }
       addToast(`Saldo de "${reconcileWallet.name}" conciliado`, 'success')
       setReconcileOpen(false)
       refetch()
-    } catch {
-      addToast('Error al conciliar la billetera', 'error')
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Error al conciliar la billetera', 'error')
     } finally { setReconciling(false) }
   }
 
@@ -281,7 +307,7 @@ export default function WalletsPage() {
 
       {/* Compact row header */}
       <div
-        className="rounded-2xl px-5 py-4 flex items-center justify-between gap-4 relative overflow-hidden"
+        className="rounded-2xl px-4 py-4 sm:px-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative overflow-hidden"
         style={{
           background:  'linear-gradient(135deg, #5B21B6 0%, #2563EB 100%)',
           boxShadow:   '0 8px 24px -6px rgba(91,33,182,0.32)',
@@ -305,12 +331,12 @@ export default function WalletsPage() {
               Mis billeteras
             </h1>
             <p className="text-xs font-medium mt-0.5" style={{ color: 'rgba(255,255,255,0.52)' }}>
-              {wallets.length} {wallets.length === 1 ? 'billetera' : 'billeteras'} configuradas
+              {wallets.length} {plural(wallets.length, 'billetera configurada', 'billeteras configuradas')}
             </p>
           </div>
         </div>
 
-        <div className="relative flex gap-2">
+        <div className="relative flex gap-2 flex-wrap">
           <HelpButton section="wallets" />
           <Button onClick={() => setDiagnosticOpen(true)} variant="secondary" size="sm">
             <Stethoscope size={14} /> Diagnóstico
@@ -323,12 +349,17 @@ export default function WalletsPage() {
 
       {/* Totales por moneda */}
       {Object.keys(totalByCurrency).length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <motion.div
+          className="grid grid-cols-2 sm:grid-cols-4 gap-3"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
           {Object.entries(totalByCurrency).map(([curr, bal]) => {
             const s = SUMMARY_COLORS[curr] ?? { color: '#7C3AED', bg: 'rgba(124,58,237,0.07)' }
             return (
+              <motion.div key={curr} variants={staggerItem}>
               <div
-                key={curr}
                 className="rounded-2xl p-4 transition-all hover:-translate-y-0.5"
                 style={{ background: s.bg, border: `1px solid ${s.color}20` }}
               >
@@ -346,9 +377,10 @@ export default function WalletsPage() {
                 </p>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Saldo total</p>
               </div>
+              </motion.div>
             )
           })}
-        </div>
+        </motion.div>
       )}
 
       {/* Cards */}
@@ -366,16 +398,22 @@ export default function WalletsPage() {
           action={{ label: '+ Nueva billetera', onClick: openCreate }}
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <motion.div
+          className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
           {wallets.map(wallet => {
             const curr  = wallet.currency ?? 'ARS'
             const meta  = wallet.id ? (metas[wallet.id] ?? EMPTY_META) : EMPTY_META
             const theme = getTheme(wallet.provider, curr, meta.theme)
             const last4 = meta.last_four || (wallet.id ? wallet.id.slice(-4).toUpperCase() : '••••')
+            const isEfectivo = wallet.name?.toLowerCase() === 'efectivo' || wallet.provider?.toLowerCase() === 'efectivo'
 
             return (
+              <motion.div key={wallet.id} variants={staggerItem}>
               <div
-                key={wallet.id}
                 className="relative rounded-3xl p-5 overflow-hidden group"
                 style={{
                   background:  theme.grad,
@@ -417,34 +455,34 @@ export default function WalletsPage() {
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-200">
                       <button
                         onClick={() => openEdit(wallet)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-white transition-colors"
+                        className="w-9 h-9 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-white transition-colors"
                         style={{ background: 'rgba(255,255,255,0.17)' }}
                         onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.28)')}
                         onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.17)')}
                         title="Editar"
                       >
-                        <Pencil size={11} />
+                        <Pencil size={13} />
                       </button>
                       <button
                         onClick={() => openReconcile(wallet)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-white transition-colors"
+                        className="w-9 h-9 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-white transition-colors"
                         style={{ background: 'rgba(255,255,255,0.17)' }}
                         onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.background = 'rgba(99,102,241,0.55)')}
                         onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.17)')}
                         title="Conciliar saldo"
                       >
-                        <SlidersHorizontal size={11} />
+                        <SlidersHorizontal size={13} />
                       </button>
                       <button
                         onClick={() => wallet.id && handleDeleteClick(wallet.id, wallet.name)}
                         disabled={deleting === wallet.id}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-white transition-colors"
+                        className="w-9 h-9 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-white transition-colors"
                         style={{ background: 'rgba(255,255,255,0.17)' }}
                         onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.50)')}
                         onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.17)')}
                         title="Eliminar"
                       >
-                        <Trash2 size={11} />
+                        <Trash2 size={13} />
                       </button>
                     </div>
                   </div>
@@ -462,15 +500,19 @@ export default function WalletsPage() {
                 </div>
 
                 {/* Card number — •••• •••• •••• XXXX */}
-                <p className="relative text-white/40 text-xs font-mono tracking-[0.20em] mb-3">
-                  {'•••• •••• •••• '}{last4}
-                </p>
+                {isEfectivo ? (
+                  <p className="relative text-white/40 text-xs font-medium mb-3">Billetera física</p>
+                ) : (
+                  <p className="relative text-white/40 text-xs font-mono tracking-[0.20em] mb-3">
+                    {'•••• •••• •••• '}{last4}
+                  </p>
+                )}
 
                 {/* Balance + transactions */}
                 <div className="relative flex items-end justify-between">
                   <div>
                     <p className="text-white/50 text-xs font-medium mb-0.5">Saldo disponible</p>
-                    <p className="text-white text-xl font-extrabold tabular-nums leading-none">
+                    <p className="text-white text-xl font-extrabold tabular-nums leading-none whitespace-nowrap">
                       {formatCurrency(wallet.current_balance ?? 0, curr)}
                     </p>
                   </div>
@@ -483,9 +525,10 @@ export default function WalletsPage() {
                   </div>
                 </div>
               </div>
+              </motion.div>
             )
           })}
-        </div>
+        </motion.div>
       )}
 
       {/* Modal */}
@@ -657,6 +700,36 @@ export default function WalletsPage() {
                 autoFocus
               />
 
+              {/* Mode toggle */}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>
+                  Tipo de ajuste
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { key: 'fix_initial', label: 'Saldo inicial incorrecto', desc: 'Corrige el punto de partida sin afectar estadísticas' },
+                    { key: 'adjustment', label: 'Dinero sin registrar', desc: 'Registra como ingreso o gasto de ajuste' },
+                  ] as const).map(opt => (
+                    <button
+                      key={opt.key}
+                      onClick={() => setReconcileMode(opt.key)}
+                      className="text-left rounded-xl p-3 transition-all"
+                      style={{
+                        background: reconcileMode === opt.key ? 'var(--brand-50)' : 'var(--bg-subtle)',
+                        border: `1.5px solid ${reconcileMode === opt.key ? 'var(--brand-400)' : 'var(--border)'}`,
+                      }}
+                    >
+                      <p className="text-xs font-bold leading-snug" style={{ color: reconcileMode === opt.key ? 'var(--brand-600)' : 'var(--text-primary)' }}>
+                        {opt.label}
+                      </p>
+                      <p className="text-xs mt-0.5 leading-snug" style={{ color: 'var(--text-muted)' }}>
+                        {opt.desc}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Diff preview */}
               {hasDiff && (
                 <div
@@ -676,7 +749,11 @@ export default function WalletsPage() {
                     <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                       {diff === 0
                         ? 'El saldo ya coincide'
-                        : 'Ajuste de conciliación — no se registra como ingreso ni gasto'}
+                        : reconcileMode === 'fix_initial'
+                          ? 'Corregirá el saldo inicial — no impacta ingresos ni gastos'
+                          : diff > 0
+                            ? 'Se registrará como ingreso de ajuste (categoría: Ajuste)'
+                            : 'Se registrará como gasto de ajuste (categoría: Ajuste)'}
                     </p>
                   </div>
                   {diff !== 0 && (

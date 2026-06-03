@@ -13,6 +13,7 @@ import { useWallets }      from '@/hooks/useWallets'
 import { useToast }        from '@/components/providers/ToastProvider'
 import { exchangeService } from '@/services/exchange.service'
 import { calculateExchange, formatCurrency, formatAmount, safeNumber } from '@/utils/format'
+import { localDateStr } from '@/utils/date'
 
 const RATE_META: Record<string, { label: string; description: string; color: string; bg: string }> = {
   'Oficial':      { label: 'Oficial',      description: 'Banco Central',     color: '#6d3bd7', bg: 'rgba(109,59,215,0.10)' },
@@ -163,7 +164,7 @@ export default function DollarPage() {
         exchangeRate: effectiveRate,
         exchangeType: selectedRateKey || 'Manual',
         operationType,
-        date: new Date().toISOString().split('T')[0],
+        date: localDateStr(),
       })
       addToast('Conversión realizada exitosamente', 'success')
       refetchWallets()
@@ -271,7 +272,7 @@ export default function DollarPage() {
                       <p className="text-sm font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
                         {meta.label}
                       </p>
-                      <p className="text-xs truncate" style={{ color: 'var(--text-faint)' }}>
+                      <p className="text-xs truncate" title={meta.description} style={{ color: 'var(--text-faint)' }}>
                         {meta.description}
                       </p>
                     </div>

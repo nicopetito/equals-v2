@@ -1,4 +1,9 @@
 import { format, parseISO, startOfMonth, endOfMonth, subDays, startOfYear, subMonths } from 'date-fns'
+
+/** Fecha local de hoy en formato YYYY-MM-DD (respeta timezone del dispositivo). */
+export function localDateStr(d: Date = new Date()): string {
+  return format(d, 'yyyy-MM-dd')
+}
 import { es } from 'date-fns/locale'
 
 export function formatDate(date: string | Date): string {
@@ -9,6 +14,14 @@ export function formatDate(date: string | Date): string {
 export function formatDateFull(date: string | Date): string {
   const d = typeof date === 'string' ? parseISO(date) : date
   return format(d, "d 'de' MMMM, yyyy", { locale: es })
+}
+
+export function formatDateSmart(date: string | Date): string {
+  const d = typeof date === 'string' ? parseISO(date) : date
+  const fmt = d.getFullYear() !== new Date().getFullYear()
+    ? "d 'de' MMM yyyy"
+    : "d 'de' MMM"
+  return format(d, fmt, { locale: es })
 }
 
 export function formatMonthLabel(monthStr: string): string {

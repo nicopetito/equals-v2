@@ -46,15 +46,15 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen lg:h-screen lg:overflow-hidden">
       <AuthSidebar />
 
       {/* Panel derecho — formulario */}
-      <div className="flex-1 flex items-center justify-center p-6">
+      <div className="flex-1 flex items-center justify-center p-5 lg:p-6 overflow-y-auto lg:overflow-hidden">
         <div className="w-full max-w-md">
 
           {/* Logo mobile */}
-          <div className="flex items-center gap-3 mb-8 lg:hidden enter-1">
+          <div className="flex items-center gap-3 mb-6 lg:hidden enter-1">
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)', boxShadow: 'var(--shadow-brand)' }}
@@ -67,7 +67,7 @@ export default function LoginPage() {
           </div>
 
           {/* Encabezado */}
-          <div className="mb-8 enter-1">
+          <div className="mb-6 enter-1">
             <h1
               className="text-3xl font-extrabold"
               style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}
@@ -82,7 +82,7 @@ export default function LoginPage() {
           {/* Formulario */}
           <form
             onSubmit={handleSubmit}
-            className="space-y-5 rounded-3xl p-7 enter-2"
+            className="space-y-5 rounded-3xl p-6 enter-2"
             style={{
               background: 'var(--bg-card)',
               border: '1px solid var(--border)',

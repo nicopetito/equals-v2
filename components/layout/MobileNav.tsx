@@ -7,7 +7,7 @@ import { LayoutDashboard, Wallet, BarChart2, Target, Grid3X3 } from 'lucide-reac
 const BOTTOM_NAV = [
   { href: '/dashboard',    label: 'Inicio',       icon: LayoutDashboard },
   { href: '/estadisticas', label: 'Estadísticas', icon: BarChart2       },
-  { href: '/transactions', label: 'Movimientos',  icon: Wallet          },
+  { href: '/transactions', label: 'Transacciones', icon: Wallet          },
   { href: '/goals',        label: 'Objetivos',    icon: Target          },
 ]
 
@@ -20,10 +20,12 @@ export function MobileNav({ onMenuOpen }: MobileNavProps) {
 
   return (
     <nav
+      aria-label="Navegación principal"
       className="fixed bottom-3 left-3 right-3 z-40 flex md:hidden rounded-2xl overflow-hidden"
       style={{
         background: 'var(--grad-brand)',
         boxShadow: 'var(--shadow-brand)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
       {BOTTOM_NAV.map(item => {

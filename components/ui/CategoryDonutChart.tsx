@@ -84,7 +84,7 @@ function CustomTooltip({ active, payload }: TooltipProps) {
   const d = payload[0]
   return (
     <div
-      className="rounded-2xl px-4 py-3 text-sm"
+      className="rounded-2xl px-4 py-3 text-sm min-w-[160px]"
       style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)' }}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -205,7 +205,11 @@ export function CategoryDonutChart({ transactions, currency, loading }: Props) {
                     <Cell key={i} fill={s.color} />
                   ))}
                 </TypedPie>
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip
+                  content={<CustomTooltip />}
+                  wrapperStyle={{ zIndex: 50, pointerEvents: 'none' }}
+                  allowEscapeViewBox={{ x: true, y: true }}
+                />
               </PieChart>
             </ResponsiveContainer>
             {/* Total en el centro */}

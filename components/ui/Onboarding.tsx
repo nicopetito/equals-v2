@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, CreditCard, TrendingDown, Target, Check, ChevronRight } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import { stepForward } from '@/utils/animations'
 import { useAuth } from '@/hooks/useAuth'
 import { useWallets } from '@/hooks/useWallets'
 import { useTransactions } from '@/hooks/useTransactions'
@@ -64,7 +66,7 @@ function Confetti() {
 export function Onboarding() {
   const router   = useRouter()
   const { user } = useAuth()
-  const { data: wallets }      = useWallets()
+  const { data: wallets, loading: walletsLoading } = useWallets()
   const { data: transactions } = useTransactions()
   const { data: goals }        = useGoals()
 
@@ -138,6 +140,8 @@ export function Onboarding() {
   }
 
   if (!visible) return null
+  // Suprimir mientras FirstWalletWizard esté activo (usuario sin billeteras)
+  if (walletsLoading || wallets.length === 0) return null
 
   return (
     <>
@@ -220,34 +224,41 @@ export function Onboarding() {
             </div>
 
             {/* Tarjeta del paso */}
-            <div
-              className="rounded-2xl p-5 mb-6 text-center"
-              style={{ background: currentStep.bg, border: `1px solid ${currentStep.color}25` }}
-            >
-              <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-3"
-                style={{ background: currentStep.color + '20', color: currentStep.color }}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentStep.id}
+                variants={stepForward}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="rounded-2xl p-5 mb-6 text-center"
+                style={{ background: currentStep.bg, border: `1px solid ${currentStep.color}25` }}
               >
-                {currentStep.icon}
-              </div>
-              <h3
-                className="font-extrabold text-lg mb-1"
-                style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}
-              >
-                {currentStep.title}
-              </h3>
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                {currentStep.description}
-              </p>
-              {currentStep.checkCondition && (
                 <div
-                  className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold px-3 py-1.5 rounded-full"
-                  style={{ background: 'var(--income-50)', color: 'var(--income-600)' }}
+                  className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-3"
+                  style={{ background: currentStep.color + '20', color: currentStep.color }}
                 >
-                  <Check size={14} strokeWidth={3} /> ¡Completado!
+                  {currentStep.icon}
                 </div>
-              )}
-            </div>
+                <h3
+                  className="font-extrabold text-lg mb-1"
+                  style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}
+                >
+                  {currentStep.title}
+                </h3>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  {currentStep.description}
+                </p>
+                {currentStep.checkCondition && (
+                  <div
+                    className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold px-3 py-1.5 rounded-full"
+                    style={{ background: 'var(--income-50)', color: 'var(--income-600)' }}
+                  >
+                    <Check size={14} strokeWidth={3} /> ¡Completado!
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
 
             {/* Botones */}
             <div className="flex gap-3">

@@ -77,7 +77,7 @@ export function AuthSidebar({ variant = 'default' }: AuthSidebarProps) {
 
   return (
     <div
-      className="hidden lg:flex flex-col justify-between w-2/5 p-12"
+      className="hidden lg:flex flex-col justify-between w-2/5 p-8 lg:p-10"
       style={{
         background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)',
         position: 'relative',
@@ -112,7 +112,7 @@ export function AuthSidebar({ variant = 'default' }: AuthSidebarProps) {
       <div className="relative space-y-6">
         <div>
           <h2
-            className="text-4xl font-extrabold text-white leading-tight mb-3"
+            className="text-3xl font-extrabold text-white leading-tight mb-2"
             style={{ fontFamily: 'var(--font-sora)' }}
           >
             {heading}

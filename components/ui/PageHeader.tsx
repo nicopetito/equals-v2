@@ -12,7 +12,7 @@ interface PageHeaderProps {
 export function PageHeader({ title, subtitle, icon: Icon, color = '#d0bcff', children, layout = 'centered' }: PageHeaderProps) {
   return (
     <div
-      className={`rounded-3xl px-6 py-6 relative overflow-hidden ${layout === 'split' ? 'flex items-center' : 'flex flex-col items-center text-center gap-3'}`}
+      className={`rounded-3xl px-4 py-4 sm:px-6 sm:py-5 relative ${layout === 'split' ? 'flex flex-wrap items-center gap-3' : 'flex flex-col items-center text-center gap-3'}`}
       style={{
         background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)',
         boxShadow: '0 20px 40px -10px rgba(109,59,215,0.35)',
@@ -35,14 +35,14 @@ export function PageHeader({ title, subtitle, icon: Icon, color = '#d0bcff', chi
               <Icon size={19} style={{ color }} />
             </div>
             <h1
-              className="text-3xl font-black tracking-tight"
+              className="text-2xl sm:text-3xl font-black tracking-tight"
               style={{ color: 'rgba(255,255,255,0.96)', fontFamily: 'var(--font-sora)' }}
             >
               {title}
             </h1>
           </div>
           {subtitle && (
-            <p className="relative z-10 text-sm font-medium -mt-1" style={{ color: 'rgba(255,255,255,0.60)' }}>
+            <p className="relative z-10 text-xs sm:text-sm font-medium -mt-1 w-full text-center" style={{ color: 'rgba(255,255,255,0.60)' }}>
               {subtitle}
             </p>
           )}
@@ -53,8 +53,9 @@ export function PageHeader({ title, subtitle, icon: Icon, color = '#d0bcff', chi
           )}
         </>
       ) : (
-        <div className="relative z-10 w-full flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
+        <>
+          {/* Split: título a la izquierda, acciones a la derecha — wrappean en mobile */}
+          <div className="relative z-10 flex items-center gap-3 flex-1 min-w-0">
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
               style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.20)' }}
@@ -63,24 +64,24 @@ export function PageHeader({ title, subtitle, icon: Icon, color = '#d0bcff', chi
             </div>
             <div className="min-w-0">
               <h1
-                className="text-3xl font-black tracking-tight leading-none"
+                className="text-2xl sm:text-3xl font-black tracking-tight leading-none"
                 style={{ color: 'rgba(255,255,255,0.96)', fontFamily: 'var(--font-sora)' }}
               >
                 {title}
               </h1>
               {subtitle && (
-                <p className="text-sm font-medium mt-0.5" style={{ color: 'rgba(255,255,255,0.60)' }}>
+                <p className="text-xs sm:text-sm font-medium mt-0.5 leading-snug" style={{ color: 'rgba(255,255,255,0.60)' }}>
                   {subtitle}
                 </p>
               )}
             </div>
           </div>
           {children && (
-            <div className="flex gap-2 flex-wrap justify-end shrink-0">
+            <div className="relative z-10 flex gap-2 flex-wrap justify-end">
               {children}
             </div>
           )}
-        </div>
+        </>
       )}
     </div>
   )

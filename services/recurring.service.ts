@@ -1,4 +1,4 @@
-import { parseISO, addDays, addMonths, addYears } from 'date-fns'
+import { parseISO, addDays, addMonths, addYears, format } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import { safeNumber } from '@/utils/format'
 import { transactionsService } from './transactions.service'
@@ -131,7 +131,7 @@ export const recurringService = {
       currency:    (item.currency ?? 'ARS') as Currency,
       category_id: item.category_id ?? null,
       wallet_id:   walletId,
-      date:        new Date().toISOString().split('T')[0],
+      date:        format(new Date(), 'yyyy-MM-dd'),
       is_recurring: true,
       recurring_id: item.id ?? null,
       notes:        null,

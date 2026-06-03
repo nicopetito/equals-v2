@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/Button'
 import { HelpButton } from '@/components/help/HelpButton'
 import { Input } from '@/components/ui/Input'
 import type { Category } from '@/types'
+import { plural } from '@/utils/format'
 
 // ── Icon registry ──────────────────────────────────────────────────────────────
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -298,7 +299,7 @@ export default function CategoriesPage() {
 
       {/* ── Hero compact ──────────────────────────────────────────────────────────── */}
       <div
-        className="rounded-2xl px-5 py-4 flex items-center justify-between gap-4 relative overflow-hidden"
+        className="rounded-2xl px-4 py-4 sm:px-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative overflow-hidden"
         style={{
           background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)',
           boxShadow:  '0 8px 24px -6px rgba(109,59,215,0.35)',
@@ -329,12 +330,12 @@ export default function CategoriesPage() {
               Categorías
             </h1>
             <p className="text-[11px] font-medium mt-0.5" style={{ color: 'rgba(255,255,255,0.56)' }}>
-              {loading ? 'Cargando…' : `${categories.length} categorías · organizá tus finanzas`}
+              {loading ? 'Cargando…' : `${categories.length} ${plural(categories.length, 'categoría', 'categorías')} · organizá tus finanzas`}
             </p>
           </div>
         </div>
 
-        <div className="relative z-10 shrink-0 flex gap-2">
+        <div className="relative z-10 flex gap-2 flex-wrap">
           <HelpButton section="categories" />
           <button
             onClick={() => openCreate()}
@@ -353,7 +354,7 @@ export default function CategoriesPage() {
         >
           <span className="flex items-center gap-1.5 text-sm">
             <strong style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}>{categories.length}</strong>
-            <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>categorías</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{plural(categories.length, 'categoría', 'categorías')}</span>
           </span>
           <span className="w-px h-3.5 shrink-0" style={{ background: 'var(--border)' }} />
           <span className="flex items-center gap-1.5 text-sm">

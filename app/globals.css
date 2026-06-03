@@ -107,6 +107,11 @@ body {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+@keyframes selectDropdownIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)   scale(1);    }
+}
 .animate-fade-in { animation: fadeSlideUp 0.25s ease forwards; }
 
 @keyframes shimmer {
@@ -210,6 +215,13 @@ body {
   0%   { background-position: 0% 50%;   }
   50%  { background-position: 100% 50%; }
   100% { background-position: 0% 50%;   }
+}
+
+/* ── Mobile utilities ───────────────────────────────────── */
+/* Fade derecho para indicar scroll horizontal */
+.scroll-fade-right {
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 2rem), transparent 100%);
+  mask-image: linear-gradient(to right, black calc(100% - 2rem), transparent 100%);
 }
 
 .hero-animated {

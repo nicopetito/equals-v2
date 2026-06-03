@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { HelpCircle } from 'lucide-react'
 import { HelpDrawer } from './HelpDrawer'
 import { helpContent } from './helpContent'
@@ -35,18 +35,11 @@ interface HelpButtonProps {
 
 export function HelpButton({ section, variant = 'glass' }: HelpButtonProps) {
   const [open, setOpen] = useState(false)
-
-  // Auto-open on first visit
-  useEffect(() => {
-    const seen = getSeenSections()
-    if (!seen.includes(section)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setOpen(true)
-    }
-  }, [section])
+  const [unseen, setUnseen] = useState(() => !getSeenSections().includes(section))
 
   function handleClose() {
     markSectionSeen(section)
+    setUnseen(false)
     setOpen(false)
   }
 
@@ -61,7 +54,7 @@ export function HelpButton({ section, variant = 'glass' }: HelpButtonProps) {
         aria-label="Abrir guía de esta sección"
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all duration-150 hover:-translate-y-px"
+        className="relative flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all duration-150 hover:-translate-y-px"
         style={
           variant === 'light'
             ? {
@@ -94,6 +87,13 @@ export function HelpButton({ section, variant = 'glass' }: HelpButtonProps) {
       >
         <HelpCircle size={14} />
         Guía
+        {unseen && (
+          <span
+            className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
+            style={{ background: '#facc15', border: '1.5px solid rgba(0,0,0,0.15)' }}
+            aria-hidden="true"
+          />
+        )}
       </button>
 
       <HelpDrawer open={open} onClose={handleClose} section={section} />

@@ -1,12 +1,15 @@
 ﻿'use client'
 
 import { useState, type ReactNode } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
 import { FAB } from '@/components/ui/FAB'
 import { ToastContainer } from '@/components/ui/ToastContainer'
 import { Onboarding } from '@/components/ui/Onboarding'
 import { WelcomeModal } from '@/components/ui/WelcomeModal'
+import { FirstWalletWizard } from '@/components/onboarding/FirstWalletWizard'
+import { modalOverlay, slideInLeft } from '@/utils/animations'
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -32,22 +35,34 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
       </div>
 
       {/* Mobile sidebar overlay */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 flex md:hidden">
-          <div
-            className="absolute inset-0 backdrop-blur-sm"
-            style={{ background: 'rgba(13,15,28,0.40)' }}
-            onClick={() => setMobileOpen(false)}
-          />
-          <div className="relative z-10 h-full">
-            <Sidebar mobile onClose={() => setMobileOpen(false)} />
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            key="mobile-sidebar-root"
+            className="fixed inset-0 z-50 flex md:hidden"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          >
+            <motion.div
+              variants={modalOverlay}
+              className="absolute inset-0 backdrop-blur-sm"
+              style={{ background: 'rgba(13,15,28,0.40)' }}
+              onClick={() => setMobileOpen(false)}
+            />
+            <motion.div
+              variants={slideInLeft}
+              className="relative z-10 h-full"
+            >
+              <Sidebar mobile onClose={() => setMobileOpen(false)} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main content */}
       <main className="flex-1 flex flex-col overflow-hidden relative z-10">
-        <div className="flex-1 overflow-y-auto pb-28 md:pb-6">
+        <div className="flex-1 overflow-y-auto pb-[calc(7rem+env(safe-area-inset-bottom,0px))] md:pb-6">
           {children}
         </div>
       </main>
@@ -57,6 +72,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
       <ToastContainer />
       <Onboarding />
       <WelcomeModal />
+      <FirstWalletWizard />
     </div>
   )
 }

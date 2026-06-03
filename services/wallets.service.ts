@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/client'
 import { safeNumber } from '@/utils/format'
-import type { Wallet, WalletWithBalance, WalletDiagnostic } from '@/types'
+import { categoriesService } from '@/services/categories.service'
+import { transactionsService } from '@/services/transactions.service'
+import type { Wallet, WalletWithBalance, WalletDiagnostic, Currency } from '@/types'
 
 function getSupabase() {
   return createClient()
@@ -53,13 +55,29 @@ export const walletsService = {
     const user_id = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
 
+    const initialBalance = wallet.balance ?? 0
+
     const { data, error } = await supabase
       .from('wallets')
-      .insert([{ ...wallet, user_id }])
+      .insert([{ ...wallet, balance: 0, user_id }])
       .select()
       .single()
 
     if (error) throw error
+
+    if (initialBalance > 0) {
+      const catId = await categoriesService.getOrCreateSaldoInicialCategory()
+      await transactionsService.create({
+        type: 'income',
+        amount: initialBalance,
+        currency: (wallet.currency ?? 'ARS') as Currency,
+        description: 'Saldo inicial',
+        wallet_id: data.id,
+        date: new Date().toISOString().split('T')[0],
+        category_id: catId,
+      })
+    }
+
     return data
   },
 
@@ -125,6 +143,79 @@ export const walletsService = {
       .eq('user_id', user_id)
 
     if (error) throw error
+  },
+
+  async fixInitialBalance(
+    walletId: string,
+    target: number,
+    currency: Currency,
+    currentTransactionTotal: number,
+    currentWalletBalance: number,
+  ): Promise<void> {
+    const supabase = getSupabase()
+    const user_id = await getUserId()
+    if (!user_id) throw new Error('Not authenticated')
+
+    const catId = await categoriesService.getOrCreateSaldoInicialCategory()
+
+    const { data: existingTx } = await supabase
+      .from('transactions')
+      .select('id, amount')
+      .eq('user_id', user_id)
+      .eq('wallet_id', walletId)
+      .eq('category_id', catId)
+      .eq('type', 'income')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    // transaction_total includes "Saldo inicial" transactions; wallet.balance is separate
+    const saldoTxAmount = existingTx ? safeNumber((existingTx as { id: string; amount: unknown }).amount) : 0
+    const otherTotal = currentTransactionTotal - saldoTxAmount  // non-initial transactions
+    const newSaldoAmount = target - otherTotal
+
+    if (newSaldoAmount < 0) {
+      throw new Error('Las demás transacciones ya superan el saldo objetivo. Usá el modo de ajuste contable.')
+    }
+
+    // Normalise wallet.balance to 0 — all initial balance will live in the transaction
+    if (currentWalletBalance !== 0) {
+      const { error } = await supabase
+        .from('wallets')
+        .update({ balance: 0 })
+        .eq('id', walletId)
+        .eq('user_id', user_id)
+      if (error) throw error
+    }
+
+    if (existingTx?.id) {
+      if (newSaldoAmount > 0) {
+        const { error } = await supabase
+          .from('transactions')
+          .update({ amount: newSaldoAmount })
+          .eq('id', existingTx.id)
+          .eq('user_id', user_id)
+        if (error) throw error
+      } else {
+        await transactionsService.delete(existingTx.id)
+      }
+    } else if (newSaldoAmount > 0) {
+      const { error } = await supabase
+        .from('transactions')
+        .insert([{
+          user_id,
+          wallet_id: walletId,
+          type: 'income',
+          amount: newSaldoAmount,
+          currency,
+          description: 'Saldo inicial',
+          category_id: catId,
+          date: new Date().toISOString().slice(0, 10),
+          is_recurring: false,
+        }])
+      if (error) throw error
+    }
+    // if newSaldoAmount === 0 and no existingTx: wallet.balance already set to 0, nothing else needed
   },
 
   async diagnose(): Promise<WalletDiagnostic[]> {

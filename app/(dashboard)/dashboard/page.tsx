@@ -28,14 +28,16 @@ import { useToast } from '@/components/providers/ToastProvider'
 import { NewTransactionModal } from '@/components/transactions/NewTransactionModal'
 import { TemplateConfirmModal } from '@/components/transactions/TemplateConfirmModal'
 import { seedDemoData } from '@/utils/seed'
-import { formatCurrency } from '@/utils/format'
+import { formatCurrency, plural } from '@/utils/format'
 import { calculateNetWorth, calculateSavingsMetrics } from '@/utils/finance'
 import { format } from 'date-fns'
-import { formatDate, getDateRangeForPeriod, PERIOD_OPTIONS, type Period } from '@/utils/date'
+import { formatDateSmart, getDateRangeForPeriod, PERIOD_OPTIONS, type Period } from '@/utils/date'
 import type { TransactionWithDetails, Currency, TransactionTemplate } from '@/types'
 import type { WalletWithBalance } from '@/types/wallet'
 import { AnimatedAmount } from '@/components/ui/AnimatedAmount'
 import { DashboardFilters } from '@/components/dashboard/DashboardFilters'
+import { motion, AnimatePresence } from 'motion/react'
+import { staggerContainer, staggerItem, fadeUp } from '@/utils/animations'
 
 // â"€â"€ Design tokens â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 // Usados de forma consistente en TODOS los componentes de esta pÃ¡gina.
@@ -226,7 +228,7 @@ export default function DashboardPage() {
     <div className="p-5 md:p-7 max-w-5xl mx-auto space-y-4">
 
       {/* â"€â"€ HEADER â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
-      <div className="enter-1 hero-animated rounded-3xl px-6 py-5 flex items-center justify-between gap-4 relative overflow-hidden"
+      <div className="enter-1 hero-animated rounded-3xl px-4 py-4 sm:px-6 sm:py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative overflow-hidden"
         style={{ boxShadow: '0 12px 32px -8px rgba(109,59,215,0.45), 0 0 60px rgba(109,59,215,0.12)' }}>
         <div className="absolute bottom-0 left-0 right-0 h-20 pointer-events-none opacity-10">
           <svg width="100%" height="100%" preserveAspectRatio="none" viewBox="0 0 1000 100">
@@ -234,7 +236,7 @@ export default function DashboardPage() {
           </svg>
         </div>
         <div className="relative z-10 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
             style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.20)' }}>
             <TrendingUp size={17} className="text-white" />
           </div>
@@ -245,15 +247,15 @@ export default function DashboardPage() {
             <p className="text-[11px] text-white/55 mt-0.5">Resumen del período</p>
           </div>
         </div>
-        <div className="relative z-10 flex gap-2 shrink-0 flex-wrap justify-end">
+        <div className="relative z-10 flex gap-2 flex-wrap">
           <HelpButton section="dashboard" />
           <button onClick={() => setReportOpen(true)}
-            className="hidden sm:flex hero-btn hero-btn-secondary">
+            className="hidden md:flex hero-btn hero-btn-secondary">
             <FileText size={14} /> Exportar
           </button>
           <button
             onClick={() => setTemplatePickerOpen(true)}
-            className="hidden sm:flex hero-btn hero-btn-secondary">
+            className="hidden md:flex hero-btn hero-btn-secondary">
             <Zap size={14} /> Transacción rápida
           </button>
           <button onClick={() => setNewTxOpen(true)}
@@ -290,8 +292,13 @@ export default function DashboardPage() {
       )}
 
       {/* Panel de alertas (acordeón) */}
+      <AnimatePresence>
       {(orphanStats || uncategorizedStats) && (
-        <div
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
           className="rounded-2xl overflow-hidden"
           style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
         >
@@ -394,15 +401,16 @@ export default function DashboardPage() {
 
             </div>
           )}
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* â"€â"€ BALANCE TOTAL + KPIs â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
       <div className="enter-3">
       {loading ? (
         <div className="space-y-3">
           <div className="rounded-3xl animate-shimmer" style={{ height: 56, border: CARD_BORDER }} />
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[0,1,2].map(i => <div key={i} className="rounded-2xl animate-shimmer" style={{ height: 88, border: CARD_BORDER }} />)}
           </div>
         </div>
@@ -475,11 +483,16 @@ export default function DashboardPage() {
 
           {/* KPIs */}
           {summaryRows.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <KpiCard label="Ingresos"     icon={TrendingUp}   accent="var(--income-500)" rows={summaryRows.map(r => ({ curr: r.curr, value: r.income }))} />
-              <KpiCard label="Gastos"       icon={TrendingDown}  accent="var(--expense-500)" rows={summaryRows.map(r => ({ curr: r.curr, value: r.expenses }))} />
-              <KpiCard label="Balance neto" icon={Wallet}        accent="var(--brand-500)" rows={summaryRows.map(r => ({ curr: r.curr, value: r.balance, signed: true }))} />
-            </div>
+            <motion.div
+              className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+              variants={staggerContainer}
+              initial="hidden"
+              animate="visible"
+            >
+              <motion.div variants={staggerItem}><KpiCard label="Ingresos"     icon={TrendingUp}   accent="var(--income-500)" rows={summaryRows.map(r => ({ curr: r.curr, value: r.income }))} /></motion.div>
+              <motion.div variants={staggerItem}><KpiCard label="Gastos"       icon={TrendingDown}  accent="var(--expense-500)" rows={summaryRows.map(r => ({ curr: r.curr, value: r.expenses }))} /></motion.div>
+              <motion.div variants={staggerItem}><KpiCard label="Balance neto" tooltip="Ingresás menos Gastás en el período. El saldo total de tus billeteras está disponible en el inicio." icon={Wallet} accent="var(--brand-500)" rows={summaryRows.map(r => ({ curr: r.curr, value: r.balance, signed: true }))} /></motion.div>
+            </motion.div>
           )}
 
           {/* Sin datos en período */}
@@ -579,12 +592,17 @@ export default function DashboardPage() {
 
       {/* â"€â"€ RESUMEN POR CATEGORÃA â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
       <div className="enter-5">
-      {!loading && filtered.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <QuickCategoryBreakdown transactions={filtered} type="expense" currency={activeCurr} />
-          <QuickCategoryBreakdown transactions={filtered} type="income"  currency={activeCurr} />
-        </div>
-      )}
+      {!loading && filtered.length > 0 && (() => {
+        const hasExpense = filtered.some(t => t.type === 'expense')
+        const hasIncome  = filtered.some(t => t.type === 'income')
+        const bothTypes  = hasExpense && hasIncome
+        return (
+          <div className={`grid grid-cols-1 gap-3 ${bothTypes ? 'sm:grid-cols-2' : ''}`}>
+            {hasExpense && <QuickCategoryBreakdown transactions={filtered} type="expense" currency={activeCurr} />}
+            {hasIncome  && <QuickCategoryBreakdown transactions={filtered} type="income"  currency={activeCurr} />}
+          </div>
+        )
+      })()}
       </div>
 
       {/* â"€â"€ ÃšLTIMAS TRANSACCIONES â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
@@ -625,9 +643,10 @@ export default function DashboardPage() {
 
 // â"€â"€ KPI Card â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
-function KpiCard({ label, icon: Icon, accent, rows }: {
+function KpiCard({ label, icon: Icon, accent, rows, tooltip }: {
   label: string; icon: React.ElementType; accent: string
   rows: { curr: string; value: number; signed?: boolean }[]
+  tooltip?: string
 }) {
   return (
     <div className="glass-card rounded-2xl p-4 cursor-default"
@@ -638,11 +657,15 @@ function KpiCard({ label, icon: Icon, accent, rows }: {
         <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg-subtle)' }}>
           <Icon size={13} style={{ color: accent }} />
         </div>
-        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>{label}</span>
+        <span
+          className="text-[10px] font-bold uppercase tracking-widest"
+          style={{ color: 'var(--text-muted)' }}
+          title={tooltip}
+        >{label}{tooltip && <span className="ml-1 opacity-50">ⓘ</span>}</span>
       </div>
       <div className="space-y-1.5">
         {rows.map(({ curr, value, signed }) => {
-          const signedPos = signed && value >= 0
+          const signedPos = signed && value > 0
           const signedNeg = signed && value < 0
           const rowColor = signedPos ? 'var(--income-500)' : signedNeg ? 'var(--expense-500)' : accent
           return (
@@ -736,7 +759,7 @@ function WalletSlider({ wallets, onNavigate }: { wallets: WalletWithBalance[]; o
               <p className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>{w.name}</p>
               {w.transaction_count != null && (
                 <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  {w.transaction_count} movimientos
+                  {w.transaction_count} {plural(w.transaction_count, 'movimiento', 'movimientos')}
                 </p>
               )}
             </div>
@@ -911,6 +934,7 @@ function QuickTemplatesBar({
           </button>
         </div>
       ) : (
+        <div className="relative">
         <div className="flex gap-2.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
           {templates.map(t => {
             const accentColor = t.color ?? (t.type === 'income' ? 'var(--income-500)' : 'var(--expense-500)')
@@ -957,6 +981,9 @@ function QuickTemplatesBar({
               </button>
             )
           })}
+        </div>
+        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8"
+          style={{ background: 'linear-gradient(to right, transparent, var(--bg-card))' }} />
         </div>
       )}
     </div>
@@ -1045,7 +1072,7 @@ function TxRow({ tx, last }: { tx: TransactionWithDetails; index: number; last: 
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{tx.description}</p>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{formatDate(tx.date)}</span>
+          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{formatDateSmart(tx.date)}</span>
           {tx.category_name && <CategoryBadge name={tx.category_name} color={tx.category_color} />}
         </div>
       </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { RotateCcw, ChevronUp, ChevronDown, Zap } from 'lucide-react'
+import { RotateCcw, ChevronUp, ChevronDown, Zap, AlertTriangle } from 'lucide-react'
 import { transactionsService } from '@/services/transactions.service'
 import { refundService } from '@/services/refund.service'
 import { transactionTemplateService } from '@/services/transaction_template.service'
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { formatCurrency, safeNumber } from '@/utils/format'
+import { localDateStr } from '@/utils/date'
 import type {
   Transaction, TransactionWithDetails, Currency, TransactionType,
   RefundFormState, RefundRuleType, Category,
@@ -238,7 +239,7 @@ export function NewTransactionModal({
 }: NewTransactionModalProps) {
   const { addToast } = useToast()
 
-  const [form, setForm]               = useState<Partial<Transaction>>({ type: 'expense', currency: 'ARS', date: new Date().toISOString().split('T')[0] })
+  const [form, setForm]               = useState<Partial<Transaction>>({ type: 'expense', currency: 'ARS', date: localDateStr() })
   const [saving, setSaving]           = useState(false)
   const [formError, setFormError]     = useState<string | null>(null)
   const [refundForm, setRefundForm]   = useState<RefundFormState>(DEFAULT_REFUND_FORM)
@@ -248,6 +249,16 @@ export function NewTransactionModal({
   const [editImpact, setEditImpact]         = useState<{ creditedRefundCount: number; hasGoalMovement: boolean } | null>(null)
   const [softConfirmStep, setSoftConfirmStep] = useState(false)
   const softCheckBypassed                   = useRef(false)
+  const [futureDateWarnDismissed, setFutureDateWarnDismissed] = useState(() => {
+    try { return localStorage.getItem('eq_future_date_warn') === '1' } catch { return false }
+  })
+
+  const isFutureDate = !!form.date && form.date > localDateStr()
+
+  function dismissFutureDateWarn() {
+    try { localStorage.setItem('eq_future_date_warn', '1') } catch { /* noop */ }
+    setFutureDateWarnDismissed(true)
+  }
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -257,7 +268,7 @@ export function NewTransactionModal({
         setForm({ ...editing })
         transactionsService.checkEditImpact(editing.id!).then(setEditImpact).catch(() => {})
       } else {
-        setForm({ type: 'expense', currency: 'ARS', date: new Date().toISOString().split('T')[0] })
+        setForm({ type: 'expense', currency: 'ARS', date: localDateStr() })
         setEditImpact(null)
       }
       setFormError(null)
@@ -483,6 +494,31 @@ export function NewTransactionModal({
           required
         />
 
+        {isFutureDate && !futureDateWarnDismissed && (
+          <div
+            className="flex items-start gap-2.5 rounded-xl px-3.5 py-2.5"
+            style={{ background: '#FFFBEB', border: '1px solid #FDE68A' }}
+          >
+            <AlertTriangle size={14} style={{ color: '#D97706', flexShrink: 0, marginTop: 2 }} />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold" style={{ color: '#92400E' }}>
+                Fecha futura
+              </p>
+              <p className="text-xs mt-0.5 leading-relaxed" style={{ color: '#78350F' }}>
+                Esta fecha todavía no ocurrió. La transacción impactará el saldo de la billetera, pero no aparecerá en los KPIs ni en el historial del período actual hasta que llegue ese día.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={dismissFutureDateWarn}
+              className="text-xs font-semibold shrink-0 mt-0.5 transition-opacity hover:opacity-70 whitespace-nowrap"
+              style={{ color: '#D97706' }}
+            >
+              No mostrar
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Select
@@ -581,7 +617,10 @@ export function NewTransactionModal({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-2 pt-1">
+        <div
+          className="grid grid-cols-2 gap-2 pt-1 sticky bottom-0 -mx-4 sm:-mx-5 px-4 sm:px-5 pb-4 sm:pb-5"
+          style={{ background: 'rgba(255,255,255,0.97)', borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem' }}
+        >
           <Button variant="secondary" onClick={onClose} className="w-full">
             Cancelar
           </Button>

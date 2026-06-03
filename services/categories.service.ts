@@ -145,6 +145,50 @@ export const categoriesService = {
     return created.id!
   },
 
+  async getOrCreateSaldoInicialCategory(): Promise<string> {
+    const supabase = getSupabase()
+    const user_id = await getUserId()
+    if (!user_id) throw new Error('Not authenticated')
+
+    const { data } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('user_id', user_id)
+      .eq('name', 'Saldo inicial')
+      .eq('type', 'income')
+      .eq('is_system', true)
+      .maybeSingle()
+
+    if (data?.id) return data.id
+
+    const created = await categoriesService.create({
+      name: 'Saldo inicial', type: 'income', color: '#10b981', icon: 'wallet', is_system: true,
+    })
+    return created.id!
+  },
+
+  async getOrCreateAjusteCategory(type: 'income' | 'expense'): Promise<string> {
+    const supabase = getSupabase()
+    const user_id = await getUserId()
+    if (!user_id) throw new Error('Not authenticated')
+
+    const { data } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('user_id', user_id)
+      .eq('name', 'Ajuste')
+      .eq('type', type)
+      .eq('is_system', true)
+      .maybeSingle()
+
+    if (data?.id) return data.id
+
+    const created = await categoriesService.create({
+      name: 'Ajuste', type, color: '#6366f1', icon: 'sliders-horizontal', is_system: true,
+    })
+    return created.id!
+  },
+
   async seedDefaults(): Promise<void> {
     for (const cat of DEFAULT_CATEGORIES) {
       await categoriesService.create(cat)

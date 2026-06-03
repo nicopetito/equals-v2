@@ -19,6 +19,8 @@ import { formatCurrency, safeNumber } from '@/utils/format'
 import { calculateNetWorth, calculateSavingsMetrics } from '@/utils/finance'
 import { getDateRangeForPeriod, PERIOD_OPTIONS, type Period } from '@/utils/date'
 import type { Currency } from '@/types'
+import { motion } from 'motion/react'
+import { staggerContainer, staggerItem } from '@/utils/animations'
 
 const CURRENCIES: { value: Currency | 'all'; label: string }[] = [
   { value: 'all', label: 'Todas' },
@@ -65,32 +67,43 @@ function FilterBar({ period, setPeriod, currency, setCurrency }: {
   currency: Currency | 'all'; setCurrency: (v: Currency | 'all') => void
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-2xl px-3 py-2"
+    <div className="rounded-2xl px-3 py-2"
       style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-      <div className="flex items-center gap-1 flex-wrap">
-        {PERIOD_OPTIONS.map(opt => (
-          <button key={opt.value} onClick={() => setPeriod(opt.value)}
-            className="px-3 py-1.5 text-xs font-semibold rounded-xl transition-all duration-150"
-            style={period === opt.value
-              ? { background: 'linear-gradient(135deg,#6d3bd7,#0566d9)', color: '#fff', boxShadow: '0 2px 8px rgba(109,59,215,0.35)' }
-              : { color: 'var(--text-muted)' }}
-            onMouseEnter={e => { if (period !== opt.value) e.currentTarget.style.color = 'var(--text-secondary)' }}
-            onMouseLeave={e => { if (period !== opt.value) e.currentTarget.style.color = 'var(--text-muted)' }}
-          >{opt.label}</button>
-        ))}
+      {/* Períodos con scroll horizontal y fade */}
+      <div className="relative">
+        <div className="flex items-center gap-1 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
+          {PERIOD_OPTIONS.map(opt => (
+            <button key={opt.value} onClick={() => setPeriod(opt.value)}
+              className="px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap shrink-0 transition-all duration-150"
+              style={period === opt.value
+                ? { background: 'linear-gradient(135deg,#6d3bd7,#0566d9)', color: '#fff', boxShadow: '0 2px 8px rgba(109,59,215,0.28)' }
+                : { color: 'var(--text-muted)' }}
+              onMouseEnter={e => { if (period !== opt.value) { e.currentTarget.style.background = 'var(--bg-subtle)'; e.currentTarget.style.color = 'var(--text-secondary)' } }}
+              onMouseLeave={e => { if (period !== opt.value) { e.currentTarget.style.background = ''; e.currentTarget.style.color = 'var(--text-muted)' } }}
+            >{opt.label}</button>
+          ))}
+        </div>
+        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8"
+          style={{ background: 'linear-gradient(to right, transparent, var(--bg-card))' }} />
       </div>
-      <div className="w-px self-stretch" style={{ background: 'var(--border)' }} />
-      <div className="flex items-center gap-1">
-        {CURRENCIES.map(opt => (
-          <button key={opt.value} onClick={() => setCurrency(opt.value)}
-            className="px-3 py-1.5 text-xs font-semibold rounded-xl transition-all duration-150"
-            style={currency === opt.value
-              ? { background: 'rgba(208,188,255,0.18)', color: 'var(--brand-500)', border: '1px solid rgba(208,188,255,0.25)' }
-              : { color: 'var(--text-muted)' }}
-            onMouseEnter={e => { if (currency !== opt.value) e.currentTarget.style.color = 'var(--text-secondary)' }}
-            onMouseLeave={e => { if (currency !== opt.value) e.currentTarget.style.color = 'var(--text-muted)' }}
-          >{opt.label}</button>
-        ))}
+      {/* Separador */}
+      <div className="my-2" style={{ height: 1, background: 'var(--border-light, var(--border))' }} />
+      {/* Monedas */}
+      <div className="relative">
+        <div className="flex items-center gap-1 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
+          {CURRENCIES.map(opt => (
+            <button key={opt.value} onClick={() => setCurrency(opt.value)}
+              className="px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap shrink-0 transition-all duration-150"
+              style={currency === opt.value
+                ? { background: 'rgba(208,188,255,0.18)', color: 'var(--brand-500)', border: '1px solid rgba(208,188,255,0.25)' }
+                : { color: 'var(--text-muted)' }}
+              onMouseEnter={e => { if (currency !== opt.value) { e.currentTarget.style.background = 'var(--bg-subtle)'; e.currentTarget.style.color = 'var(--text-secondary)' } }}
+              onMouseLeave={e => { if (currency !== opt.value) { e.currentTarget.style.background = ''; e.currentTarget.style.color = 'var(--text-muted)' } }}
+            >{opt.label}</button>
+          ))}
+        </div>
+        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8"
+          style={{ background: 'linear-gradient(to right, transparent, var(--bg-card))' }} />
       </div>
     </div>
   )
@@ -274,7 +287,12 @@ export default function EstadisticasPage() {
       {showContent && (
         <>
           {/* ── KPIs RÁPIDOS ─────────────────────────────────────── */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <motion.div
+            className="grid grid-cols-2 sm:grid-cols-4 gap-3"
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+          >
             {([
               {
                 label: 'Transacciones',
@@ -309,7 +327,7 @@ export default function EstadisticasPage() {
                 deltaPositiveIsGood: true,
               },
             ] as const).map(item => (
-              <div key={item.label} className="glass-card rounded-2xl px-4 py-3.5">
+              <motion.div key={item.label} variants={staggerItem} className="glass-card rounded-2xl px-4 py-3.5">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-1.5">
                     <item.icon size={11} style={{ color: item.color }} />
@@ -328,9 +346,9 @@ export default function EstadisticasPage() {
                 <p className="text-lg font-extrabold tabular-nums" style={{ color: item.color, fontFamily: 'var(--font-sora)' }}>
                   {item.value}
                 </p>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           {/* ── TASA DE AHORRO ───────────────────────────────────── */}
           {savingsRate !== null && (
@@ -483,7 +501,7 @@ export default function EstadisticasPage() {
                       {i + 1}
                     </span>
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cat.color }} />
-                    <p className="flex-1 text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{cat.name}</p>
+                    <p className="flex-1 text-sm font-semibold truncate" title={cat.name} style={{ color: 'var(--text-primary)' }}>{cat.name}</p>
                     {cat.name === 'Categoría eliminada' && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
                         style={{ background: 'var(--bg-subtle)', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
@@ -496,7 +514,7 @@ export default function EstadisticasPage() {
                     <div className="w-16 h-1.5 rounded-full shrink-0" style={{ background: 'var(--bg-subtle)' }}>
                       <div className="h-full rounded-full" style={{ width: `${cat.pct}%`, background: cat.color, opacity: 0.80 }} />
                     </div>
-                    <span className="text-sm font-extrabold tabular-nums shrink-0 w-32 text-right"
+                    <span className="text-sm font-extrabold tabular-nums shrink-0 w-24 sm:w-32 text-right"
                       style={{ color: 'var(--expense-500)', fontFamily: 'var(--font-sora)' }}>
                       {formatCurrency(cat.amount, activeCurr)}
                     </span>
@@ -525,7 +543,7 @@ export default function EstadisticasPage() {
                       {i + 1}
                     </span>
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cat.color }} />
-                    <p className="flex-1 text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{cat.name}</p>
+                    <p className="flex-1 text-sm font-semibold truncate" title={cat.name} style={{ color: 'var(--text-primary)' }}>{cat.name}</p>
                     {cat.name === 'Categoría eliminada' && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
                         style={{ background: 'var(--bg-subtle)', color: 'var(--text-faint)', border: '1px solid var(--border)' }}>
@@ -538,7 +556,7 @@ export default function EstadisticasPage() {
                     <div className="w-16 h-1.5 rounded-full shrink-0" style={{ background: 'var(--bg-subtle)' }}>
                       <div className="h-full rounded-full" style={{ width: `${cat.pct}%`, background: cat.color, opacity: 0.80 }} />
                     </div>
-                    <span className="text-sm font-extrabold tabular-nums shrink-0 w-32 text-right"
+                    <span className="text-sm font-extrabold tabular-nums shrink-0 w-24 sm:w-32 text-right"
                       style={{ color: 'var(--income-500)', fontFamily: 'var(--font-sora)' }}>
                       {formatCurrency(cat.amount, activeCurr)}
                     </span>

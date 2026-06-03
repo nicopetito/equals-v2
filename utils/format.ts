@@ -40,6 +40,10 @@ export function roundMoney(amount: number): number {
   return Math.round((safeNumber(amount) + Number.EPSILON) * 100) / 100
 }
 
+export function plural(count: number, singular: string, pluralForm: string): string {
+  return count === 1 ? singular : pluralForm
+}
+
 export function calculateExchange(
   amount: number,
   rate: number,

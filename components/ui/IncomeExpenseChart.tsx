@@ -74,6 +74,10 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
         background: 'var(--bg-card)',
         border: '1px solid var(--border)',
         boxShadow: 'var(--shadow-lg)',
+        zIndex: 50,
+        position: 'relative',
+        maxWidth: 220,
+        pointerEvents: 'none',
       }}
     >
       <p className="font-bold mb-2" style={{ color: 'var(--text-primary)' }}>{label}</p>

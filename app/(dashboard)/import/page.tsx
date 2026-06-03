@@ -1341,18 +1341,11 @@ export default function ImportPage() {
                         <span className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>{label}</span>
                         {autoDetectedFields.has(field) && <AutoDetectedBadge />}
                       </div>
-                      <select
+                      <Select
                         value={(mapping[field] as string) ?? ''}
                         onChange={e => setMapping(p => ({ ...p, [field]: e.target.value || undefined }))}
-                        className="w-full text-sm rounded-xl px-3 py-2.5 outline-none transition-all"
-                        style={{
-                          background: 'var(--bg-card)',
-                          border: '1px solid var(--border)',
-                          color: 'var(--text-primary)',
-                        }}
-                      >
-                        {columnOpts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </select>
+                        options={columnOpts}
+                      />
                     </div>
                   ))}
                 </div>
