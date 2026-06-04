@@ -25,7 +25,7 @@ export function formatCurrency(amount: number | string | null | undefined, curre
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Math.abs(safe))
-  return `${symbol} ${formatted}`
+  return `${safe < 0 ? '-' : ''}${symbol} ${formatted}`
 }
 
 export function formatAmount(amount: number | string | null | undefined): string {

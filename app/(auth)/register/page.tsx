@@ -14,12 +14,12 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 function humanizeAuthError(error: unknown): string {
   const msg = error instanceof Error ? error.message.toLowerCase() : ''
   if (msg.includes('user already registered') || msg.includes('already registered'))
-    return 'Ya existe una cuenta con ese email. ¿Querés iniciar sesión?'
+    return 'Ya hay una cuenta con ese email. ¿Lo recordás? Probá iniciar sesión.'
   if (msg.includes('password should be at least'))
-    return 'La contraseña debe tener al menos 8 caracteres.'
+    return 'La contraseña necesita al menos 8 caracteres.'
   if (msg.includes('rate limit') || msg.includes('too many'))
-    return 'Demasiados intentos. Esperá unos minutos e intentá de nuevo.'
-  return 'No se pudo crear la cuenta. Intentá de nuevo en unos segundos.'
+    return 'Demasiados intentos seguidos. Esperá unos minutos y volvé a intentar.'
+  return 'Algo salió mal al crear la cuenta. Intentá de nuevo en unos segundos.'
 }
 
 function getPasswordStrength(pwd: string): { level: 0 | 1 | 2 | 3; label: string } {
@@ -50,10 +50,10 @@ export default function RegisterPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    if (fullName.trim().length < 2)    { setError('Ingresá tu nombre completo.'); return }
-    if (!EMAIL_RE.test(email))          { setError('Ingresá un email válido.'); return }
-    if (password.length < 8)           { setError('La contraseña debe tener al menos 8 caracteres.'); return }
-    if (password !== confirm)           { setError('Las contraseñas no coinciden.'); return }
+    if (fullName.trim().length < 2)    { setError('¿Cómo te llamás? Ingresá tu nombre completo.'); return }
+    if (!EMAIL_RE.test(email))          { setError('Ese email no parece válido. Revisalo y volvé a intentar.'); return }
+    if (password.length < 8)           { setError('La contraseña necesita al menos 8 caracteres.'); return }
+    if (password !== confirm)           { setError('Las contraseñas no coinciden. Fijate bien en la segunda.'); return }
     setLoading(true)
     try {
       await signUp(email, password, fullName.trim())
@@ -92,10 +92,10 @@ export default function RegisterPage() {
               className="text-3xl font-extrabold"
               style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}
             >
-              Creá tu cuenta gratis
+              Tu plata, finalmente ordenada.
             </h1>
             <p className="mt-1.5 text-base" style={{ color: 'var(--text-muted)' }}>
-              Empezá a gestionar tus finanzas en minutos.
+              Creá tu cuenta gratis y empezá en menos de tres minutos.
             </p>
           </div>
 
@@ -196,12 +196,12 @@ export default function RegisterPage() {
             </div>
 
             <Button type="submit" loading={loading} className="w-full" size="lg">
-              <UserPlus size={18} /> Crear cuenta gratis
+              <UserPlus size={18} /> Crear mi cuenta
             </Button>
           </form>
 
           <p className="text-center text-sm mt-5 enter-3" style={{ color: 'var(--text-muted)' }}>
-            ¿Ya tenés cuenta?{' '}
+            ¿Ya sos parte?{' '}
             <Link
               href="/login"
               className="font-bold transition-colors hover:underline"

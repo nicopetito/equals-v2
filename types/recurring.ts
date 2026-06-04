@@ -18,6 +18,9 @@ export interface RecurringTransaction {
   cadence: RecurringCadence
   next_date: string
   active?: boolean
+  day_of_month?: number | null
+  email_reminder?: boolean
+  reminder_email?: string | null
   created_at?: string
   updated_at?: string
 }

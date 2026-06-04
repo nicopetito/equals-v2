@@ -160,8 +160,8 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
       style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)' }}
     >
       <div
-        className="relative w-full max-w-lg rounded-3xl animate-fade-in"
-        style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow-xl)' }}
+        className="relative w-full max-w-lg rounded-3xl animate-fade-in overflow-y-auto"
+        style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow-xl)', maxHeight: 'calc(100vh - 2rem)' }}
       >
         {/* Header */}
         <div

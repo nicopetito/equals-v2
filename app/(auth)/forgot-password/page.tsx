@@ -47,15 +47,15 @@ export default function ForgotPasswordPage() {
               className="text-2xl font-extrabold text-white"
               style={{ fontFamily: 'var(--font-sora)' }}
             >
-              Link enviado
+              Ya está en camino
             </h2>
           </div>
 
           {/* Cuerpo */}
           <div className="p-8 text-center">
             <p className="text-base mb-8" style={{ color: 'var(--text-muted)' }}>
-              Si existe una cuenta con ese email, vas a recibir las instrucciones en los próximos minutos.
-              Revisá también tu carpeta de spam.
+              Si hay una cuenta con ese email, el link ya va en camino. Puede tardar unos minutos —
+              fijate también en spam por las dudas.
             </p>
             <Button
               onClick={() => router.push('/login')}
@@ -108,10 +108,10 @@ export default function ForgotPasswordPage() {
               className="text-2xl font-extrabold"
               style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}
             >
-              Recuperar contraseña
+              Pasa, no te preocupes.
             </h1>
             <p className="mt-1.5 text-sm" style={{ color: 'var(--text-muted)' }}>
-              Ingresá tu email y te enviamos un link para crear una contraseña nueva.
+              Ingresá tu email y te mandamos un link para crear una contraseña nueva.
             </p>
           </div>
 
@@ -130,15 +130,15 @@ export default function ForgotPasswordPage() {
               autoComplete="email"
             />
             <Button type="submit" loading={loading} className="w-full" size="lg">
-              <Mail size={17} /> Enviar link de recuperación
+              <Mail size={17} /> Mandar el link
             </Button>
           </form>
         </div>
 
         <p className="text-center text-sm mt-5 enter-3" style={{ color: 'var(--text-muted)' }}>
-          ¿Todavía no tenés cuenta?{' '}
+          ¿Primera vez en Equal?{' '}
           <Link href="/register" className="font-bold hover:underline" style={{ color: 'var(--brand-500)' }}>
-            Registrarte gratis
+            Creá tu cuenta gratis
           </Link>
         </p>
       </div>

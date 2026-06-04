@@ -443,9 +443,13 @@ export default function DashboardPage() {
                       style={{ background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.80)' }}>
                       {curr}
                     </span>
-                    <AnimatedAmount value={bal} currency={curr}
-                      className="text-sm font-extrabold tabular-nums text-white"
-                      style={{ fontFamily: 'var(--font-sora)', letterSpacing: '-0.01em' }} />
+                    <span className="text-sm font-extrabold tabular-nums text-white flex items-center"
+                      style={{ fontFamily: 'var(--font-sora)', letterSpacing: '-0.01em' }}>
+                      {bal < 0 && <span>-</span>}
+                      <AnimatedAmount value={Math.abs(bal)} currency={curr}
+                        className="text-sm font-extrabold tabular-nums text-white"
+                        style={{ fontFamily: 'var(--font-sora)', letterSpacing: '-0.01em' }} />
+                    </span>
                   </div>
                 ))}
               </div>
@@ -590,21 +594,6 @@ export default function DashboardPage() {
 
 
 
-      {/* â"€â"€ RESUMEN POR CATEGORÃA â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
-      <div className="enter-5">
-      {!loading && filtered.length > 0 && (() => {
-        const hasExpense = filtered.some(t => t.type === 'expense')
-        const hasIncome  = filtered.some(t => t.type === 'income')
-        const bothTypes  = hasExpense && hasIncome
-        return (
-          <div className={`grid grid-cols-1 gap-3 ${bothTypes ? 'sm:grid-cols-2' : ''}`}>
-            {hasExpense && <QuickCategoryBreakdown transactions={filtered} type="expense" currency={activeCurr} />}
-            {hasIncome  && <QuickCategoryBreakdown transactions={filtered} type="income"  currency={activeCurr} />}
-          </div>
-        )
-      })()}
-      </div>
-
       {/* â"€â"€ ÃšLTIMAS TRANSACCIONES â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
       <div className="enter-6 glass-card rounded-2xl overflow-hidden" style={{ boxShadow: CARD_SHADOW, border: CARD_BORDER }}>
         <div className="flex items-center justify-between px-5 py-3.5"
@@ -744,8 +733,8 @@ function WalletSlider({ wallets, onNavigate }: { wallets: WalletWithBalance[]; o
           <div className="flex items-center gap-3.5 rounded-xl px-3.5 py-2.5 cursor-pointer glass-card"
             style={{ transition: TRANSITION }}
             onClick={onNavigate}
-            onMouseEnter={e => { const el = e.currentTarget; el.style.transform = 'translateY(-1px)'; el.style.boxShadow = 'var(--shadow-md)'; el.style.borderColor = `${color}40` }}
-            onMouseLeave={e => { const el = e.currentTarget; el.style.transform = ''; el.style.boxShadow = 'var(--shadow-sm)'; el.style.borderColor = 'var(--border)' }}>
+            onMouseEnter={e => { const el = e.currentTarget; el.style.transform = 'translateY(-1px)'; el.style.boxShadow = 'var(--shadow-md)' }}
+            onMouseLeave={e => { const el = e.currentTarget; el.style.transform = ''; el.style.boxShadow = 'var(--shadow-sm)' }}>
             {/* Ãcono + moneda */}
             <div className="shrink-0 flex flex-col items-center gap-1.5">
               <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'var(--bg-subtle)' }}>
@@ -765,17 +754,21 @@ function WalletSlider({ wallets, onNavigate }: { wallets: WalletWithBalance[]; o
             </div>
             {/* Balance */}
             <div className="shrink-0 text-right">
-              <AnimatedAmount value={bal} currency={w.currency ?? 'ARS'} duration={750}
-                className="text-base font-semibold tabular-nums leading-tight block"
-                style={{ color: bal >= 0 ? 'var(--income-500)' : 'var(--expense-500)', fontFamily: 'var(--font-sora)', letterSpacing: '-0.02em' }} />
+              <span className="text-base font-semibold tabular-nums leading-tight flex items-center justify-end"
+                style={{ color: bal >= 0 ? 'var(--income-500)' : 'var(--expense-500)', fontFamily: 'var(--font-sora)', letterSpacing: '-0.02em' }}>
+                {bal < 0 && <span>-</span>}
+                <AnimatedAmount value={Math.abs(bal)} currency={w.currency ?? 'ARS'} duration={750}
+                  className="text-base font-semibold tabular-nums leading-tight"
+                  style={{ color: bal >= 0 ? 'var(--income-500)' : 'var(--expense-500)', fontFamily: 'var(--font-sora)', letterSpacing: '-0.02em' }} />
+              </span>
             </div>
           </div>
         ) : (
           <button onClick={onNavigate}
             className="w-full flex items-center justify-center gap-2.5 rounded-xl px-4 py-3.5 transition-all"
             style={{ background: 'var(--bg-subtle)', border: '1px dashed var(--border)', transition: TRANSITION }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = `${color}30`; e.currentTarget.style.background = `${color}05` }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-subtle)' }}>
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-card)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-subtle)' }}>
             <div className="w-7 h-7 rounded-lg flex items-center justify-center"
               style={{ background: 'var(--brand-50)', border: '1px solid var(--brand-100)' }}>
               <Plus size={13} style={{ color: 'var(--brand-500)' }} />
@@ -797,74 +790,6 @@ function WalletSlider({ wallets, onNavigate }: { wallets: WalletWithBalance[]; o
   )
 }
 
-// â"€â"€ Quick Category Breakdown â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
-
-function QuickCategoryBreakdown({ transactions, type, currency }: {
-  transactions: TransactionWithDetails[]; type: 'expense' | 'income'; currency: string
-}) {
-  const relevant = transactions.filter(t => t.type === type)
-  const total    = relevant.reduce((s, t) => s + t.amount, 0)
-
-  /* eslint-disable react-hooks/preserve-manual-memoization */
-  const byCategory = useMemo(() => {
-    const map: Record<string, { amount: number; color: string }> = {}
-    relevant.forEach(t => {
-      const name = t.category_name ?? 'Sin categoría'
-      if (!map[name]) map[name] = { amount: 0, color: t.category_color ?? (type === 'expense' ? 'var(--expense-500)' : 'var(--income-500)') }
-      map[name].amount += t.amount
-    })
-    return Object.entries(map).sort(([,a],[,b]) => b.amount - a.amount).slice(0, 4)
-  }, [relevant, type])
-  /* eslint-enable react-hooks/preserve-manual-memoization */
-
-  if (total === 0 || byCategory.length === 0) return null
-
-  const accent = type === 'expense' ? 'var(--expense-500)' : 'var(--income-500)'
-  const Icon   = type === 'expense' ? TrendingDown : TrendingUp
-  const label  = type === 'expense' ? 'Gastos' : 'Ingresos'
-
-  return (
-    <div className="glass-card rounded-2xl p-4"
-      style={{ boxShadow: CARD_SHADOW, border: CARD_BORDER, transition: TRANSITION }}
-      onMouseEnter={e => cardHoverOn(e.currentTarget as HTMLElement)}
-      onMouseLeave={e => cardHoverOff(e.currentTarget as HTMLElement)}>
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: `${accent}14` }}>
-          <Icon size={11} style={{ color: accent }} />
-        </div>
-        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
-          {label} por categoría
-        </span>
-        <span className="ml-auto text-[10px] font-semibold" style={{ color: 'var(--text-faint)' }}>
-          {formatCurrency(total, currency)}
-        </span>
-      </div>
-      <div className="space-y-2.5">
-        {byCategory.map(([name, data]) => {
-          const pct = total > 0 ? (data.amount / total) * 100 : 0
-          return (
-            <div key={name}>
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: data.color }} />
-                  <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{name}</span>
-                </div>
-                <span className="text-xs font-bold tabular-nums ml-2 shrink-0"
-                  style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}>
-                  {pct.toFixed(0)}%
-                </span>
-              </div>
-              <div className="h-1 rounded-full" style={{ background: 'var(--border-light)' }}>
-                <div className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${pct}%`, background: data.color, opacity: 0.80 }} />
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
 
 // â"€â"€ Transaction Row â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
@@ -954,8 +879,8 @@ function QuickTemplatesBar({
                   paddingRight: 12,
                   transition: TRANSITION,
                 }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.borderColor = accentColor }}
-                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = 'var(--shadow-xs)'; e.currentTarget.style.borderColor = 'var(--border)' }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)' }}
+                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = 'var(--shadow-xs)' }}
               >
                 {/* Icon row */}
                 <div className="flex items-center gap-1.5">
@@ -1033,8 +958,8 @@ function TemplatePickerModal({
               onClick={() => { onSelect(t); onClose() }}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all"
               style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = t.color ?? 'var(--brand-200)')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-card)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-subtle)'; e.currentTarget.style.boxShadow = 'none' }}
             >
               <span className="text-xl shrink-0">{t.icon ?? (t.type === 'income' ? '↑' : '↓')}</span>
               <div className="flex-1 min-w-0">

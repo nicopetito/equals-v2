@@ -99,8 +99,6 @@ function relativeDateLabel(nextDate: string): string {
 
 type FormState = Partial<RecurringTransaction> & {
   end_date?: string
-  email_reminder?: boolean
-  reminder_email?: string
   active: boolean
   type: 'income' | 'expense'
 }
@@ -119,10 +117,11 @@ export default function ScheduledPage() {
   const [form, setForm]           = useState<FormState>({
     type: 'expense', currency: 'ARS', cadence: 'monthly',
     next_date: localDateStr(),
-    active: true, email_reminder: false,
+    active: true, email_reminder: true,
   })
   const [saving, setSaving]       = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [alreadyExecModal, setAlreadyExecModal] = useState<RecurringTransactionWithDetails | null>(null)
 
   const [filterType,   setFilterType]   = useState<'all' | 'income' | 'expense'>('all')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'paused' | 'due_soon'>('all')
@@ -170,10 +169,12 @@ export default function ScheduledPage() {
 
   function openCreate() {
     setEditing(null)
+    const today = localDateStr()
     setForm({
       type: 'expense', currency: 'ARS', cadence: 'monthly',
-      next_date: localDateStr(),
-      active: true, email_reminder: false,
+      next_date: today,
+      day_of_month: new Date(today).getDate(),
+      active: true, email_reminder: true,
     })
     setFormError(null)
     setModalOpen(true)
@@ -181,7 +182,7 @@ export default function ScheduledPage() {
 
   function openEdit(item: RecurringTransactionWithDetails) {
     setEditing(item)
-    setForm({ ...item, active: item.active ?? true, type: item.type, email_reminder: false })
+    setForm({ ...item, active: item.active ?? true, type: item.type })
     setFormError(null)
     setModalOpen(true)
   }
@@ -191,11 +192,15 @@ export default function ScheduledPage() {
       setFormError('Completá descripción y monto.')
       return
     }
+    if (!form.wallet_id) {
+      setFormError('La billetera es obligatoria para la ejecución automática.')
+      return
+    }
     setSaving(true)
     setFormError(null)
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { end_date: _ed, email_reminder: _er, reminder_email: _re, ...dbPayload } = form
+    const { end_date: _ed, ...dbPayload } = form
     const payload = { ...dbPayload, category_id: dbPayload.category_id || null, wallet_id: dbPayload.wallet_id || null }
 
     try {
@@ -246,17 +251,21 @@ export default function ScheduledPage() {
 
   const walletIds = useMemo(() => new Set((wallets ?? []).map(w => w.id!)), [wallets])
 
-  function handleExecute(item: RecurringTransactionWithDetails) {
-    if (item.wallet_id && !walletIds.has(item.wallet_id)) {
-      addToast('No se puede ejecutar: la billetera asignada ya no existe. Editá la operación para reasignar una billetera válida.', 'error')
+  async function handleExecute(item: RecurringTransactionWithDetails) {
+    if (!item.wallet_id) {
+      addToast('Asigná una billetera antes de ejecutar. Editá la operación.', 'error')
       return
     }
-    if (item.wallet_id) {
-      doExecute(item, item.wallet_id)
-    } else {
-      setExecWalletId(wallets[0]?.id ?? '')
-      setExecModal({ item })
+    if (!walletIds.has(item.wallet_id)) {
+      addToast('La billetera asignada ya no existe. Editá la operación para reasignar una válida.', 'error')
+      return
     }
+    const alreadyDone = await recurringService.wasExecutedToday(item.id!)
+    if (alreadyDone) {
+      setAlreadyExecModal(item)
+      return
+    }
+    doExecute(item, item.wallet_id)
   }
 
   async function handleDelete(item: RecurringTransactionWithDetails) {
@@ -439,6 +448,22 @@ export default function ScheduledPage() {
         </div>
       </Modal>
 
+      {/* ─── Modal: ya ejecutada hoy ─── */}
+      <Modal open={!!alreadyExecModal} onClose={() => setAlreadyExecModal(null)} title="Operación ya ejecutada hoy">
+        <div className="space-y-4">
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            <strong>{alreadyExecModal?.description}</strong> ya fue ejecutada automáticamente hoy. Ejecutarla de nuevo creará una segunda transacción del mismo tipo.
+          </p>
+          <div className="flex gap-3 pt-1">
+            <Button variant="secondary" onClick={() => setAlreadyExecModal(null)} className="flex-1">Cancelar</Button>
+            <Button onClick={() => {
+              if (alreadyExecModal?.wallet_id) doExecute(alreadyExecModal, alreadyExecModal.wallet_id)
+              setAlreadyExecModal(null)
+            }} className="flex-1">Ejecutar igual</Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* ─── Modal ─── */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Editar operación' : 'Nueva operación programada'}>
         <div className="space-y-4">
@@ -470,26 +495,29 @@ export default function ScheduledPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <Select label="Frecuencia" value={form.cadence ?? 'monthly'} onChange={e => setForm(f => ({ ...f, cadence: e.target.value as RecurringTransaction['cadence'] }))} options={cadenceOptions} />
-            <Input label="Próxima fecha" type="date" value={form.next_date ?? ''} onChange={e => setForm(f => ({ ...f, next_date: e.target.value }))} />
+            <Input label="Próxima fecha" type="date" value={form.next_date ?? ''} onChange={e => {
+            const d = e.target.value
+            setForm(f => ({ ...f, next_date: d, day_of_month: d ? new Date(d + 'T12:00:00').getDate() : f.day_of_month }))
+          }} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <Select label="Categoría (opcional)" value={form.category_id ?? ''} onChange={e => setForm(f => ({ ...f, category_id: e.target.value || null }))} options={categoryOptions} />
-            <Select label="Billetera (opcional)" value={form.wallet_id ?? ''} onChange={e => setForm(f => ({ ...f, wallet_id: e.target.value || null }))} options={walletOptions} />
+            <Select label="Billetera *" value={form.wallet_id ?? ''} onChange={e => setForm(f => ({ ...f, wallet_id: e.target.value || null }))} options={walletOptions} />
           </div>
 
           <Input label="Fecha de finalización (opcional)" type="date" value={form.end_date ?? ''} onChange={e => setForm(f => ({ ...f, end_date: e.target.value || undefined }))} />
 
-          {/* Toggle recordatorio */}
+          {/* Toggle notificaciones por mail */}
           <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-light)', borderRadius: '12px', padding: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Mail size={13} style={{ color: 'var(--sky-500)', flexShrink: 0 }} />
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>Recordatorio por mail</span>
+                  <Mail size={13} style={{ color: form.email_reminder ? 'var(--sky-500)' : 'var(--text-faint)', flexShrink: 0 }} />
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>Notificaciones por mail</span>
                 </div>
                 <span style={{ fontSize: '11px', color: 'var(--text-faint)', paddingLeft: '19px' }}>
-                  Te avisaremos antes de la ejecución
+                  {form.email_reminder ? 'Recibirás confirmación automática al ejecutarse' : 'Silenciado — no se enviarán mails'}
                 </span>
               </div>
               <button type="button" onClick={() => setForm(f => ({ ...f, email_reminder: !f.email_reminder }))}
@@ -497,11 +525,6 @@ export default function ScheduledPage() {
                 <span style={{ position: 'absolute', top: '2px', left: form.email_reminder ? '18px' : '2px', width: '16px', height: '16px', borderRadius: '50%', background: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.2s ease', display: 'block', pointerEvents: 'none' }} />
               </button>
             </div>
-            {form.email_reminder && (
-              <div style={{ marginTop: '10px' }}>
-                <Input label="Email de recordatorio" type="email" value={form.reminder_email ?? ''} onChange={e => setForm(f => ({ ...f, reminder_email: e.target.value }))} placeholder="tu@email.com" />
-              </div>
-            )}
           </div>
 
           <div className="flex items-center justify-between">

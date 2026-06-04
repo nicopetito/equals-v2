@@ -1,4 +1,4 @@
-import { parseISO, addDays, addMonths, addYears, format } from 'date-fns'
+import { parseISO, addDays, getDaysInMonth, format } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import { safeNumber } from '@/utils/format'
 import { transactionsService } from './transactions.service'
@@ -13,19 +13,20 @@ async function getUserId(): Promise<string | null> {
   return data.user?.id ?? null
 }
 
-function nextDateAfter(current: string, cadence: RecurringCadence): string {
+function nextDateAfter(current: string, cadence: RecurringCadence, dayOfMonth?: number | null): string {
   const d = parseISO(current)
-  let next: Date
-  switch (cadence) {
-    case 'daily':     next = addDays(d, 1);    break
-    case 'weekly':    next = addDays(d, 7);    break
-    case 'biweekly':  next = addDays(d, 14);   break
-    case 'monthly':   next = addMonths(d, 1);  break
-    case 'quarterly': next = addMonths(d, 3);  break
-    case 'yearly':    next = addYears(d, 1);   break
-    default:          next = addMonths(d, 1)
-  }
-  return next.toISOString().split('T')[0]
+  const dom = dayOfMonth ?? d.getDate()
+
+  if (cadence === 'daily')    return addDays(d, 1).toISOString().split('T')[0]
+  if (cadence === 'weekly')   return addDays(d, 7).toISOString().split('T')[0]
+  if (cadence === 'biweekly') return addDays(d, 14).toISOString().split('T')[0]
+
+  // For month/quarter/year: advance to the target month then clamp day to month length
+  const monthsToAdd = cadence === 'quarterly' ? 3 : cadence === 'yearly' ? 12 : 1
+  const targetMonth = new Date(d.getFullYear(), d.getMonth() + monthsToAdd, 1)
+  const clamped     = Math.min(dom, getDaysInMonth(targetMonth))
+  return new Date(targetMonth.getFullYear(), targetMonth.getMonth(), clamped)
+    .toISOString().split('T')[0]
 }
 
 export const recurringService = {
@@ -136,8 +137,23 @@ export const recurringService = {
       recurring_id: item.id ?? null,
       notes:        null,
     })
-    const next = nextDateAfter(item.next_date, item.cadence)
+    const next = nextDateAfter(item.next_date, item.cadence, item.day_of_month)
     await recurringService.update(item.id!, { next_date: next })
+  },
+
+  async wasExecutedToday(recurringId: string): Promise<boolean> {
+    const supabase = getSupabase()
+    const user_id = await getUserId()
+    if (!user_id) return false
+    const today = new Date().toISOString().split('T')[0]
+    const { data } = await supabase
+      .from('transactions')
+      .select('id')
+      .eq('recurring_id', recurringId)
+      .eq('date', today)
+      .eq('user_id', user_id)
+      .maybeSingle()
+    return !!data
   },
 
   async executeAtomic(recurringId: string, walletId: string): Promise<{ transaction_id: string; next_date: string }> {

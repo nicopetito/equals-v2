@@ -611,14 +611,6 @@ function TransactionsPageInner() {
                 color: 'var(--text-primary)',
                 boxShadow: 'var(--shadow-xs)',
               }}
-              onMouseEnter={e => {
-                if (document.activeElement !== e.currentTarget)
-                  e.currentTarget.style.borderColor = 'var(--text-faint)'
-              }}
-              onMouseLeave={e => {
-                if (document.activeElement !== e.currentTarget)
-                  e.currentTarget.style.borderColor = 'var(--border)'
-              }}
               onFocus={e => {
                 e.currentTarget.style.borderColor = 'var(--brand-400)'
                 e.currentTarget.style.boxShadow = '0 0 0 3px rgba(109,59,215,0.10), var(--shadow-xs)'
@@ -802,8 +794,8 @@ function TransactionsPageInner() {
                   onClick={() => setShowLabelDropdown(v => !v)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150"
                   style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand-400)'; e.currentTarget.style.color = 'var(--brand-500)' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--brand-50)'; e.currentTarget.style.color = 'var(--brand-500)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-subtle)'; e.currentTarget.style.color = 'var(--text-muted)' }}
                 >
                   <Tag size={12} />
                   Asignar etiqueta

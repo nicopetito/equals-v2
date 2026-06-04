@@ -87,7 +87,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
               padding: '0 0 0',
               pointerEvents: 'none',
             }}
-            className="sm:items-center sm:px-4 sm:pt-4 sm:pb-16"
+            className="sm:items-center sm:px-4 sm:py-8"
           >
             <motion.div
               key="modal-panel"
@@ -101,7 +101,9 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
                 SIZES[size]
               )}
               style={{
-                maxHeight: 'calc(92vh - env(safe-area-inset-bottom,0px))',
+                maxHeight: isMobile
+                  ? 'calc(92vh - env(safe-area-inset-bottom,0px))'
+                  : 'calc(100vh - 4rem)',
                 overflow: 'hidden',
                 pointerEvents: 'auto',
                 background: 'rgba(255, 255, 255, 0.97)',

@@ -187,14 +187,12 @@ export default function CategoriesPage() {
                 boxShadow:   'var(--shadow-xs)',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.transform    = 'translateY(-1px)'
-                e.currentTarget.style.boxShadow   = 'var(--shadow-sm)'
-                e.currentTarget.style.borderColor = `${c}38`
+                e.currentTarget.style.transform  = 'translateY(-1px)'
+                e.currentTarget.style.boxShadow  = 'var(--shadow-md)'
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.transform    = 'translateY(0)'
-                e.currentTarget.style.boxShadow   = 'var(--shadow-xs)'
-                e.currentTarget.style.borderColor = 'var(--border)'
+                e.currentTarget.style.transform  = 'translateY(0)'
+                e.currentTarget.style.boxShadow  = 'var(--shadow-xs)'
               }}
             >
               {/* Icon */}
