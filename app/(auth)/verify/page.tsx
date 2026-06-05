@@ -29,11 +29,11 @@ function VerifyContent() {
   }, [resendCooldown])
 
   useEffect(() => {
-    if (otp.length === 4) handleVerify()
+    if (otp.length === 6) handleVerify()
   }, [otp])
 
   async function handleVerify() {
-    if (!email || otp.length < 4) return
+    if (!email || otp.length < 6) return
     setLoading(true)
     setError(null)
     try {
@@ -95,7 +95,7 @@ function VerifyContent() {
             Verificá tu email
           </h1>
           <p className="mt-1.5 text-base" style={{ color: 'var(--text-muted)' }}>
-            Ingresá el código de 4 dígitos que enviamos a{' '}
+            Ingresá el código de 6 dígitos que enviamos a{' '}
             {email
               ? <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{email}</span>
               : 'tu email'
@@ -133,7 +133,7 @@ function VerifyContent() {
           <Button
             onClick={handleVerify}
             loading={loading}
-            disabled={otp.length < 4}
+            disabled={otp.length < 6}
             className="w-full"
             size="lg"
           >

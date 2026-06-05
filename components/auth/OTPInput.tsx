@@ -9,8 +9,12 @@ interface OTPInputProps {
   error?: boolean
 }
 
+const OTP_LENGTH = 6
+
 export function OTPInput({ value, onChange, disabled, error }: OTPInputProps) {
   const refs = [
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
     useRef<HTMLInputElement>(null),
     useRef<HTMLInputElement>(null),
     useRef<HTMLInputElement>(null),
@@ -18,18 +22,18 @@ export function OTPInput({ value, onChange, disabled, error }: OTPInputProps) {
   ]
 
   useEffect(() => {
-    const firstEmpty = value.length < 4 ? value.length : 3
+    const firstEmpty = value.length < OTP_LENGTH ? value.length : OTP_LENGTH - 1
     refs[firstEmpty]?.current?.focus()
   }, [])  // solo al montar
 
-  const digits = value.padEnd(4, '').split('').slice(0, 4)
+  const digits = value.padEnd(OTP_LENGTH, '').split('').slice(0, OTP_LENGTH)
 
   function handleChange(index: number, char: string) {
     const digit = char.replace(/[^0-9]/g, '').slice(-1)
     const arr = digits.map((d, i) => (i === index ? digit : d))
     const newVal = arr.join('').replace(/ /g, '')
     onChange(newVal)
-    if (digit && index < 3) {
+    if (digit && index < OTP_LENGTH - 1) {
       refs[index + 1]?.current?.focus()
     }
   }
@@ -46,16 +50,16 @@ export function OTPInput({ value, onChange, disabled, error }: OTPInputProps) {
       }
     } else if (e.key === 'ArrowLeft' && index > 0) {
       refs[index - 1]?.current?.focus()
-    } else if (e.key === 'ArrowRight' && index < 3) {
+    } else if (e.key === 'ArrowRight' && index < OTP_LENGTH - 1) {
       refs[index + 1]?.current?.focus()
     }
   }
 
   function handlePaste(e: ClipboardEvent<HTMLInputElement>) {
     e.preventDefault()
-    const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, 4)
+    const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, OTP_LENGTH)
     onChange(pasted)
-    const focusIdx = Math.min(pasted.length, 3)
+    const focusIdx = Math.min(pasted.length, OTP_LENGTH - 1)
     refs[focusIdx]?.current?.focus()
   }
 
@@ -81,7 +85,7 @@ export function OTPInput({ value, onChange, disabled, error }: OTPInputProps) {
           onKeyDown={e => handleKeyDown(i, e)}
           onPaste={i === 0 ? handlePaste : undefined}
           disabled={disabled}
-          aria-label={`Dígito ${i + 1} de 4`}
+          aria-label={`Dígito ${i + 1} de ${OTP_LENGTH}`}
           className={`w-14 h-14 text-2xl font-bold text-center rounded-xl border transition-all duration-150 outline-none ${focusRingClass} disabled:opacity-50`}
           style={{
             background: 'var(--bg-card)',
