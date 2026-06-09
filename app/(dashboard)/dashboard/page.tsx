@@ -1,20 +1,22 @@
 ﻿'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   TrendingUp, TrendingDown, Wallet, ArrowUpRight, Plus,
   FileText, Sparkles, ChevronLeft, ChevronRight, BarChart2,
-  Zap, RotateCcw, AlertTriangle, Tag, ChevronDown,
+  Zap, RotateCcw, AlertTriangle, Tag, ChevronDown, Clock, Archive,
 } from 'lucide-react'
 import { HelpButton } from '@/components/help/HelpButton'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useWallets } from '@/hooks/useWallets'
 import { useCategories } from '@/hooks/useCategories'
 import { usePendingRefunds } from '@/hooks/useRefunds'
+import { usePendingPaymentsSummary } from '@/hooks/usePendingPayments'
 import { useTransactionTemplates } from '@/hooks/useTransactionTemplates'
 import { useGoals } from '@/hooks/useGoals'
 import { useFixedTerms } from '@/hooks/useFixedTerms'
+import { useReservations } from '@/hooks/useReservations'
 import { transactionsService } from '@/services/transactions.service'
 import { refundService } from '@/services/refund.service'
 import { calculateRefundAmount } from '@/utils/refund'
@@ -29,7 +31,10 @@ import { NewTransactionModal } from '@/components/transactions/NewTransactionMod
 import { TemplateConfirmModal } from '@/components/transactions/TemplateConfirmModal'
 import { seedDemoData } from '@/utils/seed'
 import { formatCurrency, plural } from '@/utils/format'
-import { calculateNetWorth, calculateSavingsMetrics } from '@/utils/finance'
+import { calculateNetWorth, calculateSavingsMetrics, calculateYieldForPeriod } from '@/utils/finance'
+import { INTERNAL_LABELS } from '@/utils/constants'
+import { YieldBanner } from '@/components/ui/YieldBanner'
+import { useYieldCalculator } from '@/hooks/useYieldCalculator'
 import { format } from 'date-fns'
 import { formatDateSmart, getDateRangeForPeriod, PERIOD_OPTIONS, type Period } from '@/utils/date'
 import type { TransactionWithDetails, Currency, TransactionTemplate } from '@/types'
@@ -75,6 +80,8 @@ export default function DashboardPage() {
   const [newTxOpen, setNewTxOpen]                   = useState(false)
   const router = useRouter()
   const { addToast } = useToast()
+  const { calculatePendingYields, formatYieldToast } = useYieldCalculator()
+  const hasCalculatedYields = useRef(false)
 
   const { data: allTransactions, loading: txLoading, refetch: refetchTx }   = useTransactions()
   const { data: wallets, loading: walletsLoading, refetch: refetchWallets } = useWallets()
@@ -85,8 +92,21 @@ export default function DashboardPage() {
     loading: templatesLoading,
   } = useTransactionTemplates()
 
-  const { data: goals }       = useGoals()
-  const { items: fixedTerms } = useFixedTerms()
+  const { data: goals }        = useGoals()
+  const { items: fixedTerms }  = useFixedTerms()
+  const { data: reservations } = useReservations()
+  const { summary: pendingSummary } = usePendingPaymentsSummary()
+
+  // Auto-cálculo de rendimientos al cargar el dashboard (idempotente por RPC)
+  useEffect(() => {
+    if (!wallets.length || hasCalculatedYields.current) return
+    hasCalculatedYields.current = true
+    calculatePendingYields(wallets).then(results => {
+      results.forEach(r => addToast(formatYieldToast(r), 'success'))
+      if (results.length > 0) { refetchTx(); refetchWallets() }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wallets.length])
 
   async function handleSeed() {
     setSeeding(true)
@@ -163,10 +183,20 @@ export default function DashboardPage() {
     filtered.filter(t => !!(t.wallet_id && walletIds.has(t.wallet_id))),
     [filtered, walletIds])
 
+  // Excluir transferencias internas, ajustes y saldo inicial de los KPIs de ingresos/gastos.
+  // El filtro por category_name cubre transacciones históricas sin label.
+  const kpiFilteredClean = useMemo(
+    () => kpiFiltered.filter(t =>
+      !(t.label && INTERNAL_LABELS.has(t.label)) &&
+      t.category_name !== 'Saldo inicial'
+    ),
+    [kpiFiltered]
+  )
+
   const stats = useMemo(() => {
     if (currency === 'all') {
       const byCurrency: Record<string, { income: number; expenses: number; balance: number }> = {}
-      kpiFiltered.forEach(t => {
+      kpiFilteredClean.forEach(t => {
         if (!byCurrency[t.currency]) byCurrency[t.currency] = { income: 0, expenses: 0, balance: 0 }
         if (t.type === 'income') byCurrency[t.currency].income += t.amount
         else byCurrency[t.currency].expenses += t.amount
@@ -175,13 +205,23 @@ export default function DashboardPage() {
       if (!Object.keys(byCurrency).length) return { byCurrency: null, single: { income: 0, expenses: 0, balance: 0 } }
       return { byCurrency, single: null }
     }
-    const income   = kpiFiltered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-    const expenses = kpiFiltered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+    const income   = kpiFilteredClean.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+    const expenses = kpiFilteredClean.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
     return { byCurrency: null, single: { income, expenses, balance: income - expenses } }
-  }, [kpiFiltered, currency])
+  }, [kpiFilteredClean, currency])
 
-  const savingsMetrics = useMemo(() => calculateSavingsMetrics(kpiFiltered), [kpiFiltered])
+  const savingsMetrics = useMemo(() => calculateSavingsMetrics(kpiFilteredClean), [kpiFilteredClean])
   const savingsRate    = savingsMetrics.savingsRate
+
+  const yieldTotal = useMemo(() => calculateYieldForPeriod(kpiFilteredClean), [kpiFilteredClean])
+
+  const yieldRows = useMemo(() => {
+    const byCurrency: Record<string, number> = {}
+    kpiFilteredClean.filter(tx => tx.subtype === 'yield').forEach(tx => {
+      byCurrency[tx.currency] = (byCurrency[tx.currency] ?? 0) + tx.amount
+    })
+    return Object.entries(byCurrency).map(([curr, value]) => ({ curr, value }))
+  }, [kpiFilteredClean])
 
   const walletByCurrency = useMemo(() =>
     wallets.reduce<Record<string, number>>((acc, w) => {
@@ -205,10 +245,21 @@ export default function DashboardPage() {
   }, [allTransactions, txLoading])
 
   const netWorth = useMemo(
-    () => calculateNetWorth(wallets, goals, fixedTerms),
-    [wallets, goals, fixedTerms]
+    () => calculateNetWorth(wallets, goals, fixedTerms, reservations),
+    [wallets, goals, fixedTerms, reservations]
   )
-  const hasNonLiquid = Object.values(netWorth).some(v => v.goals > 0 || v.investments > 0)
+  const hasNonLiquid = Object.values(netWorth).some(v => v.goals > 0 || v.investments > 0 || v.reserved > 0)
+
+  // Totales de reservas por moneda para mostrar en el balance card
+  const reservedByCurrency = useMemo(
+    () => reservations.reduce<Record<string, number>>((acc, r) => {
+      if (r.status === 'active' && r.amount > 0) {
+        acc[r.currency] = (acc[r.currency] ?? 0) + r.amount
+      }
+      return acc
+    }, {}),
+    [reservations]
+  )
 
   const recentTx = useMemo(
     () => [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 4),
@@ -226,6 +277,10 @@ export default function DashboardPage() {
 
   return (
     <div className="p-5 md:p-7 max-w-5xl mx-auto space-y-4">
+
+      {wallets.length > 0 && (
+        <YieldBanner onConfigure={() => router.push('/wallets')} />
+      )}
 
       {/* â"€â"€ HEADER â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
       <div className="enter-1 hero-animated rounded-3xl px-4 py-4 sm:px-6 sm:py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative overflow-hidden"
@@ -464,6 +519,27 @@ export default function DashboardPage() {
                   <span className="text-[10px] text-white/50">ahorro</span>
                 </div>
               )}
+              {Object.keys(reservedByCurrency).length > 0 && (
+                <div className="w-full relative z-10 mt-1 pt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5"
+                  style={{ borderTop: '1px solid rgba(255,255,255,0.12)' }}>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Archive size={10} className="text-white/50" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">Reservado</span>
+                  </div>
+                  {Object.entries(reservedByCurrency).map(([curr, amount]) => (
+                    <div key={curr} className="flex items-center gap-2 rounded-xl px-3 py-1.5"
+                      style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                        style={{ background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.65)' }}>
+                        {curr}
+                      </span>
+                      <AnimatedAmount value={amount} currency={curr}
+                        className="text-sm font-extrabold tabular-nums text-white"
+                        style={{ fontFamily: 'var(--font-sora)', letterSpacing: '-0.01em' }} />
+                    </div>
+                  ))}
+                </div>
+              )}
               {hasNonLiquid && (
                 <div className="w-full relative z-10 mt-1 pt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5"
                   style={{ borderTop: '1px solid rgba(255,255,255,0.12)' }}>
@@ -488,7 +564,7 @@ export default function DashboardPage() {
           {/* KPIs */}
           {summaryRows.length > 0 && (
             <motion.div
-              className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+              className={`grid gap-3 ${yieldRows.length > 0 ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}
               variants={staggerContainer}
               initial="hidden"
               animate="visible"
@@ -496,6 +572,9 @@ export default function DashboardPage() {
               <motion.div variants={staggerItem}><KpiCard label="Ingresos"     icon={TrendingUp}   accent="var(--income-500)" rows={summaryRows.map(r => ({ curr: r.curr, value: r.income }))} /></motion.div>
               <motion.div variants={staggerItem}><KpiCard label="Gastos"       icon={TrendingDown}  accent="var(--expense-500)" rows={summaryRows.map(r => ({ curr: r.curr, value: r.expenses }))} /></motion.div>
               <motion.div variants={staggerItem}><KpiCard label="Balance neto" tooltip="Ingresás menos Gastás en el período. El saldo total de tus billeteras está disponible en el inicio." icon={Wallet} accent="var(--brand-500)" rows={summaryRows.map(r => ({ curr: r.curr, value: r.balance, signed: true }))} /></motion.div>
+              {yieldRows.length > 0 && (
+                <motion.div variants={staggerItem}><KpiCard label="Rendimientos" tooltip="Rendimientos estimados acreditados en el período. Los montos son estimados." icon={TrendingUp} accent="#6d3bd7" rows={yieldRows} /></motion.div>
+              )}
             </motion.div>
           )}
 
@@ -519,6 +598,53 @@ export default function DashboardPage() {
       </div>
 
       {/* â"€â"€ BILLETERAS â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
+      {/* ── PAGOS PENDIENTES ── */}
+      {!loading && pendingSummary.count > 0 && (
+        <div
+          className="glass-card rounded-2xl px-4 py-3 flex items-center justify-between gap-3"
+          style={{ boxShadow: CARD_SHADOW, border: CARD_BORDER }}
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: 'rgba(109,59,215,0.09)', border: '1px solid rgba(109,59,215,0.16)' }}>
+              <Clock size={14} style={{ color: 'var(--brand-500)' }} />
+            </div>
+            <div>
+              <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+                Pagos pendientes
+              </p>
+              <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                {pendingSummary.receivable > 0 && (
+                  <span style={{ color: 'var(--income-600)' }}>
+                    +{formatCurrency(pendingSummary.receivable, 'ARS')} a cobrar
+                  </span>
+                )}
+                {pendingSummary.receivable > 0 && pendingSummary.payable > 0 && ' · '}
+                {pendingSummary.payable > 0 && (
+                  <span style={{ color: 'var(--expense-600)' }}>
+                    -{formatCurrency(pendingSummary.payable, 'ARS')} a pagar
+                  </span>
+                )}
+                {pendingSummary.overdue > 0 && (
+                  <span style={{ color: '#DC2626' }}>
+                    {' '}· {pendingSummary.overdue} vencido{pendingSummary.overdue !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push('/pending')}
+            className="text-xs font-semibold px-3 py-1.5 rounded-xl transition-all shrink-0"
+            style={{ color: 'var(--brand-500)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--brand-50)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          >
+            Ver todos
+          </button>
+        </div>
+      )}
+
       {/* ── REINTEGROS PENDIENTES ── */}
       {!loading && pendingRefunds.length > 0 && (
         <div

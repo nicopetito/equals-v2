@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { cn } from '@/lib/utils'
-import { modalOverlay, modalContent, modalSheet } from '@/utils/animations'
+import { modalOverlay, modalContent } from '@/utils/animations'
 
 interface ModalProps {
   open: boolean
@@ -15,23 +15,13 @@ interface ModalProps {
   size?: 'sm' | 'md' | 'lg'
 }
 
-const SIZES = { sm: 'sm:max-w-md', md: 'sm:max-w-lg', lg: 'sm:max-w-2xl' }
+const SIZES = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl' }
 
 export function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
   const [mounted, setMounted] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMounted(true) }, [])
-
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 639px)')
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsMobile(mq.matches)
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [])
 
   // Escape key
   useEffect(() => {
@@ -73,7 +63,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
             }}
           />
 
-          {/* ── Modal container — bottom-sheet en mobile, centrado en sm+ ── */}
+          {/* ── Modal container — siempre centrado ── */}
           <div
             style={{
               position: 'fixed',
@@ -82,28 +72,25 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
               height: '100vh',
               zIndex: 9999,
               display: 'flex',
-              alignItems: 'flex-end',
+              alignItems: 'center',
               justifyContent: 'center',
-              padding: '0 0 0',
+              padding: '1rem',
               pointerEvents: 'none',
             }}
-            className="sm:items-center sm:px-4 sm:py-8"
           >
             <motion.div
               key="modal-panel"
-              variants={isMobile ? modalSheet : modalContent}
+              variants={modalContent}
               initial="hidden"
               animate="visible"
               exit="exit"
               className={cn(
                 'relative w-full flex flex-col',
-                'rounded-t-2xl rounded-b-none sm:rounded-xl',
+                'rounded-2xl',
                 SIZES[size]
               )}
               style={{
-                maxHeight: isMobile
-                  ? 'calc(92vh - env(safe-area-inset-bottom,0px))'
-                  : 'calc(100vh - 4rem)',
+                maxHeight: 'calc(100vh - 2rem)',
                 overflow: 'hidden',
                 pointerEvents: 'auto',
                 background: 'rgba(255, 255, 255, 0.97)',
@@ -111,11 +98,6 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
                 boxShadow: '0 24px 70px rgba(15, 23, 42, 0.14), 0 4px 16px rgba(15, 23, 42, 0.06)',
               }}
             >
-              {/* Handle bar — solo mobile */}
-              <div className="flex justify-center pt-3 pb-1 sm:hidden">
-                <div className="w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
-              </div>
-
               {title && (
                 <div
                   className="flex items-center justify-between px-5 py-3 shrink-0"
@@ -156,8 +138,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
               )}
 
               <div
-                className="flex-1 overflow-y-auto p-4 sm:p-5"
-                style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom,0px))' }}
+                className="flex-1 overflow-y-auto p-5"
               >
                 {children}
               </div>

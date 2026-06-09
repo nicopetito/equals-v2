@@ -3,6 +3,7 @@
 import { createContext, useEffect, useState, type ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { authService } from '@/services/auth.service'
+import { categoriesService } from '@/services/categories.service'
 
 interface AuthContextValue {
   user: User | null
@@ -26,9 +27,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     })
 
-    const { data: { subscription } } = authService.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = authService.onAuthStateChange((event, session) => {
       const s = session as { user?: User } | null
       setUser(s?.user ?? null)
+
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && s?.user) {
+        categoriesService.ensureDefaultCategories().catch(() => {})
+      }
     })
 
     return () => subscription.unsubscribe()

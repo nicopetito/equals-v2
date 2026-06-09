@@ -88,3 +88,9 @@ All visual tokens are CSS variables in `app/globals.css`:
 
 ### Auth
 `AuthProvider` wraps the whole app and exposes `useAuth()` → `{ user, loading, signIn, signUp, signOut }`. Services call `getSupabase().auth.getUser()` directly rather than reading from context, so they work outside React trees.
+
+## Running the dev server
+Always run `npm run dev` with `run_in_background: true` in the Bash tool.
+After starting, use the Monitor tool to stream output until the "Ready" message appears (~3–5 seconds).
+Never run `npm run dev` in the foreground — it is a blocking process that never exits.
+Use `npm run dev:clean` only when there are stale build artifacts causing errors.

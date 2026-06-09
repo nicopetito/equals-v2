@@ -5,6 +5,11 @@ export interface Wallet {
   provider?: string
   currency?: string
   balance?: number
+  generates_yield?: boolean
+  yield_mode?: 'estimated' | 'manual'
+  annual_yield_rate?: number | null
+  yield_frequency?: 'daily' | 'business_days'
+  last_yield_calculated_at?: string | null
   created_at?: string
   updated_at?: string
 }
@@ -14,6 +19,7 @@ export interface WalletWithBalance extends Wallet {
   transaction_total: number
   current_balance: number
   transaction_count: number
+  yield_month_total?: number
 }
 
 export interface WalletDiagnostic {

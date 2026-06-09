@@ -1,11 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Plus, Pencil, Trash2, CreditCard, TrendingUp, Wifi, SlidersHorizontal, Stethoscope } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, Pencil, Trash2, CreditCard, TrendingUp, Wifi, SlidersHorizontal, Stethoscope, RotateCcw, History } from 'lucide-react'
 import { useWallets } from '@/hooks/useWallets'
 import { walletsService } from '@/services/wallets.service'
-import { transactionsService } from '@/services/transactions.service'
-import { categoriesService } from '@/services/categories.service'
 import { useToast } from '@/components/providers/ToastProvider'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -14,6 +12,12 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { DiagnosticModal } from '@/components/wallets/DiagnosticModal'
+import { WalletAdjustmentModal } from '@/components/wallets/WalletAdjustmentModal'
+import { YieldConfigModal } from '@/components/wallets/YieldConfigModal'
+import { YieldHistoryModal } from '@/components/wallets/YieldHistoryModal'
+import { YieldCorrectionModal } from '@/components/wallets/YieldCorrectionModal'
+import { YieldBanner } from '@/components/ui/YieldBanner'
+import { useYieldCalculator } from '@/hooks/useYieldCalculator'
 import { formatCurrency, plural } from '@/utils/format'
 import { WALLET_PROVIDERS } from '@/types'
 import type { Wallet as WalletType, WalletWithBalance, Currency } from '@/types'
@@ -150,6 +154,8 @@ function saveMeta(id: string, meta: WalletMeta) {
 export default function WalletsPage() {
   const { data: wallets, loading, refetch } = useWallets()
   const { addToast } = useToast()
+  const { calculatePendingYields, formatYieldToast } = useYieldCalculator()
+  const hasCalculatedYields = useRef(false)
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing]     = useState<WalletType | null>(null)
@@ -163,13 +169,14 @@ export default function WalletsPage() {
   } | null>(null)
   const [error, setError]         = useState<string | null>(null)
 
-  const [reconcileOpen, setReconcileOpen]     = useState(false)
-  const [reconcileWallet, setReconcileWallet] = useState<WalletWithBalance | null>(null)
-  const [reconcileTarget, setReconcileTarget] = useState('')
-  const [reconcileMode, setReconcileMode]     = useState<'fix_initial' | 'adjustment'>('fix_initial')
-  const [reconciling, setReconciling]         = useState(false)
+  const [adjustOpen, setAdjustOpen]     = useState(false)
+  const [adjustWallet, setAdjustWallet] = useState<WalletWithBalance | null>(null)
 
   const [diagnosticOpen, setDiagnosticOpen] = useState(false)
+
+  const [yieldConfigTarget, setYieldConfigTarget]       = useState<WalletWithBalance | null>(null)
+  const [yieldHistoryTarget, setYieldHistoryTarget]     = useState<WalletWithBalance | null>(null)
+  const [yieldCorrectionTarget, setYieldCorrectionTarget] = useState<WalletWithBalance | null>(null)
 
   useEffect(() => {
     if (!wallets.length) return
@@ -178,6 +185,18 @@ export default function WalletsPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMetas(loaded)
   }, [wallets])
+
+  // Auto-cálculo de rendimientos al cargar billeteras (idempotente por diseño del RPC)
+  useEffect(() => {
+    if (!wallets.length || hasCalculatedYields.current) return
+    hasCalculatedYields.current = true
+
+    calculatePendingYields(wallets).then(results => {
+      results.forEach(r => addToast(formatYieldToast(r), 'success'))
+      if (results.length > 0) refetch()
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wallets.length])
 
   function openCreate() {
     setEditing(null)
@@ -200,7 +219,9 @@ export default function WalletsPage() {
     setSaving(true); setError(null)
     try {
       if (editing?.id) {
-        await walletsService.update(editing.id, form as Partial<WalletType>)
+        // Strip WalletWithBalance-only computed fields that don't exist in the wallets table
+        const { initial_balance: _ib, transaction_total: _tt, current_balance: _cb, transaction_count: _tc, yield_month_total: _ymt, ...walletFields } = form as Record<string, unknown>
+        await walletsService.update(editing.id, walletFields as Partial<WalletType>)
         saveMeta(editing.id, formMeta)
         addToast('Billetera actualizada correctamente', 'success')
       } else {
@@ -218,50 +239,9 @@ export default function WalletsPage() {
     } finally { setSaving(false) }
   }
 
-  function openReconcile(w: WalletWithBalance) {
-    setReconcileWallet(w)
-    setReconcileTarget(String(w.current_balance ?? 0))
-    setReconcileMode('fix_initial')
-    setReconcileOpen(true)
-  }
-
-  async function handleReconcile() {
-    if (!reconcileWallet?.id) return
-    const target = parseFloat(reconcileTarget)
-    if (isNaN(target)) return
-    const diff = target - (reconcileWallet.current_balance ?? 0)
-    if (diff === 0) return
-    setReconciling(true)
-    try {
-      const currency = (reconcileWallet.currency ?? 'ARS') as Currency
-      if (reconcileMode === 'fix_initial') {
-        await walletsService.fixInitialBalance(
-          reconcileWallet.id,
-          target,
-          currency,
-          reconcileWallet.transaction_total ?? 0,
-          reconcileWallet.initial_balance ?? 0,
-        )
-      } else {
-        const type = diff > 0 ? 'income' : 'expense'
-        const categoryId = await categoriesService.getOrCreateAjusteCategory(type)
-        await transactionsService.create({
-          type,
-          amount: Math.abs(diff),
-          currency,
-          description: 'Ajuste de conciliación',
-          wallet_id: reconcileWallet.id,
-          category_id: categoryId,
-          date: new Date().toISOString().slice(0, 10),
-          is_recurring: false,
-        })
-      }
-      addToast(`Saldo de "${reconcileWallet.name}" conciliado`, 'success')
-      setReconcileOpen(false)
-      refetch()
-    } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Error al conciliar la billetera', 'error')
-    } finally { setReconciling(false) }
+  function openAdjust(w: WalletWithBalance) {
+    setAdjustWallet(w)
+    setAdjustOpen(true)
   }
 
   async function handleDeleteClick(id: string, name: string) {
@@ -304,6 +284,11 @@ export default function WalletsPage() {
 
   return (
     <div className="p-5 md:p-7 max-w-5xl mx-auto space-y-5 animate-fade-in">
+
+      <YieldBanner onConfigure={() => {
+        const first = wallets[0]
+        if (first) setYieldConfigTarget(first)
+      }} />
 
       {/* Compact row header */}
       <div
@@ -445,14 +430,57 @@ export default function WalletsPage() {
                 {/* Top row: chip + badge + actions */}
                 <div className="relative flex items-start justify-between mb-4">
                   <CardChip color={theme.chip} />
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
                     <span
                       className="text-xs font-extrabold px-2 py-0.5 rounded-full"
                       style={{ background: 'rgba(255,255,255,0.18)', color: 'white' }}
                     >
                       {curr}
                     </span>
+                    {wallet.generates_yield && (
+                      <span
+                        className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5"
+                        style={{ background: 'rgba(255,255,255,0.18)', color: 'white' }}
+                      >
+                        <TrendingUp size={9} />
+                        {wallet.annual_yield_rate ? `${Number(wallet.annual_yield_rate).toFixed(0)}% TNA` : 'Rinde'}
+                      </span>
+                    )}
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-200">
+                      <button
+                        onClick={() => setYieldConfigTarget(wallet)}
+                        className="w-9 h-9 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-white transition-colors"
+                        style={{ background: 'rgba(255,255,255,0.17)' }}
+                        onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.background = 'rgba(109,59,215,0.55)')}
+                        onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.17)')}
+                        title="Configurar rendimiento"
+                      >
+                        <TrendingUp size={13} />
+                      </button>
+                      {wallet.generates_yield && (
+                        <>
+                          <button
+                            onClick={() => setYieldCorrectionTarget(wallet)}
+                            className="w-9 h-9 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-white transition-colors"
+                            style={{ background: 'rgba(255,255,255,0.17)' }}
+                            onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.background = 'rgba(217,119,6,0.55)')}
+                            onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.17)')}
+                            title="Corregir último rendimiento"
+                          >
+                            <RotateCcw size={13} />
+                          </button>
+                          <button
+                            onClick={() => setYieldHistoryTarget(wallet)}
+                            className="w-9 h-9 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-white transition-colors"
+                            style={{ background: 'rgba(255,255,255,0.17)' }}
+                            onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.28)')}
+                            onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.17)')}
+                            title="Historial de rendimientos"
+                          >
+                            <History size={13} />
+                          </button>
+                        </>
+                      )}
                       <button
                         onClick={() => openEdit(wallet)}
                         className="w-9 h-9 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-white transition-colors"
@@ -464,12 +492,12 @@ export default function WalletsPage() {
                         <Pencil size={13} />
                       </button>
                       <button
-                        onClick={() => openReconcile(wallet)}
+                        onClick={() => openAdjust(wallet)}
                         className="w-9 h-9 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-white transition-colors"
                         style={{ background: 'rgba(255,255,255,0.17)' }}
                         onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.background = 'rgba(99,102,241,0.55)')}
                         onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.17)')}
-                        title="Conciliar saldo"
+                        title="Ajustar billetera"
                       >
                         <SlidersHorizontal size={13} />
                       </button>
@@ -515,6 +543,12 @@ export default function WalletsPage() {
                     <p className="text-white text-xl font-extrabold tabular-nums leading-none whitespace-nowrap">
                       {formatCurrency(wallet.current_balance ?? 0, curr)}
                     </p>
+                    {wallet.generates_yield && (wallet.yield_month_total ?? 0) > 0 && (
+                      <p className="text-white/55 text-xs font-medium mt-0.5 flex items-center gap-0.5">
+                        <TrendingUp size={9} />
+                        +{formatCurrency(wallet.yield_month_total ?? 0, curr)} este mes
+                      </p>
+                    )}
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <div className="flex items-center gap-1 text-white/50 text-xs">
@@ -658,130 +692,13 @@ export default function WalletsPage() {
           </div>
         </div>
       </Modal>
-      {/* Reconcile modal */}
-      <Modal
-        open={reconcileOpen}
-        onClose={() => setReconcileOpen(false)}
-        title="Conciliar billetera"
-      >
-        {reconcileWallet && (() => {
-          const curr   = reconcileWallet.currency ?? 'ARS'
-          const target = parseFloat(reconcileTarget)
-          const diff   = isNaN(target) ? 0 : target - (reconcileWallet.current_balance ?? 0)
-          const hasDiff = !isNaN(target) && reconcileTarget !== ''
-
-          return (
-            <div className="space-y-4">
-
-              {/* Info card */}
-              <div
-                className="rounded-2xl p-4"
-                style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}
-              >
-                <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted)' }}>
-                  {reconcileWallet.name}
-                </p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Saldo registrado</span>
-                  <span className="text-lg font-extrabold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-                    {formatCurrency(reconcileWallet.current_balance ?? 0, curr)}
-                  </span>
-                </div>
-              </div>
-
-              <Input
-                label="Saldo real de la cuenta"
-                type="number"
-                step="0.01"
-                value={reconcileTarget}
-                onChange={e => setReconcileTarget(e.target.value)}
-                placeholder="0.00"
-                hint="Ingresá el saldo que muestra tu banco o app"
-                autoFocus
-              />
-
-              {/* Mode toggle */}
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>
-                  Tipo de ajuste
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {([
-                    { key: 'fix_initial', label: 'Saldo inicial incorrecto', desc: 'Corrige el punto de partida sin afectar estadísticas' },
-                    { key: 'adjustment', label: 'Dinero sin registrar', desc: 'Registra como ingreso o gasto de ajuste' },
-                  ] as const).map(opt => (
-                    <button
-                      key={opt.key}
-                      onClick={() => setReconcileMode(opt.key)}
-                      className="text-left rounded-xl p-3 transition-all"
-                      style={{
-                        background: reconcileMode === opt.key ? 'var(--brand-50)' : 'var(--bg-subtle)',
-                        border: `1.5px solid ${reconcileMode === opt.key ? 'var(--brand-400)' : 'var(--border)'}`,
-                      }}
-                    >
-                      <p className="text-xs font-bold leading-snug" style={{ color: reconcileMode === opt.key ? 'var(--brand-600)' : 'var(--text-primary)' }}>
-                        {opt.label}
-                      </p>
-                      <p className="text-xs mt-0.5 leading-snug" style={{ color: 'var(--text-muted)' }}>
-                        {opt.desc}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Diff preview */}
-              {hasDiff && (
-                <div
-                  className="rounded-xl px-4 py-3 flex items-center justify-between"
-                  style={{
-                    background: diff > 0 ? 'var(--income-50)' : diff < 0 ? 'var(--expense-50)' : 'var(--bg-subtle)',
-                    border: `1px solid ${diff > 0 ? 'var(--income-100)' : diff < 0 ? 'var(--expense-100)' : 'var(--border)'}`,
-                  }}
-                >
-                  <div>
-                    <p
-                      className="text-sm font-bold tabular-nums"
-                      style={{ color: diff > 0 ? 'var(--income-600)' : diff < 0 ? 'var(--expense-600)' : 'var(--text-muted)' }}
-                    >
-                      {diff === 0 ? 'Sin diferencia' : `${diff > 0 ? '+' : ''}${formatCurrency(diff, curr)}`}
-                    </p>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      {diff === 0
-                        ? 'El saldo ya coincide'
-                        : reconcileMode === 'fix_initial'
-                          ? 'Corregirá el saldo inicial — no impacta ingresos ni gastos'
-                          : diff > 0
-                            ? 'Se registrará como ingreso de ajuste (categoría: Ajuste)'
-                            : 'Se registrará como gasto de ajuste (categoría: Ajuste)'}
-                    </p>
-                  </div>
-                  {diff !== 0 && (
-                    <SlidersHorizontal
-                      size={18}
-                      style={{ color: diff > 0 ? 'var(--income-400)' : 'var(--expense-400)', flexShrink: 0 }}
-                    />
-                  )}
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-1">
-                <Button variant="secondary" onClick={() => setReconcileOpen(false)} className="flex-1">
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleReconcile}
-                  loading={reconciling}
-                  disabled={!hasDiff || diff === 0}
-                  className="flex-1"
-                >
-                  Confirmar ajuste
-                </Button>
-              </div>
-            </div>
-          )
-        })()}
-      </Modal>
+      <WalletAdjustmentModal
+        open={adjustOpen}
+        onClose={() => setAdjustOpen(false)}
+        wallet={adjustWallet}
+        wallets={wallets}
+        onSuccess={refetch}
+      />
 
       {/* Delete confirmation modal */}
       <Modal
@@ -869,6 +786,26 @@ export default function WalletsPage() {
         open={diagnosticOpen}
         onClose={() => setDiagnosticOpen(false)}
         liveWallets={wallets}
+      />
+
+      <YieldConfigModal
+        open={yieldConfigTarget !== null}
+        onClose={() => setYieldConfigTarget(null)}
+        wallet={yieldConfigTarget}
+        onSuccess={refetch}
+      />
+
+      <YieldHistoryModal
+        open={yieldHistoryTarget !== null}
+        onClose={() => setYieldHistoryTarget(null)}
+        wallet={yieldHistoryTarget}
+      />
+
+      <YieldCorrectionModal
+        open={yieldCorrectionTarget !== null}
+        onClose={() => setYieldCorrectionTarget(null)}
+        wallet={yieldCorrectionTarget}
+        onSuccess={refetch}
       />
     </div>
   )

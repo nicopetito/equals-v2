@@ -7,9 +7,11 @@ import {
   BookOpen, Zap, MoreHorizontal, Briefcase, Laptop, TrendingUp,
   PlusCircle, ShoppingBag, Plane, Coffee, Music, Dumbbell,
   Gift, CreditCard, PiggyBank, Building2, Baby,
+  PawPrint, Gamepad2, Landmark, Store, RotateCcw, Repeat,
+  SlidersHorizontal, Wallet,
 } from 'lucide-react'
 import { useCategories } from '@/hooks/useCategories'
-import { categoriesService } from '@/services/categories.service'
+import { categoriesService, DEFAULT_CATEGORIES } from '@/services/categories.service'
 import { useToast } from '@/components/providers/ToastProvider'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
@@ -20,30 +22,38 @@ import { plural } from '@/utils/format'
 
 // ── Icon registry ──────────────────────────────────────────────────────────────
 const ICON_MAP: Record<string, LucideIcon> = {
-  'utensils':        Utensils,
-  'car':             Car,
-  'heart-pulse':     HeartPulse,
-  'clapperboard':    Clapperboard,
-  'shirt':           Shirt,
-  'home':            Home,
-  'book-open':       BookOpen,
-  'zap':             Zap,
-  'more-horizontal': MoreHorizontal,
-  'briefcase':       Briefcase,
-  'laptop':          Laptop,
-  'trending-up':     TrendingUp,
-  'plus-circle':     PlusCircle,
-  'shopping-bag':    ShoppingBag,
-  'plane':           Plane,
-  'coffee':          Coffee,
-  'music':           Music,
-  'dumbbell':        Dumbbell,
-  'gift':            Gift,
-  'credit-card':     CreditCard,
-  'piggy-bank':      PiggyBank,
-  'building-2':      Building2,
-  'baby':            Baby,
-  'tag':             Tag,
+  'utensils':          Utensils,
+  'car':               Car,
+  'heart-pulse':       HeartPulse,
+  'clapperboard':      Clapperboard,
+  'shirt':             Shirt,
+  'home':              Home,
+  'book-open':         BookOpen,
+  'zap':               Zap,
+  'more-horizontal':   MoreHorizontal,
+  'briefcase':         Briefcase,
+  'laptop':            Laptop,
+  'trending-up':       TrendingUp,
+  'plus-circle':       PlusCircle,
+  'shopping-bag':      ShoppingBag,
+  'plane':             Plane,
+  'coffee':            Coffee,
+  'music':             Music,
+  'dumbbell':          Dumbbell,
+  'gift':              Gift,
+  'credit-card':       CreditCard,
+  'piggy-bank':        PiggyBank,
+  'building-2':        Building2,
+  'baby':              Baby,
+  'tag':               Tag,
+  'paw-print':         PawPrint,
+  'gamepad-2':         Gamepad2,
+  'landmark':          Landmark,
+  'store':             Store,
+  'rotate-ccw':        RotateCcw,
+  'repeat':            Repeat,
+  'sliders-horizontal':SlidersHorizontal,
+  'wallet':            Wallet,
 }
 const ICON_LIST = Object.entries(ICON_MAP)
 
@@ -77,10 +87,21 @@ export default function CategoriesPage() {
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string; name: string; transactionCount: number; budgetCount: number
   } | null>(null)
+  const [bannerDismissed, setBannerDismissed] = useState(() =>
+    typeof window !== 'undefined' && localStorage.getItem('equal_defaults_dismissed') === '1'
+  )
+  const [seedingDefaults, setSeedingDefaults] = useState(false)
 
   // ── Derived data ──────────────────────────────────────────────────────────────
   const totalIncome  = useMemo(() => categories.filter(c => c.type === 'income').length,  [categories])
   const totalExpense = useMemo(() => categories.filter(c => c.type === 'expense').length, [categories])
+
+  const showDefaultsBanner = useMemo(() => {
+    if (loading || bannerDismissed) return false
+    const hasDefaults  = categories.some(c => c.is_default)
+    const hasNonSystem = categories.some(c => !c.is_system)
+    return !hasDefaults && hasNonSystem
+  }, [categories, loading, bannerDismissed])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -97,6 +118,26 @@ export default function CategoriesPage() {
   // Which sections to render — never show a section the user filtered away
   const showIncome  = filter === 'all' || filter === 'income'
   const showExpense = filter === 'all' || filter === 'expense'
+
+  // ── Banner ────────────────────────────────────────────────────────────────────
+  function dismissBanner() {
+    setBannerDismissed(true)
+    localStorage.setItem('equal_defaults_dismissed', '1')
+  }
+
+  async function handleAddDefaults() {
+    setSeedingDefaults(true)
+    try {
+      await categoriesService.ensureDefaultCategories()
+      refetch()
+      dismissBanner()
+      addToast('Categorías recomendadas agregadas', 'success')
+    } catch {
+      addToast('Error al agregar las categorías recomendadas', 'error')
+    } finally {
+      setSeedingDefaults(false)
+    }
+  }
 
   // ── CRUD ──────────────────────────────────────────────────────────────────────
   function openCreate(defaultType?: Category['type']) {
@@ -203,46 +244,66 @@ export default function CategoriesPage() {
                 <CategoryIcon icon={cat.icon} color={c} size={15} />
               </div>
 
-              {/* Name + type */}
+              {/* Name + type + badges */}
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-bold truncate leading-tight" style={{ color: 'var(--text-primary)' }}>
                   {cat.name}
                 </p>
-                <p
-                  className="text-[10px] font-semibold mt-0.5 leading-none"
-                  style={{ color: isIncome ? 'var(--income-500)' : 'var(--expense-500)' }}
-                >
-                  {isIncome ? '↑ Ingreso' : '↓ Gasto'}
-                </p>
+                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                  <p
+                    className="text-[10px] font-semibold leading-none"
+                    style={{ color: isIncome ? 'var(--income-500)' : 'var(--expense-500)' }}
+                  >
+                    {isIncome ? '↑ Ingreso' : '↓ Gasto'}
+                  </p>
+                  {cat.is_system && (
+                    <span
+                      className="text-[9px] font-bold px-1 py-0.5 rounded leading-none"
+                      style={{ background: 'var(--brand-50)', color: 'var(--brand-600)', border: '1px solid var(--brand-100)' }}
+                    >
+                      Sistema
+                    </span>
+                  )}
+                  {!cat.is_system && cat.is_default && (
+                    <span
+                      className="text-[9px] font-bold px-1 py-0.5 rounded leading-none"
+                      style={{ background: 'var(--bg-subtle)', color: 'var(--text-faint)', border: '1px solid var(--border-light)' }}
+                    >
+                      Predeterminada
+                    </span>
+                  )}
+                </div>
               </div>
 
-              {/* Actions — appear on hover */}
-              <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                <button
-                  onClick={() => openEdit(cat)}
-                  className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors"
-                  style={{ color: 'var(--text-faint)' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--brand-50)'; e.currentTarget.style.color = 'var(--brand-500)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-faint)' }}
-                  title="Editar"
-                >
-                  <Pencil size={11} />
-                </button>
-                <button
-                  onClick={() => cat.id && handleDelete(cat.id)}
-                  disabled={deleting === cat.id}
-                  className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors"
-                  style={{ color: 'var(--text-faint)' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--expense-50)'; e.currentTarget.style.color = 'var(--expense-500)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-faint)' }}
-                  title="Eliminar"
-                >
-                  {deleting === cat.id
-                    ? <span className="w-2.5 h-2.5 border border-current border-t-transparent rounded-full animate-spin" />
-                    : <Trash2 size={11} />
-                  }
-                </button>
-              </div>
+              {/* Actions — appear on hover, ocultas para categorías de sistema */}
+              {!cat.is_system && (
+                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button
+                    onClick={() => openEdit(cat)}
+                    className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors"
+                    style={{ color: 'var(--text-faint)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--brand-50)'; e.currentTarget.style.color = 'var(--brand-500)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-faint)' }}
+                    title="Editar"
+                  >
+                    <Pencil size={11} />
+                  </button>
+                  <button
+                    onClick={() => cat.id && handleDelete(cat.id)}
+                    disabled={deleting === cat.id}
+                    className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors"
+                    style={{ color: 'var(--text-faint)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--expense-50)'; e.currentTarget.style.color = 'var(--expense-500)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-faint)' }}
+                    title="Eliminar"
+                  >
+                    {deleting === cat.id
+                      ? <span className="w-2.5 h-2.5 border border-current border-t-transparent rounded-full animate-spin" />
+                      : <Trash2 size={11} />
+                    }
+                  </button>
+                </div>
+              )}
             </div>
           )
         })}
@@ -364,6 +425,53 @@ export default function CategoriesPage() {
             <strong style={{ color: 'var(--expense-600)', fontFamily: 'var(--font-sora)' }}>{totalExpense}</strong>
             <span style={{ color: 'var(--expense-500)', fontSize: 12 }}>gastos</span>
           </span>
+        </div>
+      )}
+
+      {/* ── Banner categorías recomendadas (usuarios existentes sin predeterminadas) ── */}
+      {showDefaultsBanner && (
+        <div
+          className="rounded-2xl border p-4 flex items-start gap-3"
+          style={{ background: 'var(--brand-50)', borderColor: 'var(--brand-100)' }}
+        >
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+            style={{ background: 'rgba(109,59,215,0.10)' }}
+          >
+            <Tag size={16} style={{ color: 'var(--brand-500)' }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              Agregar categorías recomendadas
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              Equal incluye {DEFAULT_CATEGORIES.length} categorías listas para usar. Solo se agregarán las que aún no tenés.
+            </p>
+            <div className="flex items-center gap-3 mt-3 flex-wrap">
+              <Button size="sm" onClick={handleAddDefaults} loading={seedingDefaults}>
+                Agregar categorías
+              </Button>
+              <button
+                type="button"
+                onClick={dismissBanner}
+                className="text-xs font-medium"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                No, gracias
+              </button>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={dismissBanner}
+            className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors"
+            style={{ color: 'var(--text-faint)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-subtle)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            aria-label="Cerrar"
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 

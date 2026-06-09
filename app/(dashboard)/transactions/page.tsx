@@ -20,6 +20,9 @@ import { Modal } from '@/components/ui/Modal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { CategoryBadge } from '@/components/ui/CategoryBadge'
 import { formatCurrency } from '@/utils/format'
+import { RESERVATION_DEPOSIT_LABEL, RESERVATION_WITHDRAW_LABEL } from '@/utils/constants'
+
+const RESERVATION_LABELS = new Set<string>([RESERVATION_DEPOSIT_LABEL, RESERVATION_WITHDRAW_LABEL])
 import { formatDateSmart, getDateRangeForPeriod, PERIOD_OPTIONS, type Period } from '@/utils/date'
 import type { TransactionWithDetails, TransactionType, Refund } from '@/types'
 import { AnimatePresence, motion } from 'motion/react'
@@ -284,8 +287,9 @@ function TransactionsPageInner() {
   [transactions, startKey, endKey, filterType, filterCategory, filterWallet, filterOrphan, filterNoCategory, walletIds, search])
 
   const totals = useMemo(() => {
-    const income   = filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-    const expenses = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+    const forKpis  = filtered.filter(t => !(t.label && RESERVATION_LABELS.has(t.label)))
+    const income   = forKpis.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+    const expenses = forKpis.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
     return { income, expenses }
   }, [filtered])
 

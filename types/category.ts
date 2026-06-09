@@ -6,10 +6,7 @@ export interface Category {
   color?: string
   icon?: string
   is_system?: boolean
+  is_default?: boolean
   created_at?: string
   updated_at?: string
-}
-
-export interface DefaultCategory extends Category {
-  is_default: true
 }

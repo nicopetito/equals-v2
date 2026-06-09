@@ -1,6 +1,8 @@
 export type Currency = 'ARS' | 'USD' | 'EUR' | 'CRYPTO'
 export type TransactionType = 'income' | 'expense'
 
+export type TransactionSubtype = 'yield' | 'correction'
+
 export interface Transaction {
   id?: string
   user_id?: string
@@ -16,6 +18,14 @@ export interface Transaction {
   recurring_id?: string | null
   notes?: string | null
   label?: string | null
+  subtype?: TransactionSubtype | null
+  is_estimated?: boolean
+  estimated_rate?: number | null
+  original_amount?: number | null
+  corrected_from_transaction_id?: string | null
+  affects_budget?: boolean
+  yield_period_start?: string | null
+  yield_period_end?: string | null
   created_at?: string
   updated_at?: string
 }

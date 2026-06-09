@@ -35,6 +35,17 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
   const expenses = statsByCurrency.reduce((s, st) => s + st.expenses, 0)
   const savingRate = income > 0 ? Math.round(((income - expenses) / income) * 100) : 0
 
+  // Rendimientos del período (subtype = 'yield')
+  const yieldMap = new Map<string, { walletName: string; amount: number; currency: string }>()
+  transactions.filter(t => t.subtype === 'yield').forEach(t => {
+    const key = t.wallet_name ?? 'Billetera'
+    const entry = yieldMap.get(key) ?? { walletName: key, amount: 0, currency: t.currency }
+    entry.amount += t.amount
+    yieldMap.set(key, entry)
+  })
+  const yieldByWallet = Array.from(yieldMap.values()).sort((a, b) => b.amount - a.amount)
+  const totalYield = yieldByWallet.reduce((s, y) => s + y.amount, 0)
+
   const catMap = new Map<string, { amount: number; color: string; currency: string }>()
   transactions.filter(t => t.type === 'expense').forEach(t => {
     const name = t.category_name ?? 'Sin categoría'
@@ -113,6 +124,22 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
             <span style="font-weight:700;">Tasa de ahorro del período</span>
             <span style="font-weight:900;color:${savingRate >= 20 ? '#059669' : '#D97706'};font-size:16px;">${savingRate}%</span>
           </div>
+
+          ${yieldByWallet.length > 0 ? `
+          <h2>Rendimientos del período</h2>
+          <div style="margin-bottom:16px;padding:10px 14px;border-radius:10px;background:#F5F3FF;border:1px solid #DDD6FE;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <span style="font-weight:700;color:#6D28D9;">Total estimado</span>
+              <span style="font-weight:900;color:#6D28D9;font-size:15px;">${formatCurrency(totalYield, yieldByWallet[0]?.currency ?? 'ARS')}</span>
+            </div>
+            ${yieldByWallet.map(y => `
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#64748B;margin-top:4px;">
+              <span>${y.walletName}</span>
+              <span style="font-weight:600;">+${formatCurrency(y.amount, y.currency)}</span>
+            </div>`).join('')}
+            <div style="font-size:10px;color:#94A3B8;margin-top:8px;">* Los montos son estimados y pueden variar según la tasa real acreditada.</div>
+          </div>
+          ` : ''}
 
           ${topCats.length > 0 ? `
           <h2>Top categorías de gastos</h2>
@@ -222,6 +249,25 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
               {savingRate}%
             </span>
           </div>
+
+          {/* Rendimientos */}
+          {yieldByWallet.length > 0 && (
+            <div className="rounded-xl p-3 space-y-1.5" style={{ background: '#F5F3FF', border: '1px solid #DDD6FE' }}>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold" style={{ color: '#6D28D9' }}>Rendimientos del período</p>
+                <p className="text-sm font-extrabold tabular-nums" style={{ color: '#6D28D9' }}>
+                  +{formatCurrency(totalYield, yieldByWallet[0]?.currency ?? 'ARS')}
+                </p>
+              </div>
+              {yieldByWallet.slice(0, 3).map(y => (
+                <div key={y.walletName} className="flex items-center justify-between text-xs" style={{ color: '#7C3AED' }}>
+                  <span className="truncate">{y.walletName}</span>
+                  <span className="font-semibold tabular-nums ml-2">+{formatCurrency(y.amount, y.currency)}</span>
+                </div>
+              ))}
+              <p className="text-[10px]" style={{ color: '#94A3B8' }}>* Montos estimados</p>
+            </div>
+          )}
 
           {/* Top categorías */}
           {topCats.length > 0 && (

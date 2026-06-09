@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "rd /s /q \"%LOCALAPPDATA%\\equal-v2-next\\dev\" 2>nul & rd /s /q \"%LOCALAPPDATA%\\equal-v2-next\\cache\" 2>nul & set NODE_PATH=%CD%\\node_modules && next dev",
+    "dev": "next dev --turbopack",
+    "dev:clean": "rd /s /q \"%LOCALAPPDATA%\\equal-v2-next\" 2>nul & mkdir \"%LOCALAPPDATA%\\equal-v2-next\" & next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Wallet, CreditCard, Tag,
   CalendarClock, Target, DollarSign, PiggyBank,
   LogOut, ChevronLeft, ChevronRight, ChevronDown, X, Zap,
-  Upload, SlidersHorizontal, CalendarDays, Trophy, BarChart2, Activity,
+  Upload, SlidersHorizontal, CalendarDays, Trophy, BarChart2, Activity, Clock, Archive,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -51,7 +51,9 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: 'Planificación',
     items: [
       { href: '/scheduled', label: 'Programadas',  icon: CalendarClock     },
+      { href: '/pending',   label: 'Pendientes',   icon: Clock             },
       { href: '/goals',     label: 'Objetivos',    icon: Target            },
+      { href: '/reservas',  label: 'Reservas',     icon: Archive           },
       { href: '/budgets',   label: 'Presupuestos', icon: SlidersHorizontal },
     ],
   },

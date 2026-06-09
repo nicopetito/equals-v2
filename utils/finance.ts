@@ -1,5 +1,6 @@
 import { safeNumber } from './format'
-import type { WalletWithBalance, Goal, FixedTerm, TransactionWithDetails, Refund } from '@/types'
+import { INTERNAL_LABELS } from './constants'
+import type { WalletWithBalance, Goal, FixedTerm, TransactionWithDetails, Refund, Reservation } from '@/types'
 
 // Prefijos usados por RPCs al crear transacciones internas.
 // Deben mantenerse sincronizados con las migraciones de Supabase correspondientes.
@@ -34,6 +35,8 @@ export function calculateSavingsMetrics(transactions: TransactionWithDetails[]):
   let refundIncome = 0
 
   for (const tx of transactions) {
+    if (tx.label && INTERNAL_LABELS.has(tx.label)) continue
+
     const amount = safeNumber(tx.amount)
     const desc   = tx.description ?? ''
 
@@ -58,6 +61,13 @@ export function calculateSavingsMetrics(transactions: TransactionWithDetails[]):
   return { income, expenses, goalDeposits, goalWithdrawals, refundIncome, realIncome, consumerExpenses, netGoalFunding, savingsRate }
 }
 
+// Suma el total de rendimientos (subtype='yield') en un conjunto de transacciones.
+export function calculateYieldForPeriod(transactions: TransactionWithDetails[]): number {
+  return transactions
+    .filter(tx => tx.subtype === 'yield')
+    .reduce((sum, tx) => sum + safeNumber(tx.amount), 0)
+}
+
 // Construye un mapa transaction_id → monto total reembolsado y acreditado.
 // Solo incluye refunds con status 'credited' — los pending/cancelled/expired no
 // reducen el gasto real hasta que el dinero efectivamente vuelve a la billetera.
@@ -73,6 +83,7 @@ export function buildCreditedRefundMap(refunds: Refund[]): Map<string, number> {
 
 export interface NetWorthBreakdown {
   liquid: number
+  reserved: number
   goals: number
   // investments = capital (principal_amount)
   investments: number
@@ -87,13 +98,14 @@ export interface NetWorthBreakdown {
 export function calculateNetWorth(
   wallets: WalletWithBalance[],
   goals: Goal[],
-  fixedTerms: FixedTerm[]
+  fixedTerms: FixedTerm[],
+  reservations: Reservation[] = []
 ): Record<string, NetWorthBreakdown> {
   const result: Record<string, NetWorthBreakdown> = {}
 
   const ensure = (currency: string) => {
     if (!result[currency]) result[currency] = {
-      liquid: 0, goals: 0,
+      liquid: 0, reserved: 0, goals: 0,
       investments: 0, investmentsInterest: 0, investmentsEstimated: 0,
       total: 0,
     }
@@ -106,6 +118,14 @@ export function calculateNetWorth(
     const r = ensure(w.currency)
     r.liquid += val
     r.total  += val
+  })
+
+  reservations.filter(r => r.status === 'active').forEach(r => {
+    const currency = r.currency ?? 'ARS'
+    const val = safeNumber(r.amount)
+    const bucket = ensure(currency)
+    bucket.reserved += val
+    bucket.total    += val
   })
 
   goals.filter(g => !g.is_completed).forEach(g => {

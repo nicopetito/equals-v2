@@ -16,7 +16,8 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { HelpButton } from '@/components/help/HelpButton'
 import { formatCurrency, safeNumber } from '@/utils/format'
-import { calculateNetWorth, calculateSavingsMetrics } from '@/utils/finance'
+import { calculateNetWorth, calculateSavingsMetrics, calculateYieldForPeriod } from '@/utils/finance'
+import { INTERNAL_LABELS } from '@/utils/constants'
 import { getDateRangeForPeriod, PERIOD_OPTIONS, type Period } from '@/utils/date'
 import type { Currency } from '@/types'
 import { motion } from 'motion/react'
@@ -146,11 +147,22 @@ export default function EstadisticasPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [allTransactions, startISO, endISO, currency])
 
+  // Excluir transferencias internas, ajustes y saldo inicial de los KPIs financieros.
+  // El filtro por category_name cubre transacciones históricas sin label.
+  const filteredForKpis = useMemo(
+    () => filtered.filter(t =>
+      !(t.label && INTERNAL_LABELS.has(t.label)) &&
+      t.category_name !== 'Saldo inicial'
+    ),
+    [filtered]
+  )
+
   const prevFiltered = useMemo(() =>
     allTransactions.filter(t => {
       const d = new Date(t.date)
       if (d < prevStart || d > prevEnd) return false
       if (currency !== 'all' && t.currency !== currency) return false
+      if (t.label && INTERNAL_LABELS.has(t.label)) return false
       return true
     }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -159,7 +171,7 @@ export default function EstadisticasPage() {
   const stats = useMemo(() => {
     if (currency === 'all') {
       const byCurrency: Record<string, { income: number; expenses: number; balance: number }> = {}
-      filtered.forEach(t => {
+      filteredForKpis.forEach(t => {
         if (!byCurrency[t.currency]) byCurrency[t.currency] = { income: 0, expenses: 0, balance: 0 }
         if (t.type === 'income') byCurrency[t.currency].income += safeNumber(t.amount)
         else byCurrency[t.currency].expenses += safeNumber(t.amount)
@@ -168,16 +180,18 @@ export default function EstadisticasPage() {
       if (!Object.keys(byCurrency).length) return { byCurrency: null, single: { income: 0, expenses: 0, balance: 0 } }
       return { byCurrency, single: null }
     }
-    const income   = filtered.filter(t => t.type === 'income').reduce((s, t) => s + safeNumber(t.amount), 0)
-    const expenses = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + safeNumber(t.amount), 0)
+    const income   = filteredForKpis.filter(t => t.type === 'income').reduce((s, t) => s + safeNumber(t.amount), 0)
+    const expenses = filteredForKpis.filter(t => t.type === 'expense').reduce((s, t) => s + safeNumber(t.amount), 0)
     return { byCurrency: null, single: { income, expenses, balance: income - expenses } }
-  }, [filtered, currency])
+  }, [filteredForKpis, currency])
 
   const totalIncome   = stats.single?.income   ?? Object.values(stats.byCurrency ?? {}).reduce((s, v) => s + v.income, 0)
   const totalExpenses = stats.single?.expenses ?? Object.values(stats.byCurrency ?? {}).reduce((s, v) => s + v.expenses, 0)
 
-  const savingsMetrics = useMemo(() => calculateSavingsMetrics(filtered), [filtered])
+  const savingsMetrics = useMemo(() => calculateSavingsMetrics(filteredForKpis), [filteredForKpis])
   const savingsRate    = savingsMetrics.savingsRate
+
+  const yieldTotal = useMemo(() => calculateYieldForPeriod(filteredForKpis), [filteredForKpis])
 
   const prevIncome   = useMemo(() =>
     prevFiltered.filter(t => t.type === 'income').reduce((s, t) => s + safeNumber(t.amount), 0),
@@ -191,22 +205,22 @@ export default function EstadisticasPage() {
   const expensesDelta = prevExpenses > 0 ? ((totalExpenses - prevExpenses) / prevExpenses) * 100 : null
 
   const activeCurr = currency === 'all' ? 'ARS' : currency
-  const txCount    = filtered.length
-  const catCount   = new Set(filtered.map(t => t.category_name).filter(Boolean)).size
+  const txCount    = filteredForKpis.length
+  const catCount   = new Set(filteredForKpis.map(t => t.category_name).filter(Boolean)).size
 
   const avgExpense = useMemo(() => {
-    const g = filtered.filter(t => t.type === 'expense')
+    const g = filteredForKpis.filter(t => t.type === 'expense')
     return g.length > 0 ? g.reduce((s, t) => s + safeNumber(t.amount), 0) / g.length : null
-  }, [filtered])
+  }, [filteredForKpis])
 
   const maxIncome = useMemo(() => {
-    const incomes = filtered.filter(t => t.type === 'income').map(t => safeNumber(t.amount))
+    const incomes = filteredForKpis.filter(t => t.type === 'income').map(t => safeNumber(t.amount))
     return incomes.length > 0 ? Math.max(...incomes) : 0
-  }, [filtered])
+  }, [filteredForKpis])
 
   const topExpCategories = useMemo(() => {
     const map: Record<string, { amount: number; count: number; color: string }> = {}
-    filtered.filter(t => t.type === 'expense').forEach(t => {
+    filteredForKpis.filter(t => t.type === 'expense').forEach(t => {
       // category_id set but category_name null → the category was deleted
       const name = t.category_name ?? (t.category_id ? 'Categoría eliminada' : 'Sin categoría')
       const color = t.category_name ? (t.category_color ?? '#ffb4ab') : (t.category_id ? '#9ca3af' : '#ffb4ab')
@@ -219,11 +233,11 @@ export default function EstadisticasPage() {
       .sort(([,a],[,b]) => b.amount - a.amount)
       .slice(0, 5)
       .map(([name, data]) => ({ name, ...data, pct: total > 0 ? (data.amount / total) * 100 : 0 }))
-  }, [filtered])
+  }, [filteredForKpis])
 
   const topIncCategories = useMemo(() => {
     const map: Record<string, { amount: number; count: number; color: string }> = {}
-    filtered.filter(t => t.type === 'income').forEach(t => {
+    filteredForKpis.filter(t => t.type === 'income').forEach(t => {
       const name = t.category_name ?? (t.category_id ? 'Categoría eliminada' : 'Sin categoría')
       const color = t.category_name ? (t.category_color ?? '#4edea3') : (t.category_id ? '#9ca3af' : '#4edea3')
       if (!map[name]) map[name] = { amount: 0, count: 0, color }
@@ -235,16 +249,16 @@ export default function EstadisticasPage() {
       .sort(([,a],[,b]) => b.amount - a.amount)
       .slice(0, 5)
       .map(([name, data]) => ({ name, ...data, pct: total > 0 ? (data.amount / total) * 100 : 0 }))
-  }, [filtered])
+  }, [filteredForKpis])
 
   const spendingByDay = useMemo(() => {
-    const expTx = filtered.filter(t => t.type === 'expense')
+    const expTx = filteredForKpis.filter(t => t.type === 'expense')
     if (expTx.length < 7) return null
     const totals = new Array(7).fill(0)
     expTx.forEach(t => { totals[new Date(t.date).getDay()] += safeNumber(t.amount) })
     const max = Math.max(...totals)
     return totals.map((v, i) => ({ day: DAY_LABELS[i], value: v, pct: max > 0 ? (v / max) * 100 : 0 }))
-  }, [filtered])
+  }, [filteredForKpis])
 
   const netWorth = useMemo(
     () => calculateNetWorth(wallets, goals, fixedTerms),
@@ -375,6 +389,25 @@ export default function EstadisticasPage() {
             </div>
           )}
 
+          {/* ── RENDIMIENTOS ─────────────────────────────────────── */}
+          {yieldTotal > 0 && (
+            <div className="rounded-2xl px-5 py-4 flex items-center justify-between gap-4"
+              style={{ background: 'rgba(109,59,215,0.06)', border: '1px solid rgba(109,59,215,0.15)' }}>
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted)' }}>Rendimientos estimados</p>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  Intereses acreditados por billeteras con rendimiento automático en el período.
+                </p>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>
+                  Los montos son estimados y no representan valores exactos acreditados.
+                </p>
+              </div>
+              <span className="text-2xl font-extrabold tabular-nums shrink-0" style={{ color: 'var(--brand-500)', fontFamily: 'var(--font-sora)' }}>
+                +{formatCurrency(yieldTotal, activeCurr)}
+              </span>
+            </div>
+          )}
+
           {/* ── GRÁFICO EVOLUCIÓN ────────────────────────────────── */}
           <div>
             <SectionLabel
@@ -383,7 +416,7 @@ export default function EstadisticasPage() {
             />
             <div className="glass-card rounded-2xl overflow-hidden">
               <IncomeExpenseChart
-                transactions={filtered} start={start} end={end}
+                transactions={filteredForKpis} start={start} end={end}
                 currency={activeCurr} loading={loading}
               />
             </div>
@@ -479,7 +512,7 @@ export default function EstadisticasPage() {
               title="Distribución por categoría"
               desc="Proporción de cada categoría sobre el total del período."
             />
-            <CategoryDonutChart transactions={filtered} currency={activeCurr} loading={loading} />
+            <CategoryDonutChart transactions={filteredForKpis} currency={activeCurr} loading={loading} />
           </div>
 
           {/* ── TOP 5 CATEGORÍAS DE GASTO ────────────────────────── */}
@@ -650,7 +683,7 @@ export default function EstadisticasPage() {
       )}
 
       <ReportModal open={reportOpen} onClose={() => setReportOpen(false)}
-        transactions={filtered} period={PERIOD_OPTIONS.find(p => p.value === period)?.label ?? period} currency={currency} />
+        transactions={filteredForKpis} period={PERIOD_OPTIONS.find(p => p.value === period)?.label ?? period} currency={currency} />
     </div>
   )
 }
