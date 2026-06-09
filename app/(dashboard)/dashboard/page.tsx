@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
   TrendingUp, TrendingDown, Wallet, ArrowUpRight, Plus,
   FileText, Sparkles, ChevronLeft, ChevronRight, BarChart2,
-  Zap, RotateCcw, AlertTriangle, Tag, ChevronDown, Clock, Archive,
+  Zap, RotateCcw, AlertTriangle, Tag, ChevronDown, Clock, Archive, Info,
 } from 'lucide-react'
 import { HelpButton } from '@/components/help/HelpButton'
 import { useTransactions } from '@/hooks/useTransactions'
@@ -183,15 +183,26 @@ export default function DashboardPage() {
     filtered.filter(t => !!(t.wallet_id && walletIds.has(t.wallet_id))),
     [filtered, walletIds])
 
-  // Excluir transferencias internas, ajustes y saldo inicial de los KPIs de ingresos/gastos.
-  // El filtro por category_name cubre transacciones históricas sin label.
+  // Excluir transferencias internas y ajustes de los KPIs de ingresos/gastos
   const kpiFilteredClean = useMemo(
-    () => kpiFiltered.filter(t =>
-      !(t.label && INTERNAL_LABELS.has(t.label)) &&
-      t.category_name !== 'Saldo inicial'
-    ),
+    () => kpiFiltered.filter(t => !(t.label && INTERNAL_LABELS.has(t.label))),
     [kpiFiltered]
   )
+
+  // Para métricas de comportamiento (tasa de ahorro): excluye además el saldo inicial,
+  // ya que no es ingreso ganado y distorsionaría la tasa.
+  const kpiFilteredForMetrics = useMemo(
+    () => kpiFilteredClean.filter(t => t.category_name !== 'Saldo inicial'),
+    [kpiFilteredClean]
+  )
+
+  const saldoInicialRows = useMemo(() => {
+    const map: Record<string, number> = {}
+    kpiFilteredClean
+      .filter(t => t.category_name === 'Saldo inicial' && t.type === 'income')
+      .forEach(t => { map[t.currency] = (map[t.currency] ?? 0) + t.amount })
+    return Object.entries(map).map(([curr, amount]) => ({ curr, amount }))
+  }, [kpiFilteredClean])
 
   const stats = useMemo(() => {
     if (currency === 'all') {
@@ -210,7 +221,7 @@ export default function DashboardPage() {
     return { byCurrency: null, single: { income, expenses, balance: income - expenses } }
   }, [kpiFilteredClean, currency])
 
-  const savingsMetrics = useMemo(() => calculateSavingsMetrics(kpiFilteredClean), [kpiFilteredClean])
+  const savingsMetrics = useMemo(() => calculateSavingsMetrics(kpiFilteredForMetrics), [kpiFilteredForMetrics])
   const savingsRate    = savingsMetrics.savingsRate
 
   const yieldTotal = useMemo(() => calculateYieldForPeriod(kpiFilteredClean), [kpiFilteredClean])
@@ -558,6 +569,20 @@ export default function DashboardPage() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Aviso saldo inicial */}
+          {saldoInicialRows.length > 0 && (
+            <div className="flex items-start gap-2.5 rounded-xl px-4 py-3"
+              style={{ background: 'rgba(109,59,215,0.06)', border: '1px solid rgba(109,59,215,0.15)' }}>
+              <Info size={14} className="shrink-0 mt-0.5" style={{ color: 'var(--brand-500)' }} />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold" style={{ color: 'var(--brand-500)' }}>Incluye saldo inicial de billeteras</p>
+                <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  {saldoInicialRows.map(r => formatCurrency(r.amount, r.curr as import('@/types').Currency)).join(' · ')} corresponden al capital que ya tenías al registrar tus billeteras en la app. No se cuenta en la tasa de ahorro.
+                </p>
+              </div>
             </div>
           )}
 

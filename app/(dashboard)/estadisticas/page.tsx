@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { FileText, TrendingDown, Wallet, BarChart2, Trophy } from 'lucide-react'
+import { FileText, TrendingDown, Wallet, BarChart2, Trophy, Info } from 'lucide-react'
 import { subDays, subMonths, startOfMonth, endOfMonth, startOfYear } from 'date-fns'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useWallets } from '@/hooks/useWallets'
@@ -147,14 +147,17 @@ export default function EstadisticasPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [allTransactions, startISO, endISO, currency])
 
-  // Excluir transferencias internas, ajustes y saldo inicial de los KPIs financieros.
-  // El filtro por category_name cubre transacciones históricas sin label.
+  // Excluir transferencias internas y ajustes de billetera de los KPIs financieros
   const filteredForKpis = useMemo(
-    () => filtered.filter(t =>
-      !(t.label && INTERNAL_LABELS.has(t.label)) &&
-      t.category_name !== 'Saldo inicial'
-    ),
+    () => filtered.filter(t => !(t.label && INTERNAL_LABELS.has(t.label))),
     [filtered]
+  )
+
+  // Para métricas de comportamiento (tasa de ahorro, top categorías, donut): excluye
+  // además el saldo inicial, que no es ingreso ganado y distorsionaría el análisis.
+  const filteredForMetrics = useMemo(
+    () => filteredForKpis.filter(t => t.category_name !== 'Saldo inicial'),
+    [filteredForKpis]
   )
 
   const prevFiltered = useMemo(() =>
@@ -163,6 +166,7 @@ export default function EstadisticasPage() {
       if (d < prevStart || d > prevEnd) return false
       if (currency !== 'all' && t.currency !== currency) return false
       if (t.label && INTERNAL_LABELS.has(t.label)) return false
+      if (t.category_name === 'Saldo inicial') return false
       return true
     }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,7 +192,7 @@ export default function EstadisticasPage() {
   const totalIncome   = stats.single?.income   ?? Object.values(stats.byCurrency ?? {}).reduce((s, v) => s + v.income, 0)
   const totalExpenses = stats.single?.expenses ?? Object.values(stats.byCurrency ?? {}).reduce((s, v) => s + v.expenses, 0)
 
-  const savingsMetrics = useMemo(() => calculateSavingsMetrics(filteredForKpis), [filteredForKpis])
+  const savingsMetrics = useMemo(() => calculateSavingsMetrics(filteredForMetrics), [filteredForMetrics])
   const savingsRate    = savingsMetrics.savingsRate
 
   const yieldTotal = useMemo(() => calculateYieldForPeriod(filteredForKpis), [filteredForKpis])
@@ -208,15 +212,23 @@ export default function EstadisticasPage() {
   const txCount    = filteredForKpis.length
   const catCount   = new Set(filteredForKpis.map(t => t.category_name).filter(Boolean)).size
 
+  const saldoInicialRows = useMemo(() => {
+    const map: Record<string, number> = {}
+    filteredForKpis
+      .filter(t => t.category_name === 'Saldo inicial' && t.type === 'income')
+      .forEach(t => { map[t.currency] = (map[t.currency] ?? 0) + safeNumber(t.amount) })
+    return Object.entries(map).map(([curr, amount]) => ({ curr, amount }))
+  }, [filteredForKpis])
+
   const avgExpense = useMemo(() => {
     const g = filteredForKpis.filter(t => t.type === 'expense')
     return g.length > 0 ? g.reduce((s, t) => s + safeNumber(t.amount), 0) / g.length : null
   }, [filteredForKpis])
 
   const maxIncome = useMemo(() => {
-    const incomes = filteredForKpis.filter(t => t.type === 'income').map(t => safeNumber(t.amount))
+    const incomes = filteredForMetrics.filter(t => t.type === 'income').map(t => safeNumber(t.amount))
     return incomes.length > 0 ? Math.max(...incomes) : 0
-  }, [filteredForKpis])
+  }, [filteredForMetrics])
 
   const topExpCategories = useMemo(() => {
     const map: Record<string, { amount: number; count: number; color: string }> = {}
@@ -237,7 +249,7 @@ export default function EstadisticasPage() {
 
   const topIncCategories = useMemo(() => {
     const map: Record<string, { amount: number; count: number; color: string }> = {}
-    filteredForKpis.filter(t => t.type === 'income').forEach(t => {
+    filteredForMetrics.filter(t => t.type === 'income').forEach(t => {
       const name = t.category_name ?? (t.category_id ? 'Categoría eliminada' : 'Sin categoría')
       const color = t.category_name ? (t.category_color ?? '#4edea3') : (t.category_id ? '#9ca3af' : '#4edea3')
       if (!map[name]) map[name] = { amount: 0, count: 0, color }
@@ -249,7 +261,7 @@ export default function EstadisticasPage() {
       .sort(([,a],[,b]) => b.amount - a.amount)
       .slice(0, 5)
       .map(([name, data]) => ({ name, ...data, pct: total > 0 ? (data.amount / total) * 100 : 0 }))
-  }, [filteredForKpis])
+  }, [filteredForMetrics])
 
   const spendingByDay = useMemo(() => {
     const expTx = filteredForKpis.filter(t => t.type === 'expense')
@@ -363,6 +375,20 @@ export default function EstadisticasPage() {
               </motion.div>
             ))}
           </motion.div>
+
+          {/* ── AVISO SALDO INICIAL ──────────────────────────────── */}
+          {saldoInicialRows.length > 0 && (
+            <div className="flex items-start gap-2.5 rounded-xl px-4 py-3"
+              style={{ background: 'rgba(109,59,215,0.06)', border: '1px solid rgba(109,59,215,0.15)' }}>
+              <Info size={14} className="shrink-0 mt-0.5" style={{ color: 'var(--brand-500)' }} />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold" style={{ color: 'var(--brand-500)' }}>Incluye saldo inicial de billeteras</p>
+                <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  {saldoInicialRows.map(r => formatCurrency(r.amount, r.curr as import('@/types').Currency)).join(' · ')} corresponden al capital que ya tenías al registrar tus billeteras en la app. Se incluyen en ingresos pero no afectan la tasa de ahorro ni las categorías más usadas.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* ── TASA DE AHORRO ───────────────────────────────────── */}
           {savingsRate !== null && (
@@ -512,7 +538,7 @@ export default function EstadisticasPage() {
               title="Distribución por categoría"
               desc="Proporción de cada categoría sobre el total del período."
             />
-            <CategoryDonutChart transactions={filteredForKpis} currency={activeCurr} loading={loading} />
+            <CategoryDonutChart transactions={filteredForMetrics} currency={activeCurr} loading={loading} />
           </div>
 
           {/* ── TOP 5 CATEGORÍAS DE GASTO ────────────────────────── */}
