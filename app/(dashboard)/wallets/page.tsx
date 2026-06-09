@@ -19,8 +19,8 @@ import { YieldCorrectionModal } from '@/components/wallets/YieldCorrectionModal'
 import { YieldBanner } from '@/components/ui/YieldBanner'
 import { useYieldCalculator } from '@/hooks/useYieldCalculator'
 import { formatCurrency, plural } from '@/utils/format'
-import { WALLET_PROVIDERS } from '@/types'
-import type { Wallet as WalletType, WalletWithBalance, Currency } from '@/types'
+import { WALLET_PROVIDERS, WALLET_TYPE_OPTIONS, WALLET_NAME_SUGGESTIONS } from '@/types'
+import type { Wallet as WalletType, WalletWithBalance, Currency, WalletType as WalletKind } from '@/types'
 import { motion } from 'motion/react'
 import { staggerContainer, staggerItem } from '@/utils/animations'
 
@@ -200,7 +200,7 @@ export default function WalletsPage() {
 
   function openCreate() {
     setEditing(null)
-    setForm({ currency: 'ARS', balance: 0 })
+    setForm({ currency: 'ARS', balance: 0, wallet_type: 'digital', include_in_balance: true })
     setFormMeta(EMPTY_META)
     setError(null)
     setModalOpen(true)
@@ -394,7 +394,9 @@ export default function WalletsPage() {
             const meta  = wallet.id ? (metas[wallet.id] ?? EMPTY_META) : EMPTY_META
             const theme = getTheme(wallet.provider, curr, meta.theme)
             const last4 = meta.last_four || (wallet.id ? wallet.id.slice(-4).toUpperCase() : '••••')
-            const isEfectivo = wallet.name?.toLowerCase() === 'efectivo' || wallet.provider?.toLowerCase() === 'efectivo'
+            const isEfectivo = wallet.wallet_type === 'cash'
+              || wallet.name?.toLowerCase().includes('efectivo')
+              || wallet.provider?.toLowerCase() === 'cash'
 
             return (
               <motion.div key={wallet.id} variants={staggerItem}>
@@ -437,6 +439,14 @@ export default function WalletsPage() {
                     >
                       {curr}
                     </span>
+                    {wallet.wallet_type === 'cash' && (
+                      <span
+                        className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                        style={{ background: 'rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.85)' }}
+                      >
+                        Efectivo
+                      </span>
+                    )}
                     {wallet.generates_yield && (
                       <span
                         className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5"
@@ -585,13 +595,45 @@ export default function WalletsPage() {
             </div>
           )}
 
-          <Input
-            label="Nombre de la billetera"
-            value={form.name ?? ''}
-            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-            placeholder="Ej: Mercado Pago principal"
-            required
+          <Select
+            label="Tipo de billetera"
+            value={form.wallet_type ?? 'digital'}
+            onChange={e => setForm(f => ({ ...f, wallet_type: e.target.value as WalletKind }))}
+            options={WALLET_TYPE_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
           />
+
+          <div>
+            <Input
+              label="Nombre de la billetera"
+              value={form.name ?? ''}
+              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="Ej: Mercado Pago principal"
+              required
+            />
+            {!editing && !form.name && (() => {
+              const key = `${form.wallet_type ?? 'digital'}_${form.currency ?? 'ARS'}`
+              const suggestions = WALLET_NAME_SUGGESTIONS[key] ?? []
+              if (!suggestions.length) return null
+              return (
+                <div className="mt-2">
+                  <p className="text-xs font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                    Sugerencias rápidas
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {suggestions.map(s => (
+                      <button key={s} type="button"
+                        onClick={() => setForm(f => ({ ...f, name: s }))}
+                        className="text-xs px-2.5 py-1 rounded-lg transition-all"
+                        style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)', color: 'var(--brand-500)' }}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
 
           <Select
             label="Plataforma / Banco"
@@ -681,6 +723,23 @@ export default function WalletsPage() {
               hint="El saldo con el que arranca esta billetera"
             />
           )}
+
+          <label className="flex items-center gap-3 cursor-pointer py-1">
+            <input
+              type="checkbox"
+              checked={form.include_in_balance ?? true}
+              onChange={e => setForm(f => ({ ...f, include_in_balance: e.target.checked }))}
+              className="w-4 h-4 rounded"
+            />
+            <div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Incluir en balance y patrimonio
+              </p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Desactivar si este dinero no está disponible o no querés contarlo
+              </p>
+            </div>
+          </label>
 
           <div className="flex gap-3 pt-2">
             <Button variant="secondary" onClick={() => setModalOpen(false)} className="flex-1">

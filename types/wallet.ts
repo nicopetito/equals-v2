@@ -1,9 +1,30 @@
+export type WalletType = 'cash' | 'bank' | 'digital' | 'investment'
+
+export const WALLET_TYPE_OPTIONS = [
+  { value: 'cash',       label: 'Efectivo',           icon: 'banknote'    },
+  { value: 'bank',       label: 'Cuenta bancaria',    icon: 'landmark'    },
+  { value: 'digital',    label: 'Billetera virtual',  icon: 'wallet'      },
+  { value: 'investment', label: 'Inversión / Crypto', icon: 'trending-up' },
+] as const
+
+export const WALLET_NAME_SUGGESTIONS: Record<string, string[]> = {
+  'cash_ARS':          ['Efectivo pesos', 'Caja en ARS'],
+  'cash_USD':          ['Dólares efectivo', 'Efectivo USD'],
+  'cash_EUR':          ['Euros efectivo', 'Efectivo EUR'],
+  'bank_ARS':          ['Cuenta corriente', 'Caja de ahorro'],
+  'bank_USD':          ['Caja de ahorro USD'],
+  'digital_ARS':       ['Mercado Pago', 'Ualá', 'Cuenta digital'],
+  'investment_CRYPTO': ['Binance', 'Crypto wallet'],
+}
+
 export interface Wallet {
   id?: string
   user_id?: string
   name: string
   provider?: string
   currency?: string
+  wallet_type?: WalletType
+  include_in_balance?: boolean
   balance?: number
   generates_yield?: boolean
   yield_mode?: 'estimated' | 'manual'

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { pendingPaymentService } from '@/services/pending_payment.service'
-import type { PendingPayment, PendingPaymentFilters } from '@/types'
+import { safeNumber } from '@/utils/format'
+import type { PendingPayment, PendingPaymentFilters, PendingPaymentCurrencyGroup, PendingPaymentSummary } from '@/types'
 
 export function usePendingPayments(filters?: PendingPaymentFilters) {
   const [items, setItems]     = useState<PendingPayment[]>([])
@@ -32,14 +33,22 @@ export function usePendingPayments(filters?: PendingPaymentFilters) {
 export function usePendingPaymentsSummary() {
   const { items, loading } = usePendingPayments()
 
-  const summary = useMemo(() => {
+  const summary = useMemo((): PendingPaymentSummary => {
     const today  = new Date().toISOString().slice(0, 10)
     const active = items.filter(p => p.status === 'pending')
+
+    const byCurrency: Record<string, PendingPaymentCurrencyGroup> = {}
+    for (const p of active) {
+      const cur = p.currency || 'ARS'
+      if (!byCurrency[cur]) byCurrency[cur] = { receivable: 0, payable: 0 }
+      if (p.type === 'receivable') byCurrency[cur].receivable += safeNumber(p.amount)
+      else                         byCurrency[cur].payable    += safeNumber(p.amount)
+    }
+
     return {
-      receivable: active.filter(p => p.type === 'receivable').reduce((s, p) => s + p.amount, 0),
-      payable:    active.filter(p => p.type === 'payable').reduce((s, p) => s + p.amount, 0),
-      overdue:    active.filter(p => p.due_date && p.due_date < today).length,
-      count:      active.length,
+      byCurrency,
+      overdue: active.filter(p => p.due_date && p.due_date < today).length,
+      count:   active.length,
     }
   }, [items])
 

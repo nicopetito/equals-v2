@@ -3,7 +3,7 @@ import { safeNumber } from '@/utils/format'
 import { INITIAL_BALANCE_LABEL } from '@/utils/constants'
 import { categoriesService } from '@/services/categories.service'
 import { transactionsService } from '@/services/transactions.service'
-import type { Wallet, WalletWithBalance, WalletDiagnostic, Currency } from '@/types'
+import type { Wallet, WalletWithBalance, WalletDiagnostic, Currency, WalletType } from '@/types'
 
 function getSupabase() {
   return createClient()
@@ -42,7 +42,7 @@ export const walletsService = {
     const [balanceResult, walletResult, yieldResult] = await Promise.all([
       supabase.from('wallet_current_balance').select('*').eq('user_id', user_id),
       supabase.from('wallets')
-        .select('id, generates_yield, yield_mode, annual_yield_rate, yield_frequency, last_yield_calculated_at')
+        .select('id, generates_yield, yield_mode, annual_yield_rate, yield_frequency, last_yield_calculated_at, wallet_type, include_in_balance')
         .eq('user_id', user_id),
       supabase.from('transactions')
         .select('wallet_id, amount')
@@ -75,6 +75,8 @@ export const walletsService = {
         yield_frequency:            ((yieldInfo as { yield_frequency?: string }).yield_frequency ?? 'daily') as 'daily' | 'business_days',
         last_yield_calculated_at:   (yieldInfo as { last_yield_calculated_at?: string | null }).last_yield_calculated_at ?? null,
         yield_month_total:          yieldByWallet.get(w.id as string) ?? 0,
+        wallet_type:                ((yieldInfo as { wallet_type?: string }).wallet_type ?? 'digital') as WalletType,
+        include_in_balance:         (yieldInfo as { include_in_balance?: boolean }).include_in_balance ?? true,
       }
     })
   },

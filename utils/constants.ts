@@ -3,10 +3,13 @@ export const WALLET_ADJUSTMENT_LABEL    = 'wallet_adjustment'    as const
 export const INITIAL_BALANCE_LABEL      = 'initial_balance'      as const
 export const RESERVATION_DEPOSIT_LABEL  = 'reservation_deposit'  as const
 export const RESERVATION_WITHDRAW_LABEL = 'reservation_withdraw' as const
+
+// Transferencias, ajustes y reservas: se excluyen de ingresos/gastos Y de métricas.
+// INITIAL_BALANCE_LABEL no está aquí — el saldo inicial SÍ se muestra en ingresos,
+// solo se excluye de métricas de comportamiento (tasa de ahorro, top categorías).
 export const INTERNAL_LABELS = new Set<string>([
   INTERNAL_TRANSFER_LABEL,
   WALLET_ADJUSTMENT_LABEL,
-  INITIAL_BALANCE_LABEL,
   RESERVATION_DEPOSIT_LABEL,
   RESERVATION_WITHDRAW_LABEL,
 ])

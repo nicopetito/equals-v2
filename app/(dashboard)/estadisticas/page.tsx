@@ -17,7 +17,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { HelpButton } from '@/components/help/HelpButton'
 import { formatCurrency, safeNumber } from '@/utils/format'
 import { calculateNetWorth, calculateSavingsMetrics, calculateYieldForPeriod } from '@/utils/finance'
-import { INTERNAL_LABELS } from '@/utils/constants'
+import { INTERNAL_LABELS, INITIAL_BALANCE_LABEL } from '@/utils/constants'
 import { getDateRangeForPeriod, PERIOD_OPTIONS, type Period } from '@/utils/date'
 import type { Currency } from '@/types'
 import { motion } from 'motion/react'
@@ -154,9 +154,11 @@ export default function EstadisticasPage() {
   )
 
   // Para métricas de comportamiento (tasa de ahorro, top categorías, donut): excluye
-  // además el saldo inicial, que no es ingreso ganado y distorsionaría el análisis.
+  // además el saldo inicial. Detecta tanto nuevas (por label) como históricas (por category_name).
   const filteredForMetrics = useMemo(
-    () => filteredForKpis.filter(t => t.category_name !== 'Saldo inicial'),
+    () => filteredForKpis.filter(t =>
+      t.label !== INITIAL_BALANCE_LABEL && t.category_name !== 'Saldo inicial'
+    ),
     [filteredForKpis]
   )
 

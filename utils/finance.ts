@@ -114,6 +114,7 @@ export function calculateNetWorth(
 
   wallets.forEach(w => {
     if (!w.currency) return
+    if (w.include_in_balance === false) return
     const val = safeNumber(w.current_balance)
     const r = ensure(w.currency)
     r.liquid += val

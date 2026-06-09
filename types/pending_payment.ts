@@ -21,3 +21,14 @@ export interface PendingPaymentFilters {
   type?: PendingPaymentType
   status?: PendingPaymentStatus | PendingPaymentStatus[]
 }
+
+export interface PendingPaymentCurrencyGroup {
+  receivable: number
+  payable: number
+}
+
+export interface PendingPaymentSummary {
+  byCurrency: Record<string, PendingPaymentCurrencyGroup>
+  overdue: number
+  count: number
+}

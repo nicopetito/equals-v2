@@ -17,6 +17,7 @@ import { useTransactionTemplates } from '@/hooks/useTransactionTemplates'
 import { useGoals } from '@/hooks/useGoals'
 import { useFixedTerms } from '@/hooks/useFixedTerms'
 import { useReservations } from '@/hooks/useReservations'
+import { useDollar } from '@/hooks/useDollar'
 import { transactionsService } from '@/services/transactions.service'
 import { refundService } from '@/services/refund.service'
 import { calculateRefundAmount } from '@/utils/refund'
@@ -32,7 +33,7 @@ import { TemplateConfirmModal } from '@/components/transactions/TemplateConfirmM
 import { seedDemoData } from '@/utils/seed'
 import { formatCurrency, plural } from '@/utils/format'
 import { calculateNetWorth, calculateSavingsMetrics, calculateYieldForPeriod } from '@/utils/finance'
-import { INTERNAL_LABELS } from '@/utils/constants'
+import { INTERNAL_LABELS, INITIAL_BALANCE_LABEL } from '@/utils/constants'
 import { YieldBanner } from '@/components/ui/YieldBanner'
 import { useYieldCalculator } from '@/hooks/useYieldCalculator'
 import { format } from 'date-fns'
@@ -95,7 +96,8 @@ export default function DashboardPage() {
   const { data: goals }        = useGoals()
   const { items: fixedTerms }  = useFixedTerms()
   const { data: reservations } = useReservations()
-  const { summary: pendingSummary } = usePendingPaymentsSummary()
+  const { summary: pendingSummary, loading: pendingLoading } = usePendingPaymentsSummary()
+  const { data: dollarRates }  = useDollar(300_000)
 
   // Auto-cálculo de rendimientos al cargar el dashboard (idempotente por RPC)
   useEffect(() => {
@@ -189,10 +191,12 @@ export default function DashboardPage() {
     [kpiFiltered]
   )
 
-  // Para métricas de comportamiento (tasa de ahorro): excluye además el saldo inicial,
-  // ya que no es ingreso ganado y distorsionaría la tasa.
+  // Para métricas de comportamiento (tasa de ahorro): excluye además el saldo inicial.
+  // Detecta tanto transacciones nuevas (por label) como históricas (por category_name).
   const kpiFilteredForMetrics = useMemo(
-    () => kpiFilteredClean.filter(t => t.category_name !== 'Saldo inicial'),
+    () => kpiFilteredClean.filter(t =>
+      t.label !== INITIAL_BALANCE_LABEL && t.category_name !== 'Saldo inicial'
+    ),
     [kpiFilteredClean]
   )
 
@@ -239,6 +243,14 @@ export default function DashboardPage() {
       if (w.currency) acc[w.currency] = (acc[w.currency] ?? 0) + (w.current_balance ?? 0)
       return acc
     }, {}), [wallets])
+
+  const usdEquivARS = useMemo(() => {
+    const usdBal = walletByCurrency['USD'] ?? 0
+    if (!usdBal) return null
+    const blue = dollarRates.find(r => r.currency === 'Blue')
+    if (!blue?.sell) return null
+    return usdBal * blue.sell
+  }, [walletByCurrency, dollarRates])
 
   const orphanStats = useMemo(() => {
     if (txLoading || walletsLoading) return null
@@ -569,6 +581,20 @@ export default function DashboardPage() {
                   ))}
                 </div>
               )}
+              {usdEquivARS !== null && (
+                <div className="w-full relative z-10 mt-1 pt-2 flex items-center gap-2"
+                  style={{ borderTop: '1px solid rgba(255,255,255,0.10)' }}>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">
+                    USD blue equiv.
+                  </span>
+                  <span className="text-[10px] text-white/40">≈</span>
+                  <span className="text-xs font-bold tabular-nums text-white/65"
+                    style={{ fontFamily: 'var(--font-sora)' }}>
+                    {formatCurrency(usdEquivARS, 'ARS')}
+                  </span>
+                  <span className="text-[9px] text-white/30 ml-auto">estimado · cotiz. blue</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -624,49 +650,103 @@ export default function DashboardPage() {
 
       {/* â"€â"€ BILLETERAS â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€ */}
       {/* ── PAGOS PENDIENTES ── */}
-      {!loading && pendingSummary.count > 0 && (
+      {!pendingLoading && (
         <div
-          className="glass-card rounded-2xl px-4 py-3 flex items-center justify-between gap-3"
-          style={{ boxShadow: CARD_SHADOW, border: CARD_BORDER }}
+          className="glass-card rounded-2xl overflow-hidden"
+          style={{ boxShadow: CARD_SHADOW, border: CARD_BORDER, transition: TRANSITION }}
+          onMouseEnter={e => cardHoverOn(e.currentTarget)}
+          onMouseLeave={e => cardHoverOff(e.currentTarget)}
         >
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: 'rgba(109,59,215,0.09)', border: '1px solid rgba(109,59,215,0.16)' }}>
-              <Clock size={14} style={{ color: 'var(--brand-500)' }} />
-            </div>
-            <div>
-              <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
-                Pagos pendientes
-              </p>
-              <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                {pendingSummary.receivable > 0 && (
-                  <span style={{ color: 'var(--income-600)' }}>
-                    +{formatCurrency(pendingSummary.receivable, 'ARS')} a cobrar
-                  </span>
-                )}
-                {pendingSummary.receivable > 0 && pendingSummary.payable > 0 && ' · '}
-                {pendingSummary.payable > 0 && (
-                  <span style={{ color: 'var(--expense-600)' }}>
-                    -{formatCurrency(pendingSummary.payable, 'ARS')} a pagar
-                  </span>
-                )}
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: 'rgba(109,59,215,0.09)', border: '1px solid rgba(109,59,215,0.16)' }}
+              >
+                <Clock size={14} style={{ color: 'var(--brand-500)' }} />
+              </div>
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+                  Pagos pendientes
+                </p>
                 {pendingSummary.overdue > 0 && (
-                  <span style={{ color: '#DC2626' }}>
-                    {' '}· {pendingSummary.overdue} vencido{pendingSummary.overdue !== 1 ? 's' : ''}
+                  <span
+                    className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                    style={{ background: 'var(--expense-50)', color: 'var(--expense-600)', border: '1px solid var(--expense-100)' }}
+                  >
+                    {pendingSummary.overdue} vencido{pendingSummary.overdue !== 1 ? 's' : ''}
                   </span>
                 )}
-              </p>
+              </div>
             </div>
+            <button
+              onClick={() => router.push('/pending')}
+              className="text-xs font-semibold px-3 py-1.5 rounded-xl transition-all shrink-0"
+              style={{ color: 'var(--brand-500)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--brand-50)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              Ver todos
+            </button>
           </div>
-          <button
-            onClick={() => router.push('/pending')}
-            className="text-xs font-semibold px-3 py-1.5 rounded-xl transition-all shrink-0"
-            style={{ color: 'var(--brand-500)' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--brand-50)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-          >
-            Ver todos
-          </button>
+          {pendingSummary.count === 0 ? (
+            <p className="px-4 pb-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+              No tenés pagos pendientes
+            </p>
+          ) : (
+            <div className="px-4 pb-3 space-y-3">
+              {Object.entries(pendingSummary.byCurrency).map(([cur, group]) => (
+                <div key={cur} className="space-y-1.5">
+                  <p
+                    className="text-[10px] font-bold uppercase tracking-widest"
+                    style={{ color: 'var(--text-faint)' }}
+                  >
+                    {cur}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {group.receivable > 0 && (
+                      <div
+                        className="flex-1 min-w-[130px] rounded-xl px-3 py-2"
+                        style={{ background: 'var(--income-50)', border: '1px solid var(--income-100)' }}
+                      >
+                        <p
+                          className="text-[10px] font-bold uppercase tracking-wide"
+                          style={{ color: 'var(--income-600)' }}
+                        >
+                          A cobrar
+                        </p>
+                        <p
+                          className="text-sm font-extrabold mt-0.5 tabular-nums"
+                          style={{ color: 'var(--income-600)', fontFamily: 'var(--font-sora)' }}
+                        >
+                          +{formatCurrency(group.receivable, cur)}
+                        </p>
+                      </div>
+                    )}
+                    {group.payable > 0 && (
+                      <div
+                        className="flex-1 min-w-[130px] rounded-xl px-3 py-2"
+                        style={{ background: 'var(--expense-50)', border: '1px solid var(--expense-100)' }}
+                      >
+                        <p
+                          className="text-[10px] font-bold uppercase tracking-wide"
+                          style={{ color: 'var(--expense-600)' }}
+                        >
+                          A pagar
+                        </p>
+                        <p
+                          className="text-sm font-extrabold mt-0.5 tabular-nums"
+                          style={{ color: 'var(--expense-600)', fontFamily: 'var(--font-sora)' }}
+                        >
+                          -{formatCurrency(group.payable, cur)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
