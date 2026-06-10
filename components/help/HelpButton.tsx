@@ -2,7 +2,11 @@
 
 import { useState } from 'react'
 import { HelpCircle } from 'lucide-react'
-import { HelpDrawer } from './HelpDrawer'
+import dynamic from 'next/dynamic'
+const HelpDrawer = dynamic(
+  () => import('./HelpDrawer').then(m => ({ default: m.HelpDrawer })),
+  { ssr: false, loading: () => null }
+)
 import { helpContent } from './helpContent'
 
 const SEEN_KEY = 'equal_guide_seen_v1'

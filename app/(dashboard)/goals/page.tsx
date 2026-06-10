@@ -431,7 +431,7 @@ export default function GoalsPage() {
 
       {/* Stats compactas */}
       {!loading && goals.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             { label: 'En progreso',    value: activeGoals.length.toString() },
             { label: 'Completados',    value: completedGoals.length.toString() },
@@ -450,7 +450,7 @@ export default function GoalsPage() {
       {/* Lista de objetivos */}
       {loading ? (
         <div className="py-16 text-center" style={{ color: 'var(--text-muted)' }}>
-          <div className="w-8 h-8 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin mx-auto mb-3" />
+          <div className="w-8 h-8 border-2 border-[var(--border)] border-t-[var(--brand-500)] rounded-full animate-spin mx-auto mb-3" />
           Cargando objetivos…
         </div>
       ) : goals.length === 0 ? (
@@ -790,7 +790,7 @@ export default function GoalsPage() {
                   </p>
                   {movLoading ? (
                     <div className="py-6 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
-                      <div className="w-5 h-5 border-2 border-indigo-200 border-t-indigo-500 rounded-full animate-spin mx-auto mb-2" />
+                      <div className="w-5 h-5 border-2 border-[var(--border)] border-t-[var(--brand-500)] rounded-full animate-spin mx-auto mb-2" />
                       Cargando movimientos…
                     </div>
                   ) : movements.length === 0 ? (

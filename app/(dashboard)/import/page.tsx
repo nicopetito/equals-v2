@@ -897,6 +897,7 @@ export default function ImportPage() {
     setSelected(new Set(rows.filter(r => !r._error).map(r => r._index)))
     setRowFilter('all')
     setStep('preview')
+    setRawRows([])  // liberar memoria del CSV original — ya no se necesita tras preview
   }
 
   // ── Toggle selección ──────────────────────────────────────────────────────

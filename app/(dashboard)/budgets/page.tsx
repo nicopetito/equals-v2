@@ -341,7 +341,7 @@ export default function BudgetsPage() {
       {/* SUMMARY STRIP */}
       {budgets.length > 0 && (
         <div
-          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-0 rounded-2xl overflow-hidden"
+          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-0 rounded-2xl overflow-hidden"
           style={{ border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
         >
           {[
@@ -485,7 +485,7 @@ export default function BudgetsPage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1">
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus-within:opacity-100 transition-opacity shrink-0 ml-1">
                     <button
                       onClick={() => openEdit(budget)}
                       className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"

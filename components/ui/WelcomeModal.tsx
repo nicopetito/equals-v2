@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/Button'
 import { CreditCard, TrendingDown, Target, Zap, X } from 'lucide-react'
+import { userKey } from '@/utils/format'
 
 const ACTIONS = [
   {
@@ -44,7 +45,7 @@ export function WelcomeModal() {
 
   useEffect(() => {
     if (!user) return
-    const key = `equal_welcomed_${user.id}`
+    const key = `equal_welcomed_${userKey(user.id)}`
     if (localStorage.getItem(key)) return
 
     const name: string =
@@ -58,7 +59,7 @@ export function WelcomeModal() {
 
   function dismiss(href?: string) {
     if (!user?.id) return
-    localStorage.setItem(`equal_welcomed_${user.id}`, '1')
+    localStorage.setItem(`equal_welcomed_${userKey(user.id)}`, '1')
     setOpen(false)
     if (href) router.push(href)
   }

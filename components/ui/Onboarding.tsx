@@ -9,8 +9,9 @@ import { useAuth } from '@/hooks/useAuth'
 import { useWallets } from '@/hooks/useWallets'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useGoals } from '@/hooks/useGoals'
+import { userKey } from '@/utils/format'
 
-const DONE_KEY = (userId: string) => `eq_onboarding_${userId}`
+const DONE_KEY = (userId: string) => `eq_onboarding_${userKey(userId)}`
 
 interface Step {
   id: string

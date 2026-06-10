@@ -13,6 +13,7 @@ import { walletsService } from '@/services/wallets.service'
 import { useToast } from '@/components/providers/ToastProvider'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { userKey } from '@/utils/format'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ export function FirstWalletWizard() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisible(true)
       // Marcar WelcomeModal como visto — el wizard cubre ese flujo
-      localStorage.setItem(`equal_welcomed_${user.id}`, '1')
+      localStorage.setItem(`equal_welcomed_${userKey(user.id)}`, '1')
     } else {
       setVisible(false)
     }

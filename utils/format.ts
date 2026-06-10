@@ -56,3 +56,8 @@ export function calculateExchange(
     ? roundMoney(safeAmt / safeRate)
     : roundMoney(safeAmt * safeRate)
 }
+
+/** Ofusca un user ID para usarlo como sufijo en keys de localStorage. */
+export function userKey(userId: string): string {
+  return btoa('eq-' + userId.slice(0, 12)).replace(/=/g, '')
+}

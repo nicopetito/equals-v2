@@ -321,7 +321,7 @@ export default function ScheduledPage() {
 
       {/* ─── Mini stats ─── */}
       {!loading && items.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
           {[
             { label: 'Ingresos activos',  value: String(stats.incomesActive),  icon: ArrowUpCircle,   color: 'var(--income-500)',  bg: 'var(--income-50)'  },
             { label: 'Gastos activos',    value: String(stats.expensesActive), icon: ArrowDownCircle, color: 'var(--expense-500)', bg: 'var(--expense-50)' },
@@ -382,7 +382,7 @@ export default function ScheduledPage() {
               </button>
             )
           })}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full flex-1 min-w-44" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full w-full sm:flex-1 sm:w-auto" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
             <Search size={13} style={{ color: 'var(--text-faint)' }} />
             <input type="text" placeholder="Buscar por nombre, categoría, billetera…" value={search} onChange={e => setSearch(e.target.value)}
               className="flex-1 bg-transparent outline-none text-xs" style={{ color: 'var(--text-primary)' }} />
@@ -393,7 +393,7 @@ export default function ScheduledPage() {
       {/* ─── Contenido ─── */}
       {loading ? (
         <div className="py-16 text-center" style={{ color: 'var(--text-muted)' }}>
-          <div className="w-7 h-7 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-3" />
+          <div className="w-7 h-7 border-2 border-[var(--border)] border-t-[var(--brand-500)] rounded-full animate-spin mx-auto mb-3" />
           <p className="text-sm">Cargando operaciones…</p>
         </div>
       ) : items.length === 0 ? (

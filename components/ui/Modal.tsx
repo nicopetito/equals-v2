@@ -54,8 +54,6 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
             style={{
               position: 'fixed',
               inset: 0,
-              width: '100vw',
-              height: '100vh',
               zIndex: 9998,
               background: 'rgba(248, 250, 252, 0.35)',
               backdropFilter: 'blur(3px) saturate(110%)',
@@ -68,8 +66,6 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
             style={{
               position: 'fixed',
               inset: 0,
-              width: '100vw',
-              height: '100vh',
               zIndex: 9999,
               display: 'flex',
               alignItems: 'center',

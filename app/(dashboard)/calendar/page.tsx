@@ -413,7 +413,7 @@ function TaskItem({
       {/* Delete */}
       <button
         onClick={() => onDelete(task.id)}
-        className="w-5 h-5 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+        className="w-5 h-5 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100 transition-opacity shrink-0"
         style={{ color: 'var(--text-faint)' }}
         title="Eliminar"
       >

@@ -1,6 +1,6 @@
 import type { TransactionWithDetails } from '@/types'
 import type { Goal } from '@/types'
-import { safeNumber } from '@/utils/format'
+import { safeNumber, userKey } from '@/utils/format'
 
 export type AchievementState = 'unlocked' | 'in_progress' | 'locked' | 'hidden'
 
@@ -33,7 +33,7 @@ export interface StreakData {
 
 // ── Streak (racha de registro) ────────────────────────────────────────────────
 
-const STREAK_KEY = (userId: string) => `eq_streak_${userId}`
+const STREAK_KEY = (userId: string) => `eq_streak_${userKey(userId)}`
 
 export function getStreak(userId: string): StreakData {
   if (typeof window === 'undefined') return { current: 0, best: 0, lastDate: null }
@@ -350,7 +350,7 @@ export function computeAchievements(
 
 // ── Flags en localStorage ──────────────────────────────────────────────────────
 
-const IMPORT_KEY = (userId: string) => `eq_import_used_${userId}`
+const IMPORT_KEY = (userId: string) => `eq_import_used_${userKey(userId)}`
 
 export function markImportUsed(userId: string) {
   if (typeof window !== 'undefined') localStorage.setItem(IMPORT_KEY(userId), '1')

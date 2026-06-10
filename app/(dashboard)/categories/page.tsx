@@ -277,7 +277,7 @@ export default function CategoriesPage() {
 
               {/* Actions — appear on hover, ocultas para categorías de sistema */}
               {!cat.is_system && (
-                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
                   <button
                     onClick={() => openEdit(cat)}
                     className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors"
@@ -538,7 +538,7 @@ export default function CategoriesPage() {
       {/* ── Main content ──────────────────────────────────────────────────────────── */}
       {loading ? (
         <div className="py-14 text-center" style={{ color: 'var(--text-muted)' }}>
-          <div className="w-7 h-7 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin mx-auto mb-3" />
+          <div className="w-7 h-7 border-2 border-[var(--border)] border-t-[var(--brand-500)] rounded-full animate-spin mx-auto mb-3" />
           <p className="text-sm font-medium">Cargando categorías…</p>
         </div>
       ) : categories.length === 0 ? (

@@ -7,6 +7,7 @@ import type {
   TransactionFilters,
   TransactionSort,
   MonthlyTrend,
+  PaginatedResult,
 } from '@/types'
 
 function getSupabase() {
@@ -76,6 +77,10 @@ export const transactionsService = {
       throw new Error('Seleccioná una billetera para registrar esta transacción.')
     }
 
+    if (!tx.amount || tx.amount <= 0) {
+      throw new Error('El monto debe ser mayor a 0.')
+    }
+
     if (!tx.category_id) {
       const catId = await categoriesService.getOrCreateSystemCategory(tx.type)
       tx = { ...tx, category_id: catId }
@@ -120,6 +125,10 @@ export const transactionsService = {
     const supabase = getSupabase()
     const user_id = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
+
+    if ('amount' in tx && (!tx.amount || tx.amount <= 0)) {
+      throw new Error('El monto debe ser mayor a 0.')
+    }
 
     // Service-layer guard: block financial field changes if credited refunds exist.
     // Compare against the original values to avoid false positives when the form
@@ -212,6 +221,86 @@ export const transactionsService = {
 
     if (error) return { success: 0, errors: transactions.length }
     return { success: (data as { inserted: number }).inserted, errors: 0 }
+  },
+
+  async listPaginated(
+    filters?: TransactionFilters,
+    sort?: TransactionSort,
+    page: number = 1,
+    pageSize: number = 10,
+  ): Promise<PaginatedResult<TransactionWithDetails>> {
+    const supabase = getSupabase()
+    const user_id = await getUserId()
+    if (!user_id) return { data: [], total: 0, page, pageSize, totalPages: 0 }
+
+    const from = (page - 1) * pageSize
+    const to   = page * pageSize - 1
+
+    let query = supabase
+      .from('transactions_with_details')
+      .select('*', { count: 'exact' })
+      .eq('user_id', user_id)
+
+    if (filters) {
+      if (filters.type && filters.type !== 'all') query = query.eq('type', filters.type)
+      if (filters.category_ids?.length) query = query.in('category_id', filters.category_ids)
+      if (filters.wallet_ids?.length) query = query.in('wallet_id', filters.wallet_ids)
+      if (filters.currency) query = query.eq('currency', filters.currency)
+      if (filters.from) query = query.gte('date', filters.from)
+      if (filters.to) query = query.lte('date', filters.to)
+      if (filters.is_recurring !== undefined) query = query.eq('is_recurring', filters.is_recurring)
+      if (filters.search) query = query.ilike('description', `%${filters.search}%`)
+      if (filters.no_wallet) query = query.is('wallet_id', null)
+      if (filters.no_category) query = query.is('category_id', null)
+    }
+
+    const field = sort?.field ?? 'date'
+    const ascending = sort?.order === 'asc'
+    query = query.order(field, { ascending }).range(from, to)
+
+    const { data, error, count } = await query
+    if (error) throw error
+
+    const total = count ?? 0
+    return {
+      data: (data ?? []).map(t => ({ ...t, amount: safeNumber(t.amount) })),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    }
+  },
+
+  async getSummaryStats(filters?: TransactionFilters): Promise<{ income: number; expenses: number }> {
+    const supabase = getSupabase()
+    const user_id = await getUserId()
+    if (!user_id) return { income: 0, expenses: 0 }
+
+    let query = supabase
+      .from('transactions_with_details')
+      .select('amount, type')
+      .eq('user_id', user_id)
+
+    if (filters) {
+      if (filters.type && filters.type !== 'all') query = query.eq('type', filters.type)
+      if (filters.category_ids?.length) query = query.in('category_id', filters.category_ids)
+      if (filters.wallet_ids?.length) query = query.in('wallet_id', filters.wallet_ids)
+      if (filters.currency) query = query.eq('currency', filters.currency)
+      if (filters.from) query = query.gte('date', filters.from)
+      if (filters.to) query = query.lte('date', filters.to)
+      if (filters.is_recurring !== undefined) query = query.eq('is_recurring', filters.is_recurring)
+      if (filters.search) query = query.ilike('description', `%${filters.search}%`)
+      if (filters.no_wallet) query = query.is('wallet_id', null)
+      if (filters.no_category) query = query.is('category_id', null)
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+
+    const rows = data ?? []
+    const income   = rows.filter(t => t.type === 'income').reduce((s, t) => s + safeNumber(t.amount), 0)
+    const expenses = rows.filter(t => t.type === 'expense').reduce((s, t) => s + safeNumber(t.amount), 0)
+    return { income, expenses }
   },
 
   async getMonthlyTrends(months = 6, currency = 'ARS'): Promise<MonthlyTrend[]> {

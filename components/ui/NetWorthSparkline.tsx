@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { Wallet, Target, TrendingUp } from 'lucide-react'
-import type { WalletWithBalance, Goal, FixedTerm } from '@/types'
+import type { WalletWithBalance, Goal, FixedTerm, Reservation } from '@/types'
 import { formatCurrency } from '@/utils/format'
 import { calculateNetWorth } from '@/utils/finance'
 
@@ -10,15 +10,16 @@ interface Props {
   wallets: WalletWithBalance[]
   goals: Goal[]
   fixedTerms: FixedTerm[]
+  reservations?: Reservation[]
   // Moneda específica a mostrar, o 'all' para mostrar el total de todas.
   currency: string
   loading?: boolean
 }
 
-export function NetWorthSparkline({ wallets, goals, fixedTerms, currency, loading }: Props) {
+export function NetWorthSparkline({ wallets, goals, fixedTerms, reservations = [], currency, loading }: Props) {
   const netWorth = useMemo(
-    () => calculateNetWorth(wallets, goals, fixedTerms),
-    [wallets, goals, fixedTerms]
+    () => calculateNetWorth(wallets, goals, fixedTerms, reservations),
+    [wallets, goals, fixedTerms, reservations]
   )
 
   const displayCur = currency === 'all' ? 'ARS' : currency

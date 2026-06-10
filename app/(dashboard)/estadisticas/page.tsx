@@ -7,11 +7,16 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useWallets } from '@/hooks/useWallets'
 import { useGoals } from '@/hooks/useGoals'
 import { useFixedTerms } from '@/hooks/useFixedTerms'
+import { useReservations } from '@/hooks/useReservations'
 import { HealthScore } from '@/components/ui/HealthScore'
 import { CategoryDonutChart } from '@/components/ui/CategoryDonutChart'
 import { IncomeExpenseChart } from '@/components/ui/IncomeExpenseChart'
 import { NetWorthSparkline } from '@/components/ui/NetWorthSparkline'
-import { ReportModal } from '@/components/ui/ReportModal'
+import dynamic from 'next/dynamic'
+const ReportModal = dynamic(
+  () => import('@/components/ui/ReportModal').then(m => ({ default: m.ReportModal })),
+  { ssr: false, loading: () => null }
+)
 import { PageHeader } from '@/components/ui/PageHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { HelpButton } from '@/components/help/HelpButton'
@@ -126,9 +131,15 @@ export default function EstadisticasPage() {
 
   const { data: allTransactions, loading: txLoading } = useTransactions()
   const { data: wallets, loading: walletsLoading }    = useWallets()
-  const { data: goals }       = useGoals()
-  const { items: fixedTerms } = useFixedTerms()
+  const { data: goals }           = useGoals()
+  const { items: fixedTerms }     = useFixedTerms()
+  const { data: reservations }    = useReservations()
   const loading = txLoading || walletsLoading
+
+  const walletIds = useMemo(
+    () => new Set(wallets.map(w => w.id).filter(Boolean) as string[]),
+    [wallets]
+  )
 
   const { start, end } = getDateRangeForPeriod(period)
   const { prevStart, prevEnd } = getPrevDateRange(period)
@@ -147,10 +158,13 @@ export default function EstadisticasPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [allTransactions, startISO, endISO, currency])
 
-  // Excluir transferencias internas y ajustes de billetera de los KPIs financieros
+  // Excluir transferencias internas, ajustes y transacciones sin billetera válida
   const filteredForKpis = useMemo(
-    () => filtered.filter(t => !(t.label && INTERNAL_LABELS.has(t.label))),
-    [filtered]
+    () => filtered.filter(t =>
+      !!(t.wallet_id && walletIds.has(t.wallet_id)) &&
+      !(t.label && INTERNAL_LABELS.has(t.label))
+    ),
+    [filtered, walletIds]
   )
 
   // Para métricas de comportamiento (tasa de ahorro, top categorías, donut): excluye
@@ -275,8 +289,8 @@ export default function EstadisticasPage() {
   }, [filteredForKpis])
 
   const netWorth = useMemo(
-    () => calculateNetWorth(wallets, goals, fixedTerms),
-    [wallets, goals, fixedTerms]
+    () => calculateNetWorth(wallets, goals, fixedTerms, reservations),
+    [wallets, goals, fixedTerms, reservations]
   )
 
   const showContent = loading || filtered.length > 0
@@ -470,6 +484,7 @@ export default function EstadisticasPage() {
                   wallets={wallets}
                   goals={goals}
                   fixedTerms={fixedTerms}
+                  reservations={reservations}
                   currency={currency}
                   loading={loading}
                 />

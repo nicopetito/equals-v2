@@ -270,7 +270,7 @@ export function HelpDrawer({ open, onClose, section }: HelpDrawerProps) {
           top: 0,
           right: 0,
           bottom: 0,
-          width: 380,
+          width: 'min(380px, calc(100vw - 1rem))',
           zIndex: 9999,
           background: 'rgba(255,255,255,0.98)',
           borderLeft: '1px solid var(--border)',

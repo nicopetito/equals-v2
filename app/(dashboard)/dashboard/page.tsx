@@ -26,7 +26,11 @@ import { CategoryBadge } from '@/components/ui/CategoryBadge'
 import { TypeBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
-import { ReportModal } from '@/components/ui/ReportModal'
+import dynamic from 'next/dynamic'
+const ReportModal = dynamic(
+  () => import('@/components/ui/ReportModal').then(m => ({ default: m.ReportModal })),
+  { ssr: false, loading: () => null }
+)
 import { useToast } from '@/components/providers/ToastProvider'
 import { NewTransactionModal } from '@/components/transactions/NewTransactionModal'
 import { TemplateConfirmModal } from '@/components/transactions/TemplateConfirmModal'
@@ -84,7 +88,10 @@ export default function DashboardPage() {
   const { calculatePendingYields, formatYieldToast } = useYieldCalculator()
   const hasCalculatedYields = useRef(false)
 
-  const { data: allTransactions, loading: txLoading, refetch: refetchTx }   = useTransactions()
+  const fromStr = useMemo(() => format(getDateRangeForPeriod(period).start, 'yyyy-MM-dd'), [period])
+  const toStr   = useMemo(() => format(getDateRangeForPeriod(period).end,   'yyyy-MM-dd'), [period])
+
+  const { data: allTransactions, loading: txLoading, refetch: refetchTx } = useTransactions({ from: fromStr, to: toStr })
   const { data: wallets, loading: walletsLoading, refetch: refetchWallets } = useWallets()
   const { data: categories } = useCategories()
   const { items: pendingRefunds }   = usePendingRefunds()
@@ -163,18 +170,10 @@ export default function DashboardPage() {
     addToast('Transacción registrada', 'success')
   }
 
-  const { start, end } = getDateRangeForPeriod(period)
-  const fromStr = format(start, 'yyyy-MM-dd')
-  const toStr   = format(end,   'yyyy-MM-dd')
-
   const filtered = useMemo(() => {
-    return allTransactions.filter(t => {
-      const dayStr = t.date.substring(0, 10)
-      if (dayStr < fromStr || dayStr > toStr) return false
-      if (currency !== 'all' && t.currency !== currency) return false
-      return true
-    })
-  }, [allTransactions, fromStr, toStr, currency])
+    if (currency === 'all') return allTransactions
+    return allTransactions.filter(t => t.currency === currency)
+  }, [allTransactions, currency])
 
   // walletIds antes de los KPIs para poder excluir huérfanas de los cálculos
   const walletIds = useMemo(() => new Set(wallets.map(w => w.id).filter(Boolean) as string[]), [wallets])
@@ -285,7 +284,7 @@ export default function DashboardPage() {
   )
 
   const recentTx = useMemo(
-    () => [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 4),
+    () => [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5),
     [filtered])
 
   const loading = txLoading || walletsLoading
@@ -328,13 +327,13 @@ export default function DashboardPage() {
         <div className="relative z-10 flex gap-2 flex-wrap">
           <HelpButton section="dashboard" />
           <button onClick={() => setReportOpen(true)}
-            className="hidden md:flex hero-btn hero-btn-secondary">
-            <FileText size={14} /> Exportar
+            className="hero-btn hero-btn-secondary">
+            <FileText size={14} /> <span className="hidden sm:inline">Exportar</span>
           </button>
           <button
             onClick={() => setTemplatePickerOpen(true)}
-            className="hidden md:flex hero-btn hero-btn-secondary">
-            <Zap size={14} /> Transacción rápida
+            className="hero-btn hero-btn-secondary">
+            <Zap size={14} /> <span className="hidden sm:inline">Transacción rápida</span>
           </button>
           <button onClick={() => setNewTxOpen(true)}
             className="hero-btn hero-btn-primary">
@@ -615,16 +614,16 @@ export default function DashboardPage() {
           {/* KPIs */}
           {summaryRows.length > 0 && (
             <motion.div
-              className={`grid gap-3 ${yieldRows.length > 0 ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}
+              className={`grid gap-3 ${yieldRows.length > 0 ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3'}`}
               variants={staggerContainer}
               initial="hidden"
               animate="visible"
             >
-              <motion.div variants={staggerItem}><KpiCard label="Ingresos"     icon={TrendingUp}   accent="var(--income-500)" rows={summaryRows.map(r => ({ curr: r.curr, value: r.income }))} /></motion.div>
-              <motion.div variants={staggerItem}><KpiCard label="Gastos"       icon={TrendingDown}  accent="var(--expense-500)" rows={summaryRows.map(r => ({ curr: r.curr, value: r.expenses }))} /></motion.div>
-              <motion.div variants={staggerItem}><KpiCard label="Balance neto" tooltip="Ingresás menos Gastás en el período. El saldo total de tus billeteras está disponible en el inicio." icon={Wallet} accent="var(--brand-500)" rows={summaryRows.map(r => ({ curr: r.curr, value: r.balance, signed: true }))} /></motion.div>
+              <motion.div variants={staggerItem}><KpiCard label="Ingresos"     icon={TrendingUp}   accent="var(--income-500)"  bgTint="var(--income-50)"  rows={summaryRows.map(r => ({ curr: r.curr, value: r.income }))} /></motion.div>
+              <motion.div variants={staggerItem}><KpiCard label="Gastos"       icon={TrendingDown}  accent="var(--expense-500)" bgTint="var(--expense-50)" rows={summaryRows.map(r => ({ curr: r.curr, value: r.expenses }))} /></motion.div>
+              <motion.div variants={staggerItem}><KpiCard label="Balance neto" tooltip="Ingresás menos Gastás en el período. El saldo total de tus billeteras está disponible en el inicio." icon={Wallet} accent="var(--brand-500)" bgTint="var(--brand-50)" rows={summaryRows.map(r => ({ curr: r.curr, value: r.balance, signed: true }))} /></motion.div>
               {yieldRows.length > 0 && (
-                <motion.div variants={staggerItem}><KpiCard label="Rendimientos" tooltip="Rendimientos estimados acreditados en el período. Los montos son estimados." icon={TrendingUp} accent="#6d3bd7" rows={yieldRows} /></motion.div>
+                <motion.div variants={staggerItem}><KpiCard label="Rendimientos" tooltip="Rendimientos estimados acreditados en el período. Los montos son estimados." icon={TrendingUp} accent="#6d3bd7" bgTint="var(--brand-50)" rows={yieldRows} /></motion.div>
               )}
             </motion.div>
           )}
@@ -863,14 +862,14 @@ export default function DashboardPage() {
 
 // â"€â"€ KPI Card â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
-function KpiCard({ label, icon: Icon, accent, rows, tooltip }: {
-  label: string; icon: React.ElementType; accent: string
+function KpiCard({ label, icon: Icon, accent, bgTint, rows, tooltip }: {
+  label: string; icon: React.ElementType; accent: string; bgTint?: string
   rows: { curr: string; value: number; signed?: boolean }[]
   tooltip?: string
 }) {
   return (
     <div className="glass-card rounded-2xl p-4 cursor-default"
-      style={{ boxShadow: CARD_SHADOW, border: CARD_BORDER, transition: TRANSITION }}
+      style={{ boxShadow: CARD_SHADOW, border: CARD_BORDER, transition: TRANSITION, background: bgTint ?? undefined }}
       onMouseEnter={e => cardHoverOn(e.currentTarget as HTMLElement)}
       onMouseLeave={e => cardHoverOff(e.currentTarget as HTMLElement)}>
       <div className="flex items-center gap-2 mb-3">

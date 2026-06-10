@@ -299,7 +299,12 @@ export function NewTransactionModal({
       return
     }
 
-    if (!form.amount || !form.date) {
+    if (!form.amount || form.amount <= 0) {
+      setFormError('El monto debe ser mayor a 0.')
+      return
+    }
+
+    if (!form.date) {
       setFormError('Completá todos los campos obligatorios.')
       return
     }

@@ -173,7 +173,7 @@ export default function ResetPasswordPage() {
         {/* Formulario */}
         <form
           onSubmit={handleSubmit}
-          className="space-y-5 rounded-3xl p-7 enter-3"
+          className="space-y-5 rounded-3xl p-4 sm:p-7 enter-3"
           style={{
             background: 'var(--bg-card)',
             border: '1px solid var(--border)',

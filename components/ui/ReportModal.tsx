@@ -64,6 +64,16 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
 
   const today = format(new Date(), "d 'de' MMMM 'de' yyyy", { locale: es })
 
+  function escapeHtml(s: string | null | undefined): string {
+    if (s == null) return ''
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
+  }
+
   function handlePrint() {
     const el = printRef.current
     if (!el) return
@@ -72,7 +82,7 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
     win.document.write(`
       <html>
         <head>
-          <title>Informe financiero — ${period}</title>
+          <title>Informe financiero — ${escapeHtml(period)}</title>
           <meta charset="utf-8"/>
           <style>
             * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -109,10 +119,10 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
         </head>
         <body>
           <h1>Informe Financiero</h1>
-          <div class="sub">Período: ${period} · Moneda: ${currency !== 'all' ? currency : 'Todas'} · Generado: ${today}</div>
+          <div class="sub">Período: ${escapeHtml(period)} · Moneda: ${currency !== 'all' ? escapeHtml(currency) : 'Todas'} · Generado: ${escapeHtml(today)}</div>
 
           ${statsByCurrency.map(stats => `
-            ${currencies.length > 1 ? `<div style="font-size:11px;font-weight:700;color:#64748B;margin:12px 0 4px;">${stats.currency}</div>` : ''}
+            ${currencies.length > 1 ? `<div style="font-size:11px;font-weight:700;color:#64748B;margin:12px 0 4px;">${escapeHtml(stats.currency)}</div>` : ''}
             <div class="stats">
               <div class="stat stat-income"><div class="stat-val green">${formatCurrency(stats.income, stats.currency)}</div><div class="stat-lbl">Ingresos</div></div>
               <div class="stat stat-expense"><div class="stat-val red">${formatCurrency(stats.expenses, stats.currency)}</div><div class="stat-lbl">Gastos</div></div>
@@ -130,12 +140,12 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
           <div style="margin-bottom:16px;padding:10px 14px;border-radius:10px;background:#F5F3FF;border:1px solid #DDD6FE;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
               <span style="font-weight:700;color:#6D28D9;">Total estimado</span>
-              <span style="font-weight:900;color:#6D28D9;font-size:15px;">${formatCurrency(totalYield, yieldByWallet[0]?.currency ?? 'ARS')}</span>
+              <span style="font-weight:900;color:#6D28D9;font-size:15px;">${escapeHtml(formatCurrency(totalYield, yieldByWallet[0]?.currency ?? 'ARS'))}</span>
             </div>
             ${yieldByWallet.map(y => `
             <div style="display:flex;justify-content:space-between;font-size:11px;color:#64748B;margin-top:4px;">
-              <span>${y.walletName}</span>
-              <span style="font-weight:600;">+${formatCurrency(y.amount, y.currency)}</span>
+              <span>${escapeHtml(y.walletName)}</span>
+              <span style="font-weight:600;">+${escapeHtml(formatCurrency(y.amount, y.currency))}</span>
             </div>`).join('')}
             <div style="font-size:10px;color:#94A3B8;margin-top:8px;">* Los montos son estimados y pueden variar según la tasa real acreditada.</div>
           </div>
@@ -148,10 +158,10 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
               const pct = totalExp > 0 ? (data.amount / totalExp) * 100 : 0
               return `
               <div class="cat-row">
-                <div class="cat-dot" style="background:${data.color}"></div>
-                <div class="cat-name">${name}</div>
-                <div class="cat-bar-bg"><div class="cat-bar" style="width:${pct.toFixed(0)}%;background:${data.color}"></div></div>
-                <div class="cat-amt">${formatCurrency(data.amount, data.currency)}</div>
+                <div class="cat-dot" style="background:${escapeHtml(data.color)}"></div>
+                <div class="cat-name">${escapeHtml(name)}</div>
+                <div class="cat-bar-bg"><div class="cat-bar" style="width:${pct.toFixed(0)}%;background:${escapeHtml(data.color)}"></div></div>
+                <div class="cat-amt">${escapeHtml(formatCurrency(data.amount, data.currency))}</div>
               </div>`
             }).join('')}
           </div>
@@ -163,17 +173,17 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
             <tbody>
               ${recentTx.map(tx => `
               <tr>
-                <td>${tx.date.substring(0, 10)}</td>
-                <td>${tx.description}</td>
-                <td>${tx.category_name ?? '—'}</td>
+                <td>${escapeHtml(tx.date.substring(0, 10))}</td>
+                <td>${escapeHtml(tx.description)}</td>
+                <td>${escapeHtml(tx.category_name ?? '—')}</td>
                 <td style="text-align:right;color:${tx.type === 'income' ? '#059669' : '#E11D48'};font-weight:700;">
-                  ${tx.type === 'income' ? '+' : '-'}${formatCurrency(tx.amount, tx.currency)}
+                  ${tx.type === 'income' ? '+' : '-'}${escapeHtml(formatCurrency(tx.amount, tx.currency))}
                 </td>
               </tr>`).join('')}
             </tbody>
           </table>
 
-          <div class="footer">Generado por Equal · finanzas personales · ${today}</div>
+          <div class="footer">Generado por Equal · finanzas personales · ${escapeHtml(today)}</div>
         </body>
       </html>
     `)
@@ -219,7 +229,7 @@ export function ReportModal({ open, onClose, transactions, period, currency }: P
                 {currencies.length > 1 && (
                   <p className="text-[10px] font-bold mb-1" style={{ color: 'var(--text-faint)' }}>{stats.currency}</p>
                 )}
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {[
                     { label: 'Ingresos', value: stats.income,   color: 'var(--income-600)',  bg: 'var(--income-50)'  },
                     { label: 'Gastos',   value: stats.expenses, color: 'var(--expense-600)', bg: 'var(--expense-50)' },

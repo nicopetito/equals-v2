@@ -77,7 +77,7 @@ export function PageHeader({ title, subtitle, icon: Icon, color = '#d0bcff', chi
             </div>
           </div>
           {children && (
-            <div className="relative z-10 flex gap-2 flex-wrap justify-end">
+            <div className="relative z-10 flex gap-2 flex-wrap justify-start sm:justify-end">
               {children}
             </div>
           )}

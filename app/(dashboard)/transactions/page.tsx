@@ -1,13 +1,15 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect, Fragment, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { format } from 'date-fns'
 import {
   Plus, Search, TrendingUp, TrendingDown, Pencil, Trash2, Filter,
   ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, ChevronDown,
   RotateCcw, CheckCircle, XCircle, CheckSquare, Square, MinusSquare, AlertTriangle, Tag, Wallet,
 } from 'lucide-react'
-import { useTransactions } from '@/hooks/useTransactions'
+import { useTransactionsPaginated } from '@/hooks/useTransactionsPaginated'
+import { useTransactionStats } from '@/hooks/useTransactionStats'
 import { useCategories } from '@/hooks/useCategories'
 import { useWallets } from '@/hooks/useWallets'
 import { useRefunds } from '@/hooks/useRefunds'
@@ -18,13 +20,11 @@ import { NewTransactionModal } from '@/components/transactions/NewTransactionMod
 import { HelpButton } from '@/components/help/HelpButton'
 import { Modal } from '@/components/ui/Modal'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Pagination } from '@/components/ui/Pagination'
 import { CategoryBadge } from '@/components/ui/CategoryBadge'
 import { formatCurrency } from '@/utils/format'
-import { RESERVATION_DEPOSIT_LABEL, RESERVATION_WITHDRAW_LABEL } from '@/utils/constants'
-
-const RESERVATION_LABELS = new Set<string>([RESERVATION_DEPOSIT_LABEL, RESERVATION_WITHDRAW_LABEL])
 import { formatDateSmart, getDateRangeForPeriod, PERIOD_OPTIONS, type Period } from '@/utils/date'
-import type { TransactionWithDetails, TransactionType, Refund } from '@/types'
+import type { TransactionWithDetails, TransactionType, TransactionFilters, Refund } from '@/types'
 import { AnimatePresence, motion } from 'motion/react'
 import { DURATION, EASE_OUT } from '@/utils/animations'
 
@@ -199,56 +199,117 @@ function RefundRow({
 }
 
 function TransactionsPageInner() {
-  const { data: transactions, loading, refetch } = useTransactions()
-  const { data: categories } = useCategories()
-  const { data: wallets, refetch: refetchWallets } = useWallets()
-  const { items: allRefunds, refetch: refetchRefunds } = useRefunds()
+  const router       = useRouter()
+  const searchParams = useSearchParams()
   const { addToast } = useToast()
 
-  const searchParams = useSearchParams()
+  // State — URL-synced for page, period, search
+  const [period, setPeriod]     = useState<Period>(() => (searchParams.get('period') as Period) ?? '30_days')
+  const [page, setPage]         = useState(() => Math.max(1, parseInt(searchParams.get('page') ?? '1') || 1))
+  const [search, setSearch]     = useState(() => searchParams.get('search') ?? '')
 
-  const [period, setPeriod]               = useState<Period>('30_days')
-  const [filterType, setFilterType]       = useState<FilterType>('all')
-  const [filterCategory, setFilterCategory] = useState<string>('all')
-  const [filterWallet, setFilterWallet]   = useState<string>('all')
+  const [filterType, setFilterType]             = useState<FilterType>('all')
+  const [filterCategory, setFilterCategory]     = useState<string>('all')
+  const [filterWallet, setFilterWallet]         = useState<string>('all')
   const [filterOrphan, setFilterOrphan]         = useState(false)
   const [filterNoCategory, setFilterNoCategory] = useState(false)
 
-  // Pre-select filters from URL params
+  // Debounced search — delays API call + URL update by 350ms while user types
+  const [debouncedSearch, setDebouncedSearch] = useState(search)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search)
+      const next = new URLSearchParams(searchParams.toString())
+      if (search) next.set('search', search); else next.delete('search')
+      next.delete('page')
+      router.replace(`/transactions?${next.toString()}`, { scroll: false })
+    }, 350)
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search])
+
+  // Pre-select filters from URL params (wallet_id, orphan, no_category, category_id)
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const walletId   = searchParams.get('wallet_id')
     const orphan     = searchParams.get('orphan')
     const noCategory = searchParams.get('no_category') ?? searchParams.get('uncategorized')
     const categoryId = searchParams.get('category_id')
-    // const type       = searchParams.get('type')        // futuro
-    // const currency   = searchParams.get('currency')    // futuro
-    // const from       = searchParams.get('from')        // futuro
-    // const to         = searchParams.get('to')          // futuro
-    // const search     = searchParams.get('search')      // futuro
     if (walletId)              { setFilterWallet(walletId);    setFilterOrphan(false); setFilterNoCategory(false) }
     if (orphan === 'true')     { setFilterOrphan(true);        setFilterWallet('all'); setFilterNoCategory(false) }
     if (noCategory === 'true') { setFilterNoCategory(true);    setFilterWallet('all'); setFilterOrphan(false) }
     if (categoryId)            { setFilterCategory(categoryId); setFilterOrphan(false); setFilterNoCategory(false) }
   }, [searchParams])
   /* eslint-enable react-hooks/set-state-in-effect */
-  const [search, setSearch]               = useState('')
-  const [modalOpen, setModalOpen]         = useState(false)
-  const [editing, setEditing]             = useState<TransactionWithDetails | null>(null)
-  const [deleting, setDeleting]           = useState<string | null>(null)
-  const [chipScrolled, setChipScrolled]   = useState(false)
-  const [chipHasMore, setChipHasMore]     = useState(false)
-  const [creditingId, setCreditingId]     = useState<string | null>(null)
-  const [selectMode, setSelectMode]       = useState(false)
-  const [selected, setSelected]           = useState<Set<string>>(new Set())
-  const [bulkDeleting, setBulkDeleting]   = useState(false)
-  const [showBulkConfirm, setShowBulkConfirm] = useState(false)
-  const [groupBy, setGroupBy]             = useState<GroupBy>('none')
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+
+  // Build server-side filters
+  const txFilters = useMemo<TransactionFilters>(() => {
+    const { start, end } = getDateRangeForPeriod(period)
+    return {
+      from: format(start, 'yyyy-MM-dd'),
+      to:   format(end,   'yyyy-MM-dd'),
+      type: filterType !== 'all' ? filterType : undefined,
+      category_ids: filterCategory !== 'all' ? [filterCategory] : undefined,
+      wallet_ids: !filterOrphan && !filterNoCategory && filterWallet !== 'all' ? [filterWallet] : undefined,
+      search: debouncedSearch || undefined,
+      no_wallet: filterOrphan || undefined,
+      no_category: filterNoCategory || undefined,
+    }
+  }, [period, filterType, filterCategory, filterWallet, filterOrphan, filterNoCategory, debouncedSearch])
+
+  // Paginated list
+  const { data: transactions, total, totalPages, loading, refetch } =
+    useTransactionsPaginated(txFilters, undefined, page)
+
+  // Lightweight stats for summary cards (same filters, no pagination)
+  const { income: statsIncome, expenses: statsExpenses } = useTransactionStats(txFilters)
+
+  const { data: categories } = useCategories()
+  const { data: wallets, refetch: refetchWallets } = useWallets()
+  const { items: allRefunds, refetch: refetchRefunds } = useRefunds()
+
+  // Reset to page 1 whenever filters change
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setPage(1) }, [txFilters])
+
+  // URL update helpers
+  function updateUrl(params: Record<string, string | null>) {
+    const next = new URLSearchParams(searchParams.toString())
+    Object.entries(params).forEach(([k, v]) => {
+      if (v == null || v === '') next.delete(k); else next.set(k, v)
+    })
+    router.replace(`/transactions?${next.toString()}`, { scroll: false })
+  }
+
+  function handlePageChange(p: number) {
+    setPage(p)
+    const next = new URLSearchParams(searchParams.toString())
+    next.set('page', String(p))
+    router.push(`/transactions?${next.toString()}`, { scroll: false })
+  }
+
+  function handlePeriodChange(p: Period) {
+    setPeriod(p)
+    setPage(1)
+    updateUrl({ period: p, page: null })
+  }
+
+  const [modalOpen, setModalOpen]               = useState(false)
+  const [editing, setEditing]                   = useState<TransactionWithDetails | null>(null)
+  const [deleting, setDeleting]                 = useState<string | null>(null)
+  const [chipScrolled, setChipScrolled]         = useState(false)
+  const [chipHasMore, setChipHasMore]           = useState(false)
+  const [creditingId, setCreditingId]           = useState<string | null>(null)
+  const [selectMode, setSelectMode]             = useState(false)
+  const [selected, setSelected]                 = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting]         = useState(false)
+  const [showBulkConfirm, setShowBulkConfirm]   = useState(false)
+  const [groupBy, setGroupBy]                   = useState<GroupBy>('none')
+  const [expandedGroups, setExpandedGroups]     = useState<Set<string>>(new Set())
   const [showLabelDropdown, setShowLabelDropdown] = useState(false)
-  const [labelInput, setLabelInput]       = useState('')
-  const chipRowRef                        = useRef<HTMLDivElement>(null)
-  const chipDrag                          = useRef({ active: false, startX: 0, scrollX: 0 })
+  const [labelInput, setLabelInput]             = useState('')
+  const chipRowRef = useRef<HTMLDivElement>(null)
+  const chipDrag   = useRef({ active: false, startX: 0, scrollX: 0 })
 
   function syncChipScroll(el: HTMLDivElement) {
     setChipScrolled(el.scrollLeft > 4)
@@ -260,40 +321,6 @@ function TransactionsPageInner() {
     if (el) syncChipScroll(el)
   }, [categories, wallets])
 
-  const walletIds = useMemo(
-    () => new Set(wallets.map(w => w.id).filter(Boolean) as string[]),
-    [wallets]
-  )
-
-  const { start, end } = getDateRangeForPeriod(period)
-  const startKey = start.toISOString()
-  const endKey   = end.toISOString()
-  const filtered = useMemo(() =>
-    transactions.filter(t => {
-      const date = new Date(t.date)
-      if (date < start || date > end) return false
-      if (filterType !== 'all' && t.type !== filterType) return false
-      if (filterNoCategory) {
-        if (t.category_id) return false
-      } else if (filterCategory !== 'all' && t.category_id !== filterCategory) return false
-      if (filterOrphan) {
-        const isOrphan = !t.wallet_id || !walletIds.has(t.wallet_id)
-        if (!isOrphan) return false
-      } else if (filterWallet !== 'all' && t.wallet_id !== filterWallet) return false
-      if (search && !(t.description ?? '').toLowerCase().includes(search.toLowerCase())) return false
-      return true
-    }),
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  [transactions, startKey, endKey, filterType, filterCategory, filterWallet, filterOrphan, filterNoCategory, walletIds, search])
-
-  const totals = useMemo(() => {
-    const forKpis  = filtered.filter(t => !(t.label && RESERVATION_LABELS.has(t.label)))
-    const income   = forKpis.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-    const expenses = forKpis.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-    return { income, expenses }
-  }, [filtered])
-
-  // Mapa txId → cantidad de reintegros pendientes (para badge en lista)
   const refundsByTx = useMemo(() => {
     const map = new Map<string, number>()
     allRefunds
@@ -312,9 +339,9 @@ function TransactionsPageInner() {
   )
 
   const groups = useMemo(() => {
-    if (groupBy === 'none') return [{ key: '__all__', label: '', transactions: filtered }]
+    if (groupBy === 'none') return [{ key: '__all__', label: '', transactions }]
     const map = new Map<string, TransactionWithDetails[]>()
-    for (const tx of filtered) {
+    for (const tx of transactions) {
       const key = getGroupKey(tx, groupBy)
       const arr = map.get(key) ?? []
       arr.push(tx)
@@ -327,7 +354,7 @@ function TransactionsPageInner() {
       label: getGroupLabel(key, groupBy),
       transactions: txs,
     }))
-  }, [filtered, groupBy])
+  }, [transactions, groupBy])
 
   const existingLabels = useMemo(() => {
     const set = new Set<string>()
@@ -361,7 +388,7 @@ function TransactionsPageInner() {
 
   function selectAll() {
     const ids = transactions.map(t => t.id).filter((id): id is string => Boolean(id))
-    if (selected.size === ids.length) {
+    if (selected.size === ids.length && ids.length > 0) {
       setSelected(new Set())
     } else {
       setSelected(new Set(ids))
@@ -379,6 +406,7 @@ function TransactionsPageInner() {
         errors++
       }
     }
+    setPage(1)
     refetch()
     refetchWallets()
     refetchRefunds()
@@ -523,7 +551,7 @@ function TransactionsPageInner() {
             Transacciones
           </h1>
           <p className="text-xs font-medium mt-1" style={{ color: 'rgba(255,255,255,0.55)' }}>
-            {filtered.length} movimientos · {periodLabel}
+            {total} movimientos · {periodLabel}
           </p>
         </div>
 
@@ -551,7 +579,7 @@ function TransactionsPageInner() {
       </div>
 
       {/* ── Summary cards ── */}
-      {filtered.length > 0 && (
+      {total > 0 && (
         <div className="grid grid-cols-2 gap-3">
           <div
             className="rounded-2xl p-4 flex items-center gap-3 transition-all duration-150"
@@ -568,7 +596,7 @@ function TransactionsPageInner() {
             <div className="min-w-0">
               <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Ingresos</p>
               <p className="text-base font-extrabold tabular-nums leading-tight" style={{ color: 'var(--income-600)' }}>
-                +{formatCurrency(totals.income, 'ARS')}
+                +{formatCurrency(statsIncome, 'ARS')}
               </p>
             </div>
           </div>
@@ -588,7 +616,7 @@ function TransactionsPageInner() {
             <div className="min-w-0">
               <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Gastos</p>
               <p className="text-base font-extrabold tabular-nums leading-tight" style={{ color: 'var(--expense-600)' }}>
-                −{formatCurrency(totals.expenses, 'ARS')}
+                −{formatCurrency(statsExpenses, 'ARS')}
               </p>
             </div>
           </div>
@@ -606,7 +634,7 @@ function TransactionsPageInner() {
             />
             <input
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value) }}
               placeholder="Buscar transacciones…"
               className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 focus:outline-none placeholder:text-[var(--text-faint)]"
               style={{
@@ -627,7 +655,7 @@ function TransactionsPageInner() {
           </div>
           <div className="flex gap-1.5 flex-wrap">
             {PERIOD_OPTIONS.map(opt => (
-              <Chip key={opt.value} selected={period === opt.value} onClick={() => setPeriod(opt.value)}>
+              <Chip key={opt.value} selected={period === opt.value} onClick={() => handlePeriodChange(opt.value)}>
                 {opt.label}
               </Chip>
             ))}
@@ -772,26 +800,29 @@ function TransactionsPageInner() {
       {/* ── Bulk action bar ── */}
       {selectMode && (
         <div
-          className="flex items-center gap-3 px-4 py-3 rounded-xl flex-wrap justify-between"
+          className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 py-3 rounded-xl"
           style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-xs)' }}
         >
-          <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-            {selected.size} seleccionada{selected.size !== 1 ? 's' : ''}
-          </span>
-          <button
-            onClick={selectAll}
-            className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all duration-150"
-            style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--text-faint)' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
-          >
-            {selected.size === transactions.length && transactions.length > 0
-              ? 'Deseleccionar todas'
-              : `Seleccionar todas (${transactions.length})`
-            }
-          </button>
+          {/* Fila 1 (mobile) / lado izquierdo (desktop): contador + seleccionar todas */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+              {selected.size} seleccionada{selected.size !== 1 ? 's' : ''}
+            </span>
+            <button
+              onClick={selectAll}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all duration-150"
+              style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--text-faint)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+            >
+              {selected.size === transactions.length && transactions.length > 0
+                ? 'Deseleccionar página'
+                : `Seleccionar página (${transactions.length})`
+              }
+            </button>
+          </div>
           {selected.size > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
               {/* Asignar etiqueta */}
               <div className="relative">
                 <button
@@ -802,7 +833,7 @@ function TransactionsPageInner() {
                   onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-subtle)'; e.currentTarget.style.color = 'var(--text-muted)' }}
                 >
                   <Tag size={12} />
-                  Asignar etiqueta
+                  <span className="hidden sm:inline">Asignar </span>etiqueta
                 </button>
                 {showLabelDropdown && (
                   <div
@@ -862,7 +893,9 @@ function TransactionsPageInner() {
                 style={{ background: 'var(--expense-500)', color: 'white', opacity: bulkDeleting ? 0.6 : 1 }}
               >
                 <Trash2 size={12} />
-                Eliminar {selected.size} seleccionada{selected.size !== 1 ? 's' : ''}
+                <span className="hidden sm:inline">Eliminar </span>
+                {selected.size}
+                <span className="hidden sm:inline"> seleccionada{selected.size !== 1 ? 's' : ''}</span>
               </button>
             </div>
           )}
@@ -939,10 +972,10 @@ function TransactionsPageInner() {
       >
         {loading ? (
           <div role="status" aria-label="Cargando transacciones" className="p-12 text-center" style={{ color: 'var(--text-muted)' }}>
-            <div className="w-7 h-7 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin mx-auto mb-3" />
+            <div className="w-7 h-7 border-2 border-[var(--border)] border-t-[var(--brand-500)] rounded-full animate-spin mx-auto mb-3" />
             Cargando transacciones…
           </div>
-        ) : filtered.length === 0 ? (
+        ) : transactions.length === 0 ? (
           <EmptyState
             type="transactions"
             title="Sin transacciones"
@@ -1046,12 +1079,15 @@ function TransactionsPageInner() {
                         className="flex items-center gap-3 px-4 py-3 group transition-colors"
                         style={{
                           borderBottom: isLast ? (isGrouped ? '1px solid var(--border)' : 'none') : '1px solid var(--border-light)',
-                          background: isSelected ? 'rgba(109,59,215,0.05)' : 'transparent',
+                          borderLeft: isSelected
+                            ? '3px solid var(--brand-500)'
+                            : `3px solid ${tx.category_color ?? 'transparent'}`,
+                          background: isSelected ? 'rgba(109,59,215,0.07)' : 'transparent',
                           cursor: selectMode ? 'pointer' : 'default',
                         }}
                         onClick={selectMode && tx.id ? () => { toggleSelect(tx.id!); setShowLabelDropdown(false) } : undefined}
-                        onMouseEnter={e => (e.currentTarget.style.background = isSelected ? 'rgba(109,59,215,0.08)' : 'var(--bg-subtle)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = isSelected ? 'rgba(109,59,215,0.05)' : 'transparent')}
+                        onMouseEnter={e => (e.currentTarget.style.background = isSelected ? 'rgba(109,59,215,0.10)' : 'var(--bg-subtle)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = isSelected ? 'rgba(109,59,215,0.07)' : 'transparent')}
                       >
                         {selectMode && (
                           <button
@@ -1181,6 +1217,18 @@ function TransactionsPageInner() {
           </div>
         )}
       </div>
+
+      {/* ── Paginación ── */}
+      {totalPages > 1 && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          pageSize={10}
+          onPageChange={handlePageChange}
+          loading={loading}
+        />
+      )}
 
       {/* ── Panel de reintegros pendientes ── */}
       {pendingRefunds.length > 0 && (

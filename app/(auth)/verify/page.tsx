@@ -105,7 +105,7 @@ function VerifyContent() {
 
         {/* Card OTP */}
         <div
-          className="rounded-3xl p-7 space-y-6 enter-3"
+          className="rounded-3xl p-4 sm:p-7 space-y-6 enter-3"
           style={{
             background: 'var(--bg-card)',
             border: '1px solid var(--border)',

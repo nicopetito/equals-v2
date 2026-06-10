@@ -1,4 +1,5 @@
 import type { Category } from '@/types'
+import { userKey } from '@/utils/format'
 
 export type Confidence = 'high' | 'medium' | 'low' | 'none'
 
@@ -94,7 +95,7 @@ const MERCHANT_RULES: readonly MerchantRule[] = [
   { pattern: /\bpago\b/,              categoryName: 'Otros gastos',    confidence: 'low' },
 ]
 
-const MERCHANT_RULES_KEY = (userId: string) => `equal_merchant_rules_${userId}`
+const MERCHANT_RULES_KEY = (userId: string) => `equal_merchant_rules_${userKey(userId)}`
 
 export function getLearnedRules(userId: string): LearnedRule[] {
   if (typeof window === 'undefined') return []

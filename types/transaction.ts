@@ -47,6 +47,16 @@ export interface TransactionFilters {
   to?: string
   is_recurring?: boolean
   search?: string
+  no_wallet?: boolean
+  no_category?: boolean
+}
+
+export interface PaginatedResult<T> {
+  data: T[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
 }
 
 export type TransactionSortField = 'date' | 'amount' | 'description'
