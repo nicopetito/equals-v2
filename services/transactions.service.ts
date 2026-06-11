@@ -1,6 +1,10 @@
 import { createClient } from '@/lib/supabase/client'
 import { safeNumber } from '@/utils/format'
 import { categoriesService } from '@/services/categories.service'
+import {
+  INTERNAL_TRANSFER_LABEL, WALLET_ADJUSTMENT_LABEL, INITIAL_BALANCE_LABEL,
+  RESERVATION_DEPOSIT_LABEL, RESERVATION_WITHDRAW_LABEL,
+} from '@/utils/constants'
 import type {
   Transaction,
   TransactionWithDetails,
@@ -251,7 +255,15 @@ export const transactionsService = {
       if (filters.is_recurring !== undefined) query = query.eq('is_recurring', filters.is_recurring)
       if (filters.search) query = query.ilike('description', `%${filters.search}%`)
       if (filters.no_wallet) query = query.is('wallet_id', null)
-      if (filters.no_category) query = query.is('category_id', null)
+      if (filters.no_category) {
+        const techLabels = [
+          INTERNAL_TRANSFER_LABEL, WALLET_ADJUSTMENT_LABEL, INITIAL_BALANCE_LABEL,
+          RESERVATION_DEPOSIT_LABEL, RESERVATION_WITHDRAW_LABEL,
+        ]
+        query = query
+          .is('category_id', null)
+          .or(`label.is.null,label.not.in.(${techLabels.join(',')})`)
+      }
     }
 
     const field = sort?.field ?? 'date'
@@ -291,7 +303,15 @@ export const transactionsService = {
       if (filters.is_recurring !== undefined) query = query.eq('is_recurring', filters.is_recurring)
       if (filters.search) query = query.ilike('description', `%${filters.search}%`)
       if (filters.no_wallet) query = query.is('wallet_id', null)
-      if (filters.no_category) query = query.is('category_id', null)
+      if (filters.no_category) {
+        const techLabels = [
+          INTERNAL_TRANSFER_LABEL, WALLET_ADJUSTMENT_LABEL, INITIAL_BALANCE_LABEL,
+          RESERVATION_DEPOSIT_LABEL, RESERVATION_WITHDRAW_LABEL,
+        ]
+        query = query
+          .is('category_id', null)
+          .or(`label.is.null,label.not.in.(${techLabels.join(',')})`)
+      }
     }
 
     const { data, error } = await query

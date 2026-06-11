@@ -7,6 +7,7 @@ import {
   Plus, Search, TrendingUp, TrendingDown, Pencil, Trash2, Filter,
   ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, ChevronDown,
   RotateCcw, CheckCircle, XCircle, CheckSquare, Square, MinusSquare, AlertTriangle, Tag, Wallet,
+  ArrowLeftRight, SlidersHorizontal,
 } from 'lucide-react'
 import { useTransactionsPaginated } from '@/hooks/useTransactionsPaginated'
 import { useTransactionStats } from '@/hooks/useTransactionStats'
@@ -27,6 +28,10 @@ import { formatDateSmart, getDateRangeForPeriod, PERIOD_OPTIONS, type Period } f
 import type { TransactionWithDetails, TransactionType, TransactionFilters, Refund } from '@/types'
 import { AnimatePresence, motion } from 'motion/react'
 import { DURATION, EASE_OUT } from '@/utils/animations'
+import {
+  INTERNAL_LABELS, INITIAL_BALANCE_LABEL, LABEL_COPY,
+  INTERNAL_TRANSFER_LABEL, parseTransferNotes,
+} from '@/utils/constants'
 
 type FilterType = 'all' | TransactionType
 type GroupBy = 'none' | 'date' | 'month' | 'category' | 'wallet' | 'type' | 'label'
@@ -338,10 +343,30 @@ function TransactionsPageInner() {
     [allRefunds]
   )
 
+  // Colapsa los pares expense+income de transferencias internas en una sola fila
+  // (la leg expense), usando transfer_id del campo notes como clave de deduplicación.
+  const processedTransactions = useMemo(() => {
+    const seen = new Set<string>()
+    return transactions.flatMap(tx => {
+      if (tx.label !== INTERNAL_TRANSFER_LABEL) return [tx]
+      const notes = parseTransferNotes(tx.notes)
+      if (!notes?.transfer_id) return [tx]
+      if (seen.has(notes.transfer_id)) return []
+      seen.add(notes.transfer_id)
+      if (tx.type === 'expense') return [tx]
+      const expLeg = transactions.find(t =>
+        t.label === INTERNAL_TRANSFER_LABEL &&
+        parseTransferNotes(t.notes)?.transfer_id === notes.transfer_id &&
+        t.type === 'expense'
+      )
+      return [expLeg ?? tx]
+    })
+  }, [transactions])
+
   const groups = useMemo(() => {
-    if (groupBy === 'none') return [{ key: '__all__', label: '', transactions }]
+    if (groupBy === 'none') return [{ key: '__all__', label: '', transactions: processedTransactions }]
     const map = new Map<string, TransactionWithDetails[]>()
-    for (const tx of transactions) {
+    for (const tx of processedTransactions) {
       const key = getGroupKey(tx, groupBy)
       const arr = map.get(key) ?? []
       arr.push(tx)
@@ -354,7 +379,7 @@ function TransactionsPageInner() {
       label: getGroupLabel(key, groupBy),
       transactions: txs,
     }))
-  }, [transactions, groupBy])
+  }, [processedTransactions, groupBy])
 
   const existingLabels = useMemo(() => {
     const set = new Set<string>()
@@ -1098,18 +1123,32 @@ function TransactionsPageInner() {
                             {isSelected ? <CheckSquare size={20} /> : <Square size={20} />}
                           </button>
                         )}
-                        <div
-                          className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                          style={{ background: tx.type === 'income' ? 'var(--income-50)' : 'var(--expense-50)' }}
-                        >
-                          {tx.type === 'income'
-                            ? <TrendingUp size={15} style={{ color: 'var(--income-500)' }} />
-                            : <TrendingDown size={15} style={{ color: 'var(--expense-500)' }} />
-                          }
-                        </div>
+                        {(() => {
+                          const isTech = Boolean(tx.label && (INTERNAL_LABELS.has(tx.label) || tx.label === INITIAL_BALANCE_LABEL))
+                          const bg    = isTech ? 'var(--bg-subtle)' : tx.type === 'income' ? 'var(--income-50)' : 'var(--expense-50)'
+                          const color = isTech ? 'var(--text-muted)' : tx.type === 'income' ? 'var(--income-500)' : 'var(--expense-500)'
+                          const Icon  = tx.label === INTERNAL_TRANSFER_LABEL ? ArrowLeftRight
+                            : isTech ? SlidersHorizontal
+                            : tx.type === 'income' ? TrendingUp : TrendingDown
+                          return (
+                            <div
+                              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                              style={{ background: bg }}
+                            >
+                              <Icon size={15} style={{ color }} />
+                            </div>
+                          )
+                        })()}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                            {tx.description}
+                            {tx.label === INTERNAL_TRANSFER_LABEL
+                              ? (() => {
+                                  const n = parseTransferNotes(tx.notes)
+                                  if (!n) return tx.description
+                                  return `${walletMap.get(n.from_wallet_id) ?? 'Origen'} → ${walletMap.get(n.to_wallet_id) ?? 'Destino'}`
+                                })()
+                              : tx.description
+                            }
                           </p>
                           <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                             <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{formatDateSmart(tx.date)}</span>
@@ -1128,7 +1167,7 @@ function TransactionsPageInner() {
                                 style={{ background: 'rgba(109,59,215,0.10)', color: 'var(--brand-500)', border: '1px solid rgba(109,59,215,0.20)' }}
                               >
                                 <Tag size={8} />
-                                {tx.label}
+                                {LABEL_COPY[tx.label] ?? tx.label}
                               </span>
                             )}
                             {tx.id && refundsByTx.has(tx.id) && (
@@ -1145,9 +1184,15 @@ function TransactionsPageInner() {
                         <div className="text-right mr-1 shrink-0">
                           <p
                             className="text-sm font-bold tabular-nums"
-                            style={{ color: tx.type === 'income' ? 'var(--income-600)' : 'var(--expense-600)' }}
+                            style={{ color: (tx.label && (INTERNAL_LABELS.has(tx.label) || tx.label === INITIAL_BALANCE_LABEL))
+                              ? 'var(--text-secondary)'
+                              : tx.type === 'income' ? 'var(--income-600)' : 'var(--expense-600)'
+                            }}
                           >
-                            {tx.type === 'income' ? '+' : '−'}{formatCurrency(tx.amount, tx.currency)}
+                            {tx.label === INTERNAL_TRANSFER_LABEL
+                              ? formatCurrency(tx.amount, tx.currency)
+                              : `${tx.type === 'income' ? '+' : '−'}${formatCurrency(tx.amount, tx.currency)}`
+                            }
                           </p>
                           <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--text-faint)' }}>
                             {tx.currency}

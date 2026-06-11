@@ -741,6 +741,37 @@ export default function WalletsPage() {
             </div>
           </label>
 
+          {editing && (
+            <div
+              className="rounded-xl p-3 flex items-center justify-between gap-3"
+              style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  Saldo actual
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  {formatCurrency((editing as WalletWithBalance).current_balance ?? 0, (editing.currency ?? 'ARS') as Currency)}
+                  {' — si no coincide con la realidad, ajustá el saldo'}
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setModalOpen(false)
+                  setTimeout(() => {
+                    setAdjustWallet(editing as WalletWithBalance)
+                    setAdjustOpen(true)
+                  }, 150)
+                }}
+              >
+                <SlidersHorizontal size={13} />
+                Ajustar saldo
+              </Button>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-2">
             <Button variant="secondary" onClick={() => setModalOpen(false)} className="flex-1">
               Cancelar

@@ -201,11 +201,16 @@ export default function DashboardPage() {
 
   const saldoInicialRows = useMemo(() => {
     const map: Record<string, number> = {}
-    kpiFilteredClean
-      .filter(t => t.category_name === 'Saldo inicial' && t.type === 'income')
+    // Filtrar desde kpiFiltered (pre-INTERNAL_LABELS) porque initial_balance
+    // ya está en INTERNAL_LABELS y no llegaría a kpiFilteredClean.
+    kpiFiltered
+      .filter(t =>
+        (t.label === INITIAL_BALANCE_LABEL || t.category_name === 'Saldo inicial') &&
+        t.type === 'income'
+      )
       .forEach(t => { map[t.currency] = (map[t.currency] ?? 0) + t.amount })
     return Object.entries(map).map(([curr, amount]) => ({ curr, amount }))
-  }, [kpiFilteredClean])
+  }, [kpiFiltered])
 
   const stats = useMemo(() => {
     if (currency === 'all') {
@@ -262,7 +267,11 @@ export default function DashboardPage() {
 
   const uncategorizedStats = useMemo(() => {
     if (txLoading) return null
-    const count = allTransactions.filter(t => !t.category_id).length
+    const count = allTransactions.filter(t =>
+      !t.category_id &&
+      !(t.label && INTERNAL_LABELS.has(t.label)) &&
+      t.label !== INITIAL_BALANCE_LABEL
+    ).length
     return count > 0 ? { count } : null
   }, [allTransactions, txLoading])
 

@@ -230,11 +230,17 @@ export default function EstadisticasPage() {
 
   const saldoInicialRows = useMemo(() => {
     const map: Record<string, number> = {}
-    filteredForKpis
-      .filter(t => t.category_name === 'Saldo inicial' && t.type === 'income')
+    // Filtrar desde filtered (pre-INTERNAL_LABELS) porque initial_balance
+    // ya está en INTERNAL_LABELS y no llegaría a filteredForKpis.
+    filtered
+      .filter(t =>
+        !!(t.wallet_id && walletIds.has(t.wallet_id)) &&
+        (t.label === INITIAL_BALANCE_LABEL || t.category_name === 'Saldo inicial') &&
+        t.type === 'income'
+      )
       .forEach(t => { map[t.currency] = (map[t.currency] ?? 0) + safeNumber(t.amount) })
     return Object.entries(map).map(([curr, amount]) => ({ curr, amount }))
-  }, [filteredForKpis])
+  }, [filtered, walletIds])
 
   const avgExpense = useMemo(() => {
     const g = filteredForKpis.filter(t => t.type === 'expense')
