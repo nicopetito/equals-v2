@@ -46,6 +46,9 @@ import type { TransactionWithDetails, Currency, TransactionTemplate } from '@/ty
 import type { WalletWithBalance } from '@/types/wallet'
 import { AnimatedAmount } from '@/components/ui/AnimatedAmount'
 import { DashboardFilters } from '@/components/dashboard/DashboardFilters'
+import { BudgetSummaryWidget } from '@/components/dashboard/BudgetSummaryWidget'
+import { useBudgets } from '@/hooks/useBudgets'
+import { computeSpentByCategory } from '@/utils/budgets'
 import { motion, AnimatePresence } from 'motion/react'
 import { staggerContainer, staggerItem, fadeUp } from '@/utils/animations'
 import { getErrorMessage } from '@/utils/errors'
@@ -93,6 +96,16 @@ export default function DashboardPage() {
   const toStr   = useMemo(() => format(getDateRangeForPeriod(period).end,   'yyyy-MM-dd'), [period])
 
   const { data: allTransactions, loading: txLoading, refetch: refetchTx } = useTransactions({ from: fromStr, to: toStr })
+
+  // Budget widget — uses current calendar month (independent of the period filter)
+  const budgetNow   = useMemo(() => new Date(), [])
+  const budgetMonth = budgetNow.getMonth() + 1
+  const budgetYear  = budgetNow.getFullYear()
+  const { data: budgets } = useBudgets(budgetMonth, budgetYear)
+  const budgetSpent = useMemo(
+    () => computeSpentByCategory(allTransactions, budgetYear, budgetMonth),
+    [allTransactions, budgetYear, budgetMonth]
+  )
   const { data: wallets, loading: walletsLoading, refetch: refetchWallets } = useWallets()
   const { data: categories } = useCategories()
   const { items: pendingRefunds }   = usePendingRefunds()
@@ -256,10 +269,12 @@ export default function DashboardPage() {
   )
 
   const walletByCurrency = useMemo(() =>
-    wallets.reduce<Record<string, number>>((acc, w) => {
-      if (w.currency) acc[w.currency] = (acc[w.currency] ?? 0) + (w.current_balance ?? 0)
-      return acc
-    }, {}), [wallets])
+    wallets
+      .filter(w => w.include_in_balance !== false)
+      .reduce<Record<string, number>>((acc, w) => {
+        if (w.currency) acc[w.currency] = (acc[w.currency] ?? 0) + (w.current_balance ?? 0)
+        return acc
+      }, {}), [wallets])
 
   const usdEquivARS = useMemo(() => {
     const usdBal = walletByCurrency['USD'] ?? 0
@@ -845,6 +860,9 @@ export default function DashboardPage() {
         <WalletSlider wallets={wallets} onNavigate={() => router.push('/wallets')} />
       )}
       </div>
+
+      {/* ── WIDGET PRESUPUESTOS ── */}
+      <BudgetSummaryWidget budgets={budgets} spentByCategory={budgetSpent} />
 
       {/* ── ACCESO RÁPIDO (Plantillas) ── */}
       <QuickTemplatesBar

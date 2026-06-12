@@ -20,6 +20,11 @@ import { Select }              from '@/components/ui/Select'
 import { BudgetVsActualChart } from '@/components/ui/BudgetVsActualChart'
 import { formatCurrency, safeNumber } from '@/utils/format'
 import { buildCreditedRefundMap }    from '@/utils/finance'
+import {
+  getBudgetStatus, computeSpentByCategory, computeBudgetSummary,
+  getMonthDateRange,
+} from '@/utils/budgets'
+import { INTERNAL_LABELS, BUDGET_WARNING_THRESHOLD } from '@/utils/constants'
 import type { Budget, BudgetCreate } from '@/types'
 
 // ─── constants ────────────────────────────────────────────────────────────────
@@ -44,21 +49,6 @@ const YEAR_OPTS = (() => {
 })()
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-
-function getBudgetStatus(limitAmount: number, spent: number) {
-  const limit = safeNumber(limitAmount)
-  const s     = safeNumber(spent)
-  const pct   = limit > 0 ? (s / limit) * 100 : 0
-  const status: 'ok' | 'warning' | 'danger' =
-    pct >= 100 ? 'danger' : pct >= 70 ? 'warning' : 'ok'
-  return {
-    pct:       Math.min(pct, 100),
-    rawPct:    pct,
-    remaining: limit - s,
-    overBy:    Math.max(0, s - limit),
-    status,
-  }
-}
 
 function statusStyles(status: 'ok' | 'warning' | 'danger') {
   if (status === 'danger')  return { bar: 'var(--grad-expense)', text: 'var(--expense-600)', bg: 'var(--expense-50)',  badge: '¡Superado!' }
@@ -130,45 +120,32 @@ export default function BudgetsPage() {
 
   // ── spending per category ───────────────────────────────────────────────────
 
-  const spentByCategory = useMemo(() => {
-    const pad  = (n: number) => String(n).padStart(2, '0')
-    const from = `${year}-${pad(month)}-01`
-    const to   = `${year}-${pad(month)}-31`
-    const map: Record<string, number> = {}
-    allTx.forEach(t => {
-      if (t.type !== 'expense' || !t.category_id) return
-      if (t.date < from || t.date > to) return
-      const credited  = creditedRefundMap.get(t.id ?? '') ?? 0
-      const netAmount = Math.max(0, safeNumber(t.amount) - credited)
-      map[t.category_id] = safeNumber(map[t.category_id]) + netAmount
-    })
-    return map
-  }, [allTx, month, year, creditedRefundMap])
+  const spentByCategory = useMemo(
+    () => computeSpentByCategory(allTx, year, month, creditedRefundMap),
+    [allTx, month, year, creditedRefundMap]
+  )
 
   // ── summary totals ──────────────────────────────────────────────────────────
 
-  const summary = useMemo(() => {
-    const totalLimit = budgets.reduce((s, b) => s + safeNumber(b.limit_amount), 0)
-    const totalSpent = budgets.reduce((s, b) => s + safeNumber(spentByCategory[b.category_id]), 0)
-    const overallPct = totalLimit > 0 ? (totalSpent / totalLimit) * 100 : 0
-    const overBudget = budgets.filter(b => {
-      const spent = safeNumber(spentByCategory[b.category_id])
-      return spent > safeNumber(b.limit_amount)
-    }).length
-    return { totalLimit, totalSpent, overallPct, overBudget }
-  }, [budgets, spentByCategory])
+  const summary = useMemo(
+    () => computeBudgetSummary(budgets, spentByCategory),
+    [budgets, spentByCategory]
+  )
+  // Para el summary strip: moneda única → mostramos totales; multi-moneda → solo contadores.
+  const singleCur = summary.byCurrency.length === 1 ? summary.byCurrency[0] : null
 
   // ── uncategorized expenses in current period ────────────────────────────────
 
   const uncategorizedStats = useMemo(() => {
-    const pad  = (n: number) => String(n).padStart(2, '0')
-    const from = `${year}-${pad(month)}-01`
-    const to   = `${year}-${pad(month)}-31`
-    const txs  = allTx.filter(t =>
-      t.type === 'expense' &&
-      (!t.category_id || sinCategoriaIds.has(t.category_id)) &&
-      t.date >= from && t.date <= to
-    )
+    const { from, to } = getMonthDateRange(year, month)
+    const txs = allTx.filter(t => {
+      const isExpense = t.transaction_kind
+        ? t.transaction_kind === 'expense'
+        : t.type === 'expense' && !(t.label && INTERNAL_LABELS.has(t.label))
+      return isExpense &&
+        (!t.category_id || sinCategoriaIds.has(t.category_id)) &&
+        t.date >= from && t.date <= to
+    })
     return { count: txs.length, total: txs.reduce((s, t) => s + safeNumber(t.amount), 0) }
   }, [allTx, month, year, sinCategoriaIds])
 
@@ -339,36 +316,73 @@ export default function BudgetsPage() {
       </div>
 
       {/* SUMMARY STRIP */}
-      {budgets.length > 0 && (
-        <div
-          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-0 rounded-2xl overflow-hidden"
-          style={{ border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
-        >
-          {[
-            { label: 'Presupuestado', value: formatCurrency(summary.totalLimit, 'ARS'), icon: <Wallet size={14} />, color: 'var(--brand-500)' },
-            { label: 'Gastado',       value: formatCurrency(summary.totalSpent, 'ARS'), icon: <TrendingUp size={14} />, color: summary.overallPct >= 100 ? 'var(--expense-600)' : summary.overallPct >= 70 ? '#D97706' : 'var(--income-600)' },
-            { label: 'Restante',      value: formatCurrency(Math.max(0, summary.totalLimit - summary.totalSpent), 'ARS'), icon: <Calendar size={14} />, color: 'var(--text-secondary)' },
-            { label: 'Usado',         value: `${Math.min(summary.overallPct, 999).toFixed(0)}%`, icon: null, color: summary.overallPct >= 100 ? 'var(--expense-600)' : summary.overallPct >= 70 ? '#D97706' : 'var(--income-600)' },
-            { label: 'Categorías',    value: String(budgets.length), icon: null, color: 'var(--text-secondary)' },
-            { label: 'Superadas',     value: String(summary.overBudget), icon: summary.overBudget > 0 ? <AlertTriangle size={13} /> : null, color: summary.overBudget > 0 ? 'var(--expense-600)' : 'var(--income-600)' },
-          ].map((s, i) => (
-            <div
-              key={i}
-              className="budget-strip-item flex flex-col gap-0.5 px-4 py-3 bg-card"
-            >
-              <span className="text-xs uppercase tracking-wide font-semibold" style={{ color: 'var(--text-muted)' }}>
-                {s.label}
-              </span>
-              <div className="flex items-center gap-1">
-                {s.icon && <span style={{ color: s.color }}>{s.icon}</span>}
-                <span className="font-extrabold text-sm truncate" style={{ color: s.color, fontFamily: 'var(--font-sora)' }}>
-                  {s.value}
+      {budgets.length > 0 && (() => {
+        const pct     = singleCur?.overallPct ?? 0
+        const pctColor = pct >= 100 ? 'var(--expense-600)' : pct >= BUDGET_WARNING_THRESHOLD ? '#D97706' : 'var(--income-600)'
+        const strips = [
+          {
+            label: 'Presupuestado',
+            value: singleCur ? formatCurrency(singleCur.totalLimit, singleCur.currency) : 'Multi-moneda',
+            icon:  <Wallet size={14} />,
+            color: 'var(--brand-500)',
+          },
+          {
+            label: 'Gastado',
+            value: singleCur ? formatCurrency(singleCur.totalSpent, singleCur.currency) : 'Multi-moneda',
+            icon:  <TrendingUp size={14} />,
+            color: singleCur ? pctColor : 'var(--text-secondary)',
+          },
+          {
+            label: 'Restante',
+            value: singleCur
+              ? formatCurrency(Math.max(0, singleCur.totalLimit - singleCur.totalSpent), singleCur.currency)
+              : '—',
+            icon:  <Calendar size={14} />,
+            color: 'var(--text-secondary)',
+          },
+          {
+            label: 'Usado',
+            value: singleCur ? `${Math.min(pct, 999).toFixed(0)}%` : '—',
+            icon:  null,
+            color: singleCur ? pctColor : 'var(--text-muted)',
+          },
+          {
+            label: 'Categorías',
+            value: String(summary.totalBudgets),
+            icon:  null,
+            color: 'var(--text-secondary)',
+          },
+          {
+            label: 'Superadas',
+            value: String(summary.overBudget),
+            icon:  summary.overBudget > 0 ? <AlertTriangle size={13} /> : null,
+            color: summary.overBudget > 0 ? 'var(--expense-600)' : 'var(--income-600)',
+          },
+        ]
+        return (
+          <div
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-0 rounded-2xl overflow-hidden"
+            style={{ border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
+          >
+            {strips.map((s, i) => (
+              <div
+                key={i}
+                className="budget-strip-item flex flex-col gap-0.5 px-4 py-3 bg-card"
+              >
+                <span className="text-xs uppercase tracking-wide font-semibold" style={{ color: 'var(--text-muted)' }}>
+                  {s.label}
                 </span>
+                <div className="flex items-center gap-1">
+                  {s.icon && <span style={{ color: s.color }}>{s.icon}</span>}
+                  <span className="font-extrabold text-sm truncate" style={{ color: s.color, fontFamily: 'var(--font-sora)' }}>
+                    {s.value}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )
+      })()}
 
       {/* CHART */}
       {budgets.length > 0 && (
@@ -445,7 +459,7 @@ export default function BudgetsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {budgets.map(budget => {
             const spent  = safeNumber(spentByCategory[budget.category_id])
-            const { pct, rawPct, remaining, overBy, status } = getBudgetStatus(budget.limit_amount, spent)
+            const { pct, rawPct, remaining, overBy, status, isEmpty } = getBudgetStatus(budget.limit_amount, spent, budget.alert_percentage)
             const styles = statusStyles(status)
 
             return (
@@ -478,9 +492,12 @@ export default function BudgetsPage() {
                     )}
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0"
-                      style={{ background: styles.bg, color: styles.text }}
+                      style={{
+                        background: isEmpty ? 'var(--bg-subtle)' : styles.bg,
+                        color:      isEmpty ? 'var(--text-muted)'  : styles.text,
+                      }}
                     >
-                      {styles.badge}
+                      {isEmpty ? 'Sin movimientos' : styles.badge}
                     </span>
                   </div>
 

@@ -4,6 +4,8 @@ import { useMemo } from 'react'
 import type { Budget, TransactionWithDetails, Refund } from '@/types'
 import { formatCurrency, safeNumber } from '@/utils/format'
 import { buildCreditedRefundMap } from '@/utils/finance'
+import { filterBudgetTransactions } from '@/utils/budgets'
+import { BUDGET_WARNING_THRESHOLD } from '@/utils/constants'
 
 interface Props {
   budgets:      Budget[]
@@ -14,15 +16,15 @@ interface Props {
 }
 
 function barColor(pct: number): string {
-  if (pct >= 100) return 'var(--expense-500, #e11d48)'
-  if (pct >= 70)  return '#F59E0B'
+  if (pct >= 100)                     return 'var(--expense-500, #e11d48)'
+  if (pct >= BUDGET_WARNING_THRESHOLD) return '#F59E0B'
   return 'var(--income-500, #16a34a)'
 }
 
 function barLabel(pct: number): { text: string; bg: string; color: string } {
-  if (pct >= 100) return { text: '¡Superado!', bg: 'var(--expense-50)',  color: 'var(--expense-600)' }
-  if (pct >= 70)  return { text: 'Cerca',      bg: '#FFFBEB',            color: '#D97706' }
-  return               { text: `${Math.min(pct, 99).toFixed(0)}%`, bg: 'var(--income-50)', color: 'var(--income-600)' }
+  if (pct >= 100)                     return { text: '¡Superado!', bg: 'var(--expense-50)',  color: 'var(--expense-600)' }
+  if (pct >= BUDGET_WARNING_THRESHOLD) return { text: 'Cerca',      bg: '#FFFBEB',            color: '#D97706' }
+  return                                      { text: `${Math.min(pct, 99).toFixed(0)}%`, bg: 'var(--income-50)', color: 'var(--income-600)' }
 }
 
 export function BudgetVsActualChart({ budgets, transactions, month, year, refunds }: Props) {
@@ -35,8 +37,8 @@ export function BudgetVsActualChart({ budgets, transactions, month, year, refund
     const pad    = (n: number) => String(n).padStart(2, '0')
     const prefix = `${year}-${pad(month)}`
 
-    const monthTx = transactions.filter(
-      tx => tx.type === 'expense' && tx.date.startsWith(prefix)
+    const monthTx = filterBudgetTransactions(transactions).filter(
+      tx => tx.date.startsWith(prefix)
     )
 
     return budgets

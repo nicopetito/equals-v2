@@ -61,3 +61,7 @@ export function parseTransferNotes(notes: string | null | undefined): {
 export const YIELD_SUBTYPE            = 'yield' as const
 export const YIELD_CORRECTION_SUBTYPE = 'correction' as const
 export const YIELD_LABEL              = 'yield' as const
+
+// Porcentaje de consumo que activa el estado warning en presupuestos.
+// Se usa como default cuando el presupuesto no tiene alert_percentage configurado.
+export const BUDGET_WARNING_THRESHOLD = 80

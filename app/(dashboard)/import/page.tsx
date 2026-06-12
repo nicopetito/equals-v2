@@ -38,7 +38,7 @@ import type { Category } from '@/types'
 
 type Step = 'upload' | 'map' | 'preview' | 'done'
 type ImportResultState = 'success' | 'partial' | 'failure'
-type RowFilter = 'all' | 'errors' | 'review' | 'income' | 'expense' | 'duplicates'
+type RowFilter = 'all' | 'errors' | 'review' | 'income' | 'expense' | 'duplicates' | 'db_duplicates'
 
 interface ImportResult {
   success: number
@@ -479,6 +479,27 @@ function DuplicateBanner({ count }: { count: number }) {
   )
 }
 
+// ── DbDuplicateBanner ─────────────────────────────────────────────────────────
+
+function DbDuplicateBanner({ count }: { count: number }) {
+  return (
+    <div
+      className="flex items-start gap-3 rounded-2xl px-4 py-3"
+      style={{ background: 'var(--goal-50)', border: '1px solid var(--goal-100)' }}
+    >
+      <History size={16} className="shrink-0 mt-0.5" style={{ color: 'var(--goal-500)' }} />
+      <div>
+        <p className="text-sm font-bold" style={{ color: 'var(--goal-700)' }}>
+          {count} movimiento{count !== 1 ? 's' : ''} ya {count !== 1 ? 'existen' : 'existe'} en tu historial
+        </p>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--goal-600)' }}>
+          Los deseleccionamos para evitar duplicados. Podés incluirlos manualmente si es necesario.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // ── FinancialImpactPanel ──────────────────────────────────────────────────────
 
 interface ImpactProps {
@@ -696,6 +717,7 @@ export default function ImportPage() {
   const [rowCategories, setRowCategories] = useState<Map<number, string | null>>(new Map())
   const [rowConfidence, setRowConfidence] = useState<Map<number, Confidence>>(new Map())
   const [duplicateFlags, setDuplicateFlags] = useState<Set<number>>(new Set())
+  const [dbDuplicateFlags, setDbDuplicateFlags] = useState<Set<number>>(new Set())
   const [rowFilter, setRowFilter] = useState<RowFilter>('all')
 
   // ── Modal creación categoría inline
@@ -734,10 +756,11 @@ export default function ImportPage() {
       case 'review':     return parsed.filter(r => { const c = rowConfidence.get(r._index); return c === 'low' || c === 'none' })
       case 'income':     return parsed.filter(r => !r._error && r.type === 'income')
       case 'expense':    return parsed.filter(r => !r._error && r.type === 'expense')
-      case 'duplicates': return parsed.filter(r => duplicateFlags.has(r._index))
-      default:           return parsed
+      case 'duplicates':    return parsed.filter(r => duplicateFlags.has(r._index))
+      case 'db_duplicates': return parsed.filter(r => dbDuplicateFlags.has(r._index))
+      default:              return parsed
     }
-  }, [parsed, rowFilter, rowConfidence, duplicateFlags])
+  }, [parsed, rowFilter, rowConfidence, duplicateFlags, dbDuplicateFlags])
 
   const filterCounts: Record<RowFilter, number> = useMemo(() => ({
     all:        parsed.length,
@@ -745,8 +768,9 @@ export default function ImportPage() {
     review:     parsed.filter(r => { const c = rowConfidence.get(r._index); return c === 'low' || c === 'none' }).length,
     income:     parsed.filter(r => !r._error && r.type === 'income').length,
     expense:    parsed.filter(r => !r._error && r.type === 'expense').length,
-    duplicates: parsed.filter(r => duplicateFlags.has(r._index)).length,
-  }), [parsed, rowConfidence, duplicateFlags])
+    duplicates:    parsed.filter(r => duplicateFlags.has(r._index)).length,
+    db_duplicates: parsed.filter(r => dbDuplicateFlags.has(r._index)).length,
+  }), [parsed, rowConfidence, duplicateFlags, dbDuplicateFlags])
 
   const isAutoComplete = (['dateColumn', 'descriptionColumn', 'amountColumn'] as const).every(
     f => autoDetectedFields.has(f)
@@ -788,7 +812,7 @@ export default function ImportPage() {
 
       // Reset step-3 state
       setParsed([]); setSelected(new Set())
-      setRowCategories(new Map()); setRowConfidence(new Map()); setDuplicateFlags(new Set())
+      setRowCategories(new Map()); setRowConfidence(new Map()); setDuplicateFlags(new Set()); setDbDuplicateFlags(new Set())
 
       setHeaders(h)
       setRawRows(rows)
@@ -836,13 +860,13 @@ export default function ImportPage() {
   function resetUpload() {
     setFileName(''); setHeaders([]); setRawRows([])
     setParsed([]); setSelected(new Set())
-    setRowCategories(new Map()); setRowConfidence(new Map()); setDuplicateFlags(new Set())
+    setRowCategories(new Map()); setRowConfidence(new Map()); setDuplicateFlags(new Set()); setDbDuplicateFlags(new Set())
     setSelectedPresetId(null)
   }
 
   // ── handleGoPreview ───────────────────────────────────────────────────────
 
-  function handleGoPreview() {
+  async function handleGoPreview() {
     if (!mapping.dateColumn)   { addToast('Seleccioná la columna de fecha', 'warning'); return }
     if (!mapping.amountColumn) { addToast('Seleccioná la columna de monto', 'warning'); return }
 
@@ -890,11 +914,43 @@ export default function ImportPage() {
       if (indices.length > 1) indices.forEach(i => newDuplicates.add(i))
     }
 
+    // Detectar duplicados contra la base de datos
+    const newDbDuplicates = new Set<number>()
+    const validRows = rows.filter(r => !r._error)
+    if (validRows.length > 0) {
+      const fromDate = validRows.reduce((min, r) => r.date < min ? r.date : min, validRows[0].date)
+      const toDate   = validRows.reduce((max, r) => r.date > max ? r.date : max, validRows[0].date)
+      try {
+        const existingInDb = await transactionsService.list({ from: fromDate, to: toDate })
+        const dbKeyToTx = new Map<string, typeof existingInDb[number]>()
+        for (const t of existingInDb) {
+          const k = `${t.date}|${t.amount}|${t.type}|${normalizeDesc(t.description ?? '')}`
+          if (!dbKeyToTx.has(k)) dbKeyToTx.set(k, t)
+        }
+        for (const row of validRows) {
+          const key = `${row.date}|${row.amount}|${row.type}|${normalizeDesc(row.description)}`
+          const match = dbKeyToTx.get(key)
+          if (match) {
+            newDbDuplicates.add(row._index)
+            // Pre-rellenar categoría del historial si aún no tiene sugerencia de alta confianza
+            if (newRowConf.get(row._index) !== 'high' && match.category_id) {
+              newRowCats.set(row._index, match.category_id)
+              newRowConf.set(row._index, 'high')
+            }
+          }
+        }
+      } catch {
+        // Best-effort — si falla la consulta, se continúa sin detección de DB
+      }
+    }
+
     setRowCategories(newRowCats)
     setRowConfidence(newRowConf)
     setDuplicateFlags(newDuplicates)
+    setDbDuplicateFlags(newDbDuplicates)
     setParsed(rows)
-    setSelected(new Set(rows.filter(r => !r._error).map(r => r._index)))
+    // Deseleccionar por defecto los que ya existen en la DB
+    setSelected(new Set(rows.filter(r => !r._error && !newDbDuplicates.has(r._index)).map(r => r._index)))
     setRowFilter('all')
     setStep('preview')
     setRawRows([])  // liberar memoria del CSV original — ya no se necesita tras preview
@@ -1467,7 +1523,8 @@ export default function ImportPage() {
                 { key: 'review'     as RowFilter, label: 'A revisar' },
                 { key: 'income'     as RowFilter, label: 'Ingresos' },
                 { key: 'expense'    as RowFilter, label: 'Gastos' },
-                { key: 'duplicates' as RowFilter, label: 'Duplicados' },
+                { key: 'duplicates'    as RowFilter, label: 'Duplicados' },
+                { key: 'db_duplicates' as RowFilter, label: 'Ya importados' },
               ]).map(({ key, label }) => {
                 const count = filterCounts[key]
                 if (key !== 'all' && count === 0) return null
@@ -1489,8 +1546,11 @@ export default function ImportPage() {
             </div>
           )}
 
-          {/* Duplicados */}
+          {/* Duplicados en el archivo */}
           {duplicateFlags.size > 0 && <DuplicateBanner count={duplicateFlags.size} />}
+
+          {/* Ya existentes en la base de datos */}
+          {dbDuplicateFlags.size > 0 && <DbDuplicateBanner count={dbDuplicateFlags.size} />}
 
           {/* Alertas de errores */}
           {errorRows.length > 0 && (
@@ -1779,7 +1839,7 @@ export default function ImportPage() {
                   <Button variant="secondary" onClick={() => {
                     setStep('upload'); setFileName(''); setRawRows([]); setHeaders([])
                     setParsed([]); setResult(null); setRowCategories(new Map())
-                    setRowConfidence(new Map()); setDuplicateFlags(new Set())
+                    setRowConfidence(new Map()); setDuplicateFlags(new Set()); setDbDuplicateFlags(new Set())
                     setSelectedPresetId(null)
                   }}>
                     Cancelar
@@ -1792,7 +1852,7 @@ export default function ImportPage() {
                     onClick={() => {
                       setStep('upload'); setFileName(''); setRawRows([]); setHeaders([])
                       setParsed([]); setResult(null); setRowCategories(new Map())
-                      setRowConfidence(new Map()); setDuplicateFlags(new Set())
+                      setRowConfidence(new Map()); setDuplicateFlags(new Set()); setDbDuplicateFlags(new Set())
                       setSelectedPresetId(null)
                     }}
                   >
