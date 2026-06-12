@@ -1,17 +1,21 @@
 import { safeNumber } from './format'
-import { INTERNAL_LABELS } from './constants'
+import { INTERNAL_LABELS, REAL_TRANSACTION_KINDS } from './constants'
 import type { WalletWithBalance, Goal, FixedTerm, TransactionWithDetails, Refund, Reservation } from '@/types'
 
-// Prefijos usados por RPCs al crear transacciones internas.
-// Deben mantenerse sincronizados con las migraciones de Supabase correspondientes.
 const GOAL_DEPOSIT_PREFIX    = 'Aporte a objetivo:'
 const GOAL_WITHDRAWAL_PREFIX = 'Retiro de objetivo:'
 // rpc_refund_credit genera: 'Reintegro: ' + descripción original
 export const REFUND_PREFIX = 'Reintegro:'
 
-// Detecta si una transacción es un reintegro acreditado por su prefijo de descripción.
-// Mientras no exista un campo `is_refund` en la tabla, esta es la forma de identificarlos.
-export function isRefundTransaction(tx: { type: string; description?: string | null }): boolean {
+// Detecta si una transacción es un reintegro acreditado.
+// Usa transaction_kind cuando está disponible (nuevo sistema); cae en prefijo de
+// descripción solo para transacciones históricas anteriores a migration 037.
+export function isRefundTransaction(tx: {
+  type: string
+  description?: string | null
+  transaction_kind?: string | null
+}): boolean {
+  if (tx.transaction_kind) return tx.transaction_kind === 'refund_credit'
   return tx.type === 'income' && (tx.description ?? '').startsWith(REFUND_PREFIX)
 }
 
@@ -35,7 +39,12 @@ export function calculateSavingsMetrics(transactions: TransactionWithDetails[]):
   let refundIncome = 0
 
   for (const tx of transactions) {
-    if (tx.label && INTERNAL_LABELS.has(tx.label)) continue
+    // Exclude internal/technical movements. Uses transaction_kind when available (new),
+    // falls back to label check for historical transactions (pre-migration 037).
+    const isInternal = tx.transaction_kind
+      ? !REAL_TRANSACTION_KINDS.has(tx.transaction_kind)
+      : (!!tx.label && INTERNAL_LABELS.has(tx.label))
+    if (isInternal) continue
 
     const amount = safeNumber(tx.amount)
     const desc   = tx.description ?? ''
@@ -43,7 +52,7 @@ export function calculateSavingsMetrics(transactions: TransactionWithDetails[]):
     if (tx.type === 'income') {
       income += amount
       if (desc.startsWith(GOAL_WITHDRAWAL_PREFIX)) goalWithdrawals += amount
-      else if (desc.startsWith(REFUND_PREFIX)) refundIncome += amount
+      else if (tx.transaction_kind === 'refund_credit' || desc.startsWith(REFUND_PREFIX)) refundIncome += amount
     } else if (tx.type === 'expense') {
       expenses += amount
       if (desc.startsWith(GOAL_DEPOSIT_PREFIX)) goalDeposits += amount

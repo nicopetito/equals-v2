@@ -18,6 +18,7 @@ import { formatDate } from '@/utils/date'
 import type { PendingPayment, PendingPaymentStatus, Currency } from '@/types'
 import { motion } from 'motion/react'
 import { staggerContainer, staggerItem } from '@/utils/animations'
+import { getErrorMessage } from '@/utils/errors'
 
 type EffectiveStatus = PendingPaymentStatus | 'overdue'
 
@@ -280,7 +281,7 @@ export default function PendingPage() {
       setCreateOpen(false)
       refetch()
     } catch (e) {
-      addToast(e instanceof Error ? e.message : 'Error al guardar', 'error')
+      addToast(getErrorMessage(e, 'Error al guardar'), 'error')
     } finally {
       setSaving(false)
     }
@@ -295,7 +296,7 @@ export default function PendingPage() {
       setCancelTarget(null)
       refetch()
     } catch (e) {
-      addToast(e instanceof Error ? e.message : 'Error al cancelar', 'error')
+      addToast(getErrorMessage(e, 'Error al cancelar'), 'error')
     } finally {
       setCancelling(false)
     }
@@ -310,7 +311,7 @@ export default function PendingPage() {
       setDeleteTarget(null)
       refetch()
     } catch (e) {
-      addToast(e instanceof Error ? e.message : 'Error al eliminar', 'error')
+      addToast(getErrorMessage(e, 'Error al eliminar'), 'error')
     } finally {
       setDeleting(false)
     }

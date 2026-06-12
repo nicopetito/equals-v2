@@ -1,16 +1,25 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Activity, CheckCircle2, AlertTriangle, XCircle, Copy, RefreshCw } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { Activity, CheckCircle2, AlertTriangle, XCircle, Copy, RefreshCw, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react'
 import { PageHeader }         from '@/components/ui/PageHeader'
+import { EmptyState }         from '@/components/ui/EmptyState'
 import { useTransactions }    from '@/hooks/useTransactions'
 import { useWallets }         from '@/hooks/useWallets'
 import { useCategories }      from '@/hooks/useCategories'
 import { useBudgets }         from '@/hooks/useBudgets'
 import { useRefunds }         from '@/hooks/useRefunds'
-import { recurringService }   from '@/services/recurring.service'
+import { recurringService }    from '@/services/recurring.service'
+import { transactionsService } from '@/services/transactions.service'
 import { useToast }           from '@/components/providers/ToastProvider'
-import type { RecurringTransactionWithDetails } from '@/types'
+import { formatCurrency }     from '@/utils/format'
+import type { RecurringTransactionWithDetails, TransactionWithDetails } from '@/types'
+
+type DiagDetailType = Parameters<typeof transactionsService.getDiagnosticDetails>[0]
+
+type DiagResult = Awaited<ReturnType<typeof transactionsService.runFinancialDiagnostics>>
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -45,6 +54,7 @@ function statusBg(status: CheckStatus) {
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 export default function HealthPage() {
+  const router = useRouter()
   const { data: transactions, loading: loadingTx }       = useTransactions()
   const { data: wallets, loading: loadingWallets }       = useWallets()
   const { data: categories }                             = useCategories()
@@ -55,6 +65,57 @@ export default function HealthPage() {
   const [recurring, setRecurring]   = useState<RecurringTransactionWithDetails[]>([])
   const [loadingRec, setLoadingRec] = useState(true)
   const [copied, setCopied]         = useState(false)
+  const [diagResult, setDiagResult] = useState<DiagResult>(null)
+  const [loadingDiag, setLoadingDiag] = useState(true)
+  const [expandedDiag, setExpandedDiag] = useState<Set<string>>(new Set())
+  const [diagDetails, setDiagDetails]   = useState<Record<string, TransactionWithDetails[]>>({})
+  const [loadingDetails, setLoadingDetails] = useState<Set<string>>(new Set())
+
+  const DIAG_DETAIL_TYPES: Record<string, DiagDetailType | null> = {
+    null_kind:           'null_kind',
+    transfer_no_group:   'transfer_no_group',
+    zero_adjustment:     'zero_adjustment',
+    multi_initial_balance: 'multi_initial_balance',
+    orphan_refund_credit:  'orphan_refund_credit',
+    unbalanced_groups:   null,
+    missing_leg:         null,
+  }
+
+  const DIAG_HISTORY_LINKS: Record<string, string | null> = {
+    null_kind:             null,
+    transfer_no_group:     '/transactions',
+    zero_adjustment:       '/transactions',
+    multi_initial_balance: '/transactions',
+    orphan_refund_credit:  '/transactions',
+    unbalanced_groups:     '/transactions',
+    missing_leg:           '/transactions',
+  }
+
+  async function fetchDiagDetails(id: string) {
+    const detailType = DIAG_DETAIL_TYPES[id]
+    if (!detailType) return
+    if (diagDetails[id]) {
+      setExpandedDiag(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
+      return
+    }
+    setLoadingDetails(prev => new Set(prev).add(id))
+    setExpandedDiag(prev => new Set(prev).add(id))
+    try {
+      const rows = await transactionsService.getDiagnosticDetails(detailType)
+      setDiagDetails(prev => ({ ...prev, [id]: rows }))
+    } catch {
+      setDiagDetails(prev => ({ ...prev, [id]: [] }))
+    } finally {
+      setLoadingDetails(prev => { const next = new Set(prev); next.delete(id); return next })
+    }
+  }
+
+  useEffect(() => {
+    transactionsService.runFinancialDiagnostics()
+      .then(setDiagResult)
+      .catch(() => setDiagResult(null))
+      .finally(() => setLoadingDiag(false))
+  }, [])
 
   useEffect(() => {
     recurringService.list()
@@ -192,6 +253,11 @@ export default function HealthPage() {
       lines.push(`   Conteo: ${c.count}`)
       lines.push(``)
     })
+    if (diagResult) {
+      lines.push(`Diagnóstico financiero avanzado (JSON):`)
+      lines.push(JSON.stringify(diagResult, null, 2))
+      lines.push(``)
+    }
     lines.push(`Datos:`)
     lines.push(`  Transacciones: ${transactions.length}`)
     lines.push(`  Billeteras: ${wallets.length}`)
@@ -212,6 +278,57 @@ export default function HealthPage() {
       addToast('No se pudo copiar al portapapeles', 'error')
     }
   }
+
+  const diagChecks = useMemo<HealthCheck[]>(() => {
+    if (!diagResult) return []
+    const d = diagResult
+
+    const entry = (
+      id: string,
+      label: string,
+      count: number,
+      severity: CheckStatus,
+      okDetail: string,
+      badDetail: (n: number) => string,
+    ): HealthCheck => ({
+      id,
+      label,
+      status: count > 0 ? severity : 'ok',
+      count,
+      detail: count > 0 ? badDetail(count) : okDetail,
+    })
+
+    return [
+      entry('null_kind', 'Transacciones sin transaction_kind',
+        d.null_kind, 'warning',
+        'Todas las transacciones tienen transaction_kind.',
+        n => `${n} transacción${n>1?'es':''} sin transaction_kind. Anteriores a migración 037.`),
+      entry('transfer_no_group', 'Transferencias sin transfer_group_id',
+        d.transfer_no_group, 'critical',
+        'Todas las transferencias tienen transfer_group_id.',
+        n => `${n} transacción${n>1?'es':''} de tipo transfer sin transfer_group_id. No vinculables a su par.`),
+      entry('unbalanced_groups', 'Grupos de transferencia con legs != 2',
+        d.unbalanced_groups, 'critical',
+        'Todos los grupos de transferencia tienen exactamente 2 legs.',
+        n => `${n} grupo${n>1?'s':''} con cantidad de legs distinta de 2 (duplicadas o eliminadas).`),
+      entry('missing_leg', 'Transferencias con leg faltante',
+        d.missing_leg, 'critical',
+        'Todos los grupos tienen leg expense + leg income.',
+        n => `${n} grupo${n>1?'s':''} sin leg de egreso o sin leg de ingreso.`),
+      entry('multi_initial_balance', 'Billeteras con saldo inicial duplicado',
+        d.multi_initial_balance, 'warning',
+        'Sin billeteras con saldo inicial duplicado.',
+        n => `${n} billetera${n>1?'s':''} con más de un initial_balance registrado.`),
+      entry('zero_adjustment', 'Ajustes de saldo con monto cero',
+        d.zero_adjustment, 'warning',
+        'Sin ajustes de saldo con monto cero.',
+        n => `${n} ajuste${n>1?'s':''} de saldo con amount = 0.`),
+      entry('orphan_refund_credit', 'Reintegros acreditados sin referencia',
+        d.orphan_refund_credit, 'warning',
+        'Todos los reintegros acreditados tienen referencia en tabla refunds.',
+        n => `${n} transacción${n>1?'es':''} refund_credit sin fila acreditada en tabla refunds.`),
+    ]
+  }, [diagResult])
 
   const isLoading = loadingRec || loadingTx || loadingWallets || loadingBudgets
 
@@ -234,6 +351,16 @@ export default function HealthPage() {
           {copied ? 'Copiado' : 'Copiar diagnóstico'}
         </button>
       </PageHeader>
+
+      {/* Empty state para usuario sin transacciones */}
+      {!isLoading && transactions.length === 0 && (
+        <EmptyState
+          type="transactions"
+          title="No hay datos para analizar"
+          description="Registrá algunas transacciones para ver la salud de tus finanzas."
+          action={{ label: 'Ir a Transacciones', onClick: () => router.push('/transactions') }}
+        />
+      )}
 
       {/* Overall status */}
       <div
@@ -324,6 +451,161 @@ export default function HealthPage() {
         </div>
       )}
 
+      {/* Diagnóstico de integridad financiera */}
+      <div>
+        <p className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>
+          Diagnóstico financiero avanzado
+        </p>
+        {loadingDiag ? (
+          <div className="rounded-2xl px-5 py-4 flex items-center gap-2"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+            <RefreshCw size={14} className="animate-spin" style={{ color: 'var(--text-muted)' }} />
+            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Verificando integridad…</span>
+          </div>
+        ) : !diagResult ? (
+          <div className="rounded-2xl px-5 py-4"
+            style={{ background: 'var(--expense-50)', border: '1px solid var(--expense-200)', boxShadow: 'var(--shadow-sm)' }}>
+            <p className="text-sm font-semibold" style={{ color: 'var(--expense-700)' }}>
+              No se pudo cargar el diagnóstico financiero.
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--expense-600)' }}>
+              Verificá que la migración 047 esté aplicada en Supabase.
+            </p>
+          </div>
+        ) : diagChecks.every(c => c.status === 'ok') ? (
+          <div className="rounded-2xl px-5 py-4 flex items-center gap-3"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: 'var(--income-50)' }}>
+              <CheckCircle2 size={16} style={{ color: 'var(--income-500)' }} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                {diagChecks.length} verificaciones financieras pasadas
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Sin inconsistencias en transferencias, saldos iniciales ni reintegros.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {diagChecks.map(check => {
+              const styles = statusBg(check.status)
+              const canExpand = check.count > 0 && DIAG_DETAIL_TYPES[check.id] !== null
+              const historyLink = check.count > 0 ? DIAG_HISTORY_LINKS[check.id] : null
+              const isExpanded = expandedDiag.has(check.id)
+              const isLoadingDetails = loadingDetails.has(check.id)
+              const details = diagDetails[check.id] ?? []
+
+              return (
+                <div
+                  key={check.id}
+                  className="rounded-2xl overflow-hidden"
+                  style={{
+                    background: 'var(--bg-card)',
+                    border: `1px solid ${check.status !== 'ok' ? styles.border : 'var(--border)'}`,
+                    boxShadow: 'var(--shadow-sm)',
+                  }}
+                >
+                  <div className="px-5 py-4 flex items-start gap-3">
+                    <div style={{ marginTop: '1px', flexShrink: 0 }}>
+                      {statusIcon(check.status)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        {check.label}
+                      </p>
+                      <p className="text-xs mt-0.5" style={{ color: check.status !== 'ok' ? styles.text : 'var(--text-muted)' }}>
+                        {check.detail}
+                      </p>
+                      {check.count > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          {canExpand && (
+                            <button
+                              onClick={() => fetchDiagDetails(check.id)}
+                              className="flex items-center gap-1 text-xs font-semibold transition-colors"
+                              style={{ color: 'var(--brand-500)' }}
+                            >
+                              {isLoadingDetails
+                                ? <RefreshCw size={11} className="animate-spin" />
+                                : isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />
+                              }
+                              {isExpanded ? 'Ocultar detalles' : 'Ver detalles'}
+                            </button>
+                          )}
+                          {historyLink && (
+                            <Link
+                              href={historyLink}
+                              className="flex items-center gap-1 text-xs font-semibold transition-colors"
+                              style={{ color: 'var(--text-muted)' }}
+                            >
+                              <ExternalLink size={11} />
+                              Ir al historial
+                            </Link>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div style={{ borderTop: `1px solid ${styles.border}` }}>
+                      {isLoadingDetails ? (
+                        <div className="px-5 py-3 flex items-center gap-2">
+                          <RefreshCw size={12} className="animate-spin" style={{ color: 'var(--text-muted)' }} />
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Cargando detalles…</span>
+                        </div>
+                      ) : details.length === 0 ? (
+                        <p className="px-5 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>Sin registros encontrados.</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full min-w-[480px] text-[11px]">
+                            <thead>
+                              <tr style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-light)' }}>
+                                <th className="px-4 py-2 text-left font-semibold">Fecha</th>
+                                <th className="px-4 py-2 text-left font-semibold">Descripción</th>
+                                <th className="px-4 py-2 text-right font-semibold">Monto</th>
+                                <th className="px-4 py-2 text-left font-semibold">Billetera</th>
+                                <th className="px-4 py-2 text-left font-semibold">Kind</th>
+                                <th className="px-4 py-2 text-left font-semibold">Group ID</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {details.map(tx => (
+                                <tr key={tx.id} style={{ borderBottom: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}>
+                                  <td className="px-4 py-2 whitespace-nowrap">{tx.date}</td>
+                                  <td className="px-4 py-2 max-w-[160px] truncate">{tx.description ?? '—'}</td>
+                                  <td className="px-4 py-2 text-right whitespace-nowrap tabular-nums font-semibold">
+                                    {formatCurrency(tx.amount, tx.currency)}
+                                  </td>
+                                  <td className="px-4 py-2 whitespace-nowrap">{tx.wallet_name ?? '—'}</td>
+                                  <td className="px-4 py-2 whitespace-nowrap font-mono" style={{ color: 'var(--brand-500)' }}>
+                                    {tx.transaction_kind ?? '—'}
+                                  </td>
+                                  <td className="px-4 py-2 whitespace-nowrap font-mono" style={{ color: 'var(--text-faint)' }}>
+                                    {tx.transfer_group_id ? tx.transfer_group_id.slice(0, 8) + '…' : '—'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {details.length >= 50 && (
+                            <p className="px-4 py-2 text-[10px]" style={{ color: 'var(--text-faint)' }}>
+                              Mostrando hasta 50 registros. Usá el historial para ver todos.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Data summary */}
       <div
         className="rounded-2xl px-5 py-4"
@@ -332,7 +614,7 @@ export default function HealthPage() {
         <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--text-muted)' }}>
           Resumen de datos cargados
         </p>
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
           {[
             { label: 'Transacciones',  value: transactions.length },
             { label: 'Billeteras',     value: wallets.length },

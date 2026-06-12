@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { fixedTermService } from '@/services/fixed_term.service'
 import type { FixedTerm } from '@/types'
+import { getErrorMessage } from '@/utils/errors'
 
 export function useFixedTerms() {
   const [items, setItems]     = useState<FixedTerm[]>([])
@@ -14,7 +15,7 @@ export function useFixedTerms() {
     let active = true
     fixedTermService.list()
       .then(r  => { if (active) setItems(r) })
-      .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Error al cargar plazos fijos') })
+      .catch(e => { if (active) setError(getErrorMessage(e, 'Error al cargar plazos fijos')) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [rev])

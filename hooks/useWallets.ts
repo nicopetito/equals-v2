@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { walletsService } from '@/services/wallets.service'
 import type { WalletWithBalance } from '@/types'
+import { getErrorMessage } from '@/utils/errors'
 
 export function useWallets() {
   const [data, setData]       = useState<WalletWithBalance[]>([])
@@ -14,7 +15,7 @@ export function useWallets() {
     let active = true
     walletsService.listWithBalance()
       .then(r  => { if (active) setData(r) })
-      .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Error loading wallets') })
+      .catch(e => { if (active) setError(getErrorMessage(e, 'Error loading wallets')) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [rev])

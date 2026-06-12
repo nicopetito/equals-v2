@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import type { Reservation, WalletWithBalance } from '@/types'
+import { getErrorMessage } from '@/utils/errors'
 
 const CURRENCY_OPTS = [
   { value: 'ARS',    label: 'ARS — Peso argentino' },
@@ -50,7 +51,7 @@ export function CreateReservationModal({ open, onClose, wallets, editing, onSave
       })
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al guardar')
+      setError(getErrorMessage(e, 'Error al guardar'))
     } finally {
       setSaving(false)
     }
@@ -117,6 +118,12 @@ export function CreateReservationModal({ open, onClose, wallets, editing, onSave
           onChange={e => setCurrency(e.target.value)}
           disabled={!!editing}
         />
+
+        {!editing && (
+          <p className="text-xs px-1" style={{ color: 'var(--text-muted)' }}>
+            💡 Depositar a una reserva no cuenta como gasto. El dinero sigue siendo tuyo, solo está apartado.
+          </p>
+        )}
 
         <div className="flex gap-3 pt-1">
           <Button variant="secondary" onClick={handleClose} className="flex-1" disabled={saving}>

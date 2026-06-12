@@ -9,6 +9,7 @@ import { useToast } from '@/components/providers/ToastProvider'
 import { pendingPaymentService } from '@/services/pending_payment.service'
 import { formatCurrency } from '@/utils/format'
 import type { PendingPayment, WalletWithBalance, Currency } from '@/types'
+import { getErrorMessage } from '@/utils/errors'
 
 interface Props {
   open: boolean
@@ -62,7 +63,7 @@ export function CompletePendingModal({ open, onClose, payment, wallets, onSucces
       onSuccess()
       handleClose()
     } catch (e) {
-      addToast(e instanceof Error ? e.message : 'Error al completar el pago', 'error')
+      addToast(getErrorMessage(e, 'Error al completar el pago'), 'error')
     } finally {
       setSaving(false)
     }

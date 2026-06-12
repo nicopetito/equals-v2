@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { goalsService } from '@/services/goals.service'
 import type { Goal } from '@/types'
+import { getErrorMessage } from '@/utils/errors'
 
 export function useGoals() {
   const [data, setData]       = useState<Goal[]>([])
@@ -14,7 +15,7 @@ export function useGoals() {
     let active = true
     goalsService.list()
       .then(r  => { if (active) setData(r) })
-      .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Error loading goals') })
+      .catch(e => { if (active) setError(getErrorMessage(e, 'Error loading goals')) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [rev])

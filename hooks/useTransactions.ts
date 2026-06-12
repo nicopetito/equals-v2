@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { transactionsService } from '@/services/transactions.service'
 import type { TransactionWithDetails, TransactionFilters, TransactionSort } from '@/types'
+import { getErrorMessage } from '@/utils/errors'
 
 export function useTransactions(filters?: TransactionFilters, sort?: TransactionSort) {
   const [data, setData]       = useState<TransactionWithDetails[]>([])
@@ -17,7 +18,7 @@ export function useTransactions(filters?: TransactionFilters, sort?: Transaction
     let active = true
     transactionsService.list(filters, sort)
       .then(r  => { if (active) setData(r) })
-      .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Error loading transactions') })
+      .catch(e => { if (active) setError(getErrorMessage(e, 'Error loading transactions')) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
     // filtersKey and sortKey are stable string representations of the objects

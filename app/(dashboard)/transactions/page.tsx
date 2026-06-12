@@ -23,15 +23,18 @@ import { Modal } from '@/components/ui/Modal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Pagination } from '@/components/ui/Pagination'
 import { CategoryBadge } from '@/components/ui/CategoryBadge'
+import { KindBadge } from '@/components/ui/KindBadge'
 import { formatCurrency } from '@/utils/format'
 import { formatDateSmart, getDateRangeForPeriod, PERIOD_OPTIONS, type Period } from '@/utils/date'
-import type { TransactionWithDetails, TransactionType, TransactionFilters, Refund } from '@/types'
+import type { TransactionWithDetails, TransactionType, TransactionKind, TransactionFilters, Refund } from '@/types'
 import { AnimatePresence, motion } from 'motion/react'
 import { DURATION, EASE_OUT } from '@/utils/animations'
 import {
-  INTERNAL_LABELS, INITIAL_BALANCE_LABEL, LABEL_COPY,
-  INTERNAL_TRANSFER_LABEL, parseTransferNotes,
+  INTERNAL_LABELS, INITIAL_BALANCE_LABEL,
+  INTERNAL_TRANSFER_LABEL, REAL_TRANSACTION_KINDS, parseTransferNotes,
 } from '@/utils/constants'
+import { buildProcessedTransactions, type DisplayTransaction } from '@/utils/transactions'
+import { getErrorMessage } from '@/utils/errors'
 
 type FilterType = 'all' | TransactionType
 type GroupBy = 'none' | 'date' | 'month' | 'category' | 'wallet' | 'type' | 'label'
@@ -76,6 +79,29 @@ const TYPE_FILTERS: { value: FilterType; label: string }[] = [
   { value: 'all',     label: 'Todos' },
   { value: 'income',  label: 'Ingresos' },
   { value: 'expense', label: 'Gastos' },
+]
+
+type KindFilterKey =
+  | 'all'
+  | 'income'
+  | 'expense'
+  | 'transfer'
+  | 'reserves'
+  | 'wallet_adjustment'
+  | 'refund_credit'
+  | 'yield'
+  | 'initial_balance'
+
+const KIND_FILTERS: { value: KindFilterKey; label: string; kinds: TransactionKind[] | null }[] = [
+  { value: 'all',              label: 'Todos',          kinds: null },
+  { value: 'income',           label: 'Ingresos reales', kinds: ['income'] },
+  { value: 'expense',          label: 'Gastos reales',   kinds: ['expense'] },
+  { value: 'transfer',         label: 'Transferencias',  kinds: ['transfer'] },
+  { value: 'reserves',         label: 'Reservas',        kinds: ['reserve_deposit', 'reserve_withdrawal'] },
+  { value: 'wallet_adjustment',label: 'Ajustes',         kinds: ['wallet_adjustment'] },
+  { value: 'refund_credit',    label: 'Reintegros',      kinds: ['refund_credit'] },
+  { value: 'yield',            label: 'Rendimientos',    kinds: ['yield'] },
+  { value: 'initial_balance',  label: 'Saldos iniciales',kinds: ['initial_balance'] },
 ]
 
 function Chip({ selected, onClick, children }: {
@@ -214,6 +240,7 @@ function TransactionsPageInner() {
   const [search, setSearch]     = useState(() => searchParams.get('search') ?? '')
 
   const [filterType, setFilterType]             = useState<FilterType>('all')
+  const [filterKind, setFilterKind]             = useState<KindFilterKey>('all')
   const [filterCategory, setFilterCategory]     = useState<string>('all')
   const [filterWallet, setFilterWallet]         = useState<string>('all')
   const [filterOrphan, setFilterOrphan]         = useState(false)
@@ -250,17 +277,22 @@ function TransactionsPageInner() {
   // Build server-side filters
   const txFilters = useMemo<TransactionFilters>(() => {
     const { start, end } = getDateRangeForPeriod(period)
+    const selectedKindOption = KIND_FILTERS.find(k => k.value === filterKind)
+    const kinds = selectedKindOption?.kinds ?? null
+    // When kind filter is active, ignore the legacy type filter to avoid conflicts
+    const typeFilter = kinds ? undefined : (filterType !== 'all' ? filterType : undefined)
     return {
       from: format(start, 'yyyy-MM-dd'),
       to:   format(end,   'yyyy-MM-dd'),
-      type: filterType !== 'all' ? filterType : undefined,
+      type: typeFilter,
+      kinds: kinds ?? undefined,
       category_ids: filterCategory !== 'all' ? [filterCategory] : undefined,
       wallet_ids: !filterOrphan && !filterNoCategory && filterWallet !== 'all' ? [filterWallet] : undefined,
       search: debouncedSearch || undefined,
       no_wallet: filterOrphan || undefined,
       no_category: filterNoCategory || undefined,
     }
-  }, [period, filterType, filterCategory, filterWallet, filterOrphan, filterNoCategory, debouncedSearch])
+  }, [period, filterType, filterKind, filterCategory, filterWallet, filterOrphan, filterNoCategory, debouncedSearch])
 
   // Paginated list
   const { data: transactions, total, totalPages, loading, refetch } =
@@ -343,25 +375,10 @@ function TransactionsPageInner() {
     [allRefunds]
   )
 
-  // Colapsa los pares expense+income de transferencias internas en una sola fila
-  // (la leg expense), usando transfer_id del campo notes como clave de deduplicación.
-  const processedTransactions = useMemo(() => {
-    const seen = new Set<string>()
-    return transactions.flatMap(tx => {
-      if (tx.label !== INTERNAL_TRANSFER_LABEL) return [tx]
-      const notes = parseTransferNotes(tx.notes)
-      if (!notes?.transfer_id) return [tx]
-      if (seen.has(notes.transfer_id)) return []
-      seen.add(notes.transfer_id)
-      if (tx.type === 'expense') return [tx]
-      const expLeg = transactions.find(t =>
-        t.label === INTERNAL_TRANSFER_LABEL &&
-        parseTransferNotes(t.notes)?.transfer_id === notes.transfer_id &&
-        t.type === 'expense'
-      )
-      return [expLeg ?? tx]
-    })
-  }, [transactions])
+  const processedTransactions = useMemo(
+    (): DisplayTransaction[] => buildProcessedTransactions(transactions),
+    [transactions]
+  )
 
   const groups = useMemo(() => {
     if (groupBy === 'none') return [{ key: '__all__', label: '', transactions: processedTransactions }]
@@ -487,7 +504,7 @@ function TransactionsPageInner() {
       refetch()
       addToast(label ? `Etiqueta "${label}" asignada` : 'Etiqueta quitada', 'success')
     } catch (e) {
-      addToast(e instanceof Error ? e.message : 'Error al asignar etiqueta', 'error')
+      addToast(getErrorMessage(e, 'Error al asignar etiqueta'), 'error')
     } finally {
       setShowLabelDropdown(false)
       setLabelInput('')
@@ -510,7 +527,7 @@ function TransactionsPageInner() {
       refetchRefunds()
       addToast('Transacción eliminada', 'info')
     } catch (e) {
-      addToast(e instanceof Error ? e.message : 'Error al eliminar', 'error')
+      addToast(getErrorMessage(e, 'Error al eliminar'), 'error')
     } finally {
       setDeleting(null)
     }
@@ -530,7 +547,7 @@ function TransactionsPageInner() {
       refetchWallets()
       refetchRefunds()
     } catch (e) {
-      addToast(e instanceof Error ? e.message : 'Error al acreditar', 'error')
+      addToast(getErrorMessage(e, 'Error al acreditar'), 'error')
     } finally {
       setCreditingId(null)
     }
@@ -542,7 +559,7 @@ function TransactionsPageInner() {
       refetchRefunds()
       addToast('Reintegro cancelado', 'info')
     } catch (e) {
-      addToast(e instanceof Error ? e.message : 'Error al cancelar', 'error')
+      addToast(getErrorMessage(e, 'Error al cancelar'), 'error')
     }
   }
 
@@ -605,7 +622,7 @@ function TransactionsPageInner() {
 
       {/* ── Summary cards ── */}
       {total > 0 && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div
             className="rounded-2xl p-4 flex items-center gap-3 transition-all duration-150"
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
@@ -802,6 +819,26 @@ function TransactionsPageInner() {
             <ChevronRight size={13} />
           </button>
         </div>
+      </div>
+
+      {/* ── Filtros por tipo financiero ── */}
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
+        {KIND_FILTERS.map(opt => (
+          <button
+            key={opt.value}
+            onClick={() => {
+              setFilterKind(opt.value)
+              if (opt.value !== 'all') setFilterType('all')
+            }}
+            className="px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all duration-150 shrink-0"
+            style={filterKind === opt.value
+              ? { background: 'var(--grad-brand)', color: 'white', boxShadow: '0 2px 8px rgba(109,59,215,0.25)' }
+              : { background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)' }
+            }
+          >
+            {opt.label}
+          </button>
+        ))}
       </div>
 
       {/* ── Agrupar por (siempre visible) ── */}
@@ -1124,10 +1161,13 @@ function TransactionsPageInner() {
                           </button>
                         )}
                         {(() => {
-                          const isTech = Boolean(tx.label && (INTERNAL_LABELS.has(tx.label) || tx.label === INITIAL_BALANCE_LABEL))
+                          const isTech = tx.transaction_kind
+                            ? !REAL_TRANSACTION_KINDS.has(tx.transaction_kind)
+                            : Boolean(tx.label && (INTERNAL_LABELS.has(tx.label) || tx.label === INITIAL_BALANCE_LABEL))
+                          const isTransfer = tx.transaction_kind === 'transfer' || tx.label === INTERNAL_TRANSFER_LABEL
                           const bg    = isTech ? 'var(--bg-subtle)' : tx.type === 'income' ? 'var(--income-50)' : 'var(--expense-50)'
                           const color = isTech ? 'var(--text-muted)' : tx.type === 'income' ? 'var(--income-500)' : 'var(--expense-500)'
-                          const Icon  = tx.label === INTERNAL_TRANSFER_LABEL ? ArrowLeftRight
+                          const Icon  = isTransfer ? ArrowLeftRight
                             : isTech ? SlidersHorizontal
                             : tx.type === 'income' ? TrendingUp : TrendingDown
                           return (
@@ -1141,11 +1181,15 @@ function TransactionsPageInner() {
                         })()}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                            {tx.label === INTERNAL_TRANSFER_LABEL
+                            {(tx.transaction_kind === 'transfer' || tx.label === INTERNAL_TRANSFER_LABEL)
                               ? (() => {
+                                  const dest = (tx as DisplayTransaction)._destinationWalletName
+                                  const origin = tx.wallet_name ?? 'Origen'
+                                  if (dest) return `${origin} → ${dest}`
+                                  // fallback legacy: leer from/to de notes
                                   const n = parseTransferNotes(tx.notes)
-                                  if (!n) return tx.description
-                                  return `${walletMap.get(n.from_wallet_id) ?? 'Origen'} → ${walletMap.get(n.to_wallet_id) ?? 'Destino'}`
+                                  if (n) return `${walletMap.get(n.from_wallet_id) ?? origin} → ${walletMap.get(n.to_wallet_id) ?? 'Destino'}`
+                                  return tx.description
                                 })()
                               : tx.description
                             }
@@ -1161,13 +1205,14 @@ function TransactionsPageInner() {
                                 {tx.wallet_name}
                               </span>
                             )}
-                            {tx.label && (
+                            <KindBadge kind={tx.transaction_kind} label={tx.label} />
+                            {(tx as DisplayTransaction)._isIncomplete && (
                               <span
                                 className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5"
-                                style={{ background: 'rgba(109,59,215,0.10)', color: 'var(--brand-500)', border: '1px solid rgba(109,59,215,0.20)' }}
+                                style={{ background: '#FFFBEB', color: '#D97706', border: '1px solid #FDE68A' }}
                               >
-                                <Tag size={8} />
-                                {LABEL_COPY[tx.label] ?? tx.label}
+                                <AlertTriangle size={8} />
+                                Transferencia incompleta
                               </span>
                             )}
                             {tx.id && refundsByTx.has(tx.id) && (
@@ -1184,12 +1229,14 @@ function TransactionsPageInner() {
                         <div className="text-right mr-1 shrink-0">
                           <p
                             className="text-sm font-bold tabular-nums"
-                            style={{ color: (tx.label && (INTERNAL_LABELS.has(tx.label) || tx.label === INITIAL_BALANCE_LABEL))
-                              ? 'var(--text-secondary)'
-                              : tx.type === 'income' ? 'var(--income-600)' : 'var(--expense-600)'
-                            }}
+                            style={{ color: (() => {
+                              const tech = tx.transaction_kind
+                                ? !REAL_TRANSACTION_KINDS.has(tx.transaction_kind)
+                                : Boolean(tx.label && (INTERNAL_LABELS.has(tx.label) || tx.label === INITIAL_BALANCE_LABEL))
+                              return tech ? 'var(--text-secondary)' : tx.type === 'income' ? 'var(--income-600)' : 'var(--expense-600)'
+                            })() }}
                           >
-                            {tx.label === INTERNAL_TRANSFER_LABEL
+                            {(tx.transaction_kind === 'transfer' || tx.label === INTERNAL_TRANSFER_LABEL)
                               ? formatCurrency(tx.amount, tx.currency)
                               : `${tx.type === 'income' ? '+' : '−'}${formatCurrency(tx.amount, tx.currency)}`
                             }

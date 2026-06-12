@@ -90,8 +90,8 @@ export function EmptyState({
   type = 'default',
 }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-14 px-4 text-center">
-      <div className="mb-5">
+    <div className="flex flex-col items-center justify-center py-14 px-4 text-center animate-fade-in">
+      <div className="mb-5" aria-hidden="true">
         <Illustration type={type} />
       </div>
       <p className="text-base font-bold mb-1.5" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}>
@@ -103,9 +103,10 @@ export function EmptyState({
       {action && (
         <button
           onClick={action.onClick}
+          aria-label={action.label}
           className="mt-5 px-5 py-2.5 text-white text-sm font-bold rounded-xl transition-all hover:opacity-90 hover:-translate-y-px"
           style={{
-            background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)',
+            background: 'var(--grad-brand)',
             boxShadow: '0 4px 14px rgba(109,59,215,0.40)',
           }}
         >

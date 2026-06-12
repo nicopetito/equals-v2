@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { refundService } from '@/services/refund.service'
 import type { Refund } from '@/types'
+import { getErrorMessage } from '@/utils/errors'
 
 export function useRefunds() {
   const [items, setItems]     = useState<Refund[]>([])
@@ -14,7 +15,7 @@ export function useRefunds() {
     let active = true
     refundService.list()
       .then(r  => { if (active) setItems(r) })
-      .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Error al cargar reintegros') })
+      .catch(e => { if (active) setError(getErrorMessage(e, 'Error al cargar reintegros')) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [rev])

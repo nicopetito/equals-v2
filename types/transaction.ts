@@ -3,6 +3,17 @@ export type TransactionType = 'income' | 'expense'
 
 export type TransactionSubtype = 'yield' | 'correction'
 
+export type TransactionKind =
+  | 'income'
+  | 'expense'
+  | 'transfer'
+  | 'initial_balance'
+  | 'wallet_adjustment'
+  | 'reserve_deposit'
+  | 'reserve_withdrawal'
+  | 'yield'
+  | 'refund_credit'
+
 export interface Transaction {
   id?: string
   user_id?: string
@@ -26,6 +37,8 @@ export interface Transaction {
   affects_budget?: boolean
   yield_period_start?: string | null
   yield_period_end?: string | null
+  transaction_kind?: TransactionKind | null
+  transfer_group_id?: string | null
   created_at?: string
   updated_at?: string
 }
@@ -40,6 +53,7 @@ export interface TransactionWithDetails extends Transaction {
 
 export interface TransactionFilters {
   type?: TransactionType | 'all'
+  kinds?: TransactionKind[]
   category_ids?: string[]
   wallet_ids?: string[]
   currency?: Currency

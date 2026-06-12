@@ -81,6 +81,8 @@ export function Pagination({
                   key={p}
                   onClick={() => onPageChange(p as number)}
                   disabled={loading}
+                  aria-current={p === page ? 'page' : undefined}
+                  aria-label={`Página ${p}`}
                   className={`${btnBase} w-8 h-8`}
                   style={
                     p === page

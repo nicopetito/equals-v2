@@ -19,6 +19,7 @@ import { useWallets } from '@/hooks/useWallets'
 import { fixedTermService } from '@/services/fixed_term.service'
 import { safeNumber, formatCurrency } from '@/utils/format'
 import type { FixedTerm } from '@/types'
+import { getErrorMessage } from '@/utils/errors'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -283,7 +284,7 @@ export default function FixedTermPage() {
       setNewOpen(false)
       addToast('Plazo fijo creado y capital descontado de la billetera.', 'success')
     } catch (e) {
-      setNewError(e instanceof Error ? e.message : 'Error al guardar el plazo fijo.')
+      setNewError(getErrorMessage(e, 'Error al guardar el plazo fijo.'))
     } finally {
       setSaving(false)
     }
@@ -308,7 +309,7 @@ export default function FixedTermPage() {
       setActionItem(null)
       addToast(`Retiro de ${formatCurrency(amount, actionItem.currency)} registrado.`, 'success')
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Error al retirar.')
+      setActionError(getErrorMessage(e, 'Error al retirar.'))
     } finally {
       setActioning(false)
     }
@@ -342,7 +343,7 @@ export default function FixedTermPage() {
       setActionItem(null)
       addToast(`Plazo fijo renovado por ${reinvestDays} días.`, 'success')
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Error al renovar.')
+      setActionError(getErrorMessage(e, 'Error al renovar.'))
     } finally {
       setActioning(false)
     }

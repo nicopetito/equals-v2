@@ -12,6 +12,7 @@ import type {
   TransactionSort,
   MonthlyTrend,
   PaginatedResult,
+  TransactionKind,
 } from '@/types'
 
 function getSupabase() {
@@ -37,6 +38,7 @@ export const transactionsService = {
 
     if (filters) {
       if (filters.type && filters.type !== 'all') query = query.eq('type', filters.type)
+      if (filters.kinds?.length) query = query.in('transaction_kind', filters.kinds)
       if (filters.category_ids?.length) query = query.in('category_id', filters.category_ids)
       if (filters.wallet_ids?.length) query = query.in('wallet_id', filters.wallet_ids)
       if (filters.currency) query = query.eq('currency', filters.currency)
@@ -172,7 +174,8 @@ export const transactionsService = {
     }
 
     const COLUMNS = new Set(['description', 'amount', 'type', 'currency', 'crypto_type',
-      'category_id', 'wallet_id', 'date', 'is_recurring', 'recurring_id', 'notes', 'label'])
+      'category_id', 'wallet_id', 'date', 'is_recurring', 'recurring_id', 'notes', 'label',
+      'transaction_kind'])
     const updatePayload = Object.fromEntries(Object.entries(tx).filter(([k]) => COLUMNS.has(k)))
 
     const { data, error } = await supabase
@@ -191,6 +194,19 @@ export const transactionsService = {
     const supabase = getSupabase()
     const user_id = await getUserId()
     if (!user_id) throw new Error('Not authenticated')
+
+    const { count } = await supabase
+      .from('refunds')
+      .select('id', { count: 'exact', head: true })
+      .eq('original_transaction_id', id)
+      .eq('user_id', user_id)
+      .eq('status', 'credited')
+
+    if ((count ?? 0) > 0) {
+      throw new Error(
+        'No podés eliminar esta transacción porque tiene un reintegro acreditado asociado. Primero anulá o revisá el reintegro.'
+      )
+    }
 
     const { error } = await supabase.rpc('rpc_delete_transaction_cascade', {
       p_transaction_id: id,
@@ -247,6 +263,7 @@ export const transactionsService = {
 
     if (filters) {
       if (filters.type && filters.type !== 'all') query = query.eq('type', filters.type)
+      if (filters.kinds?.length) query = query.in('transaction_kind', filters.kinds)
       if (filters.category_ids?.length) query = query.in('category_id', filters.category_ids)
       if (filters.wallet_ids?.length) query = query.in('wallet_id', filters.wallet_ids)
       if (filters.currency) query = query.eq('currency', filters.currency)
@@ -363,5 +380,61 @@ export const transactionsService = {
           transaction_count: d.count,
         }
       })
+  },
+
+  async runFinancialDiagnostics(): Promise<{
+    null_kind: number
+    transfer_no_group: number
+    unbalanced_groups: number
+    missing_leg: number
+    multi_initial_balance: number
+    zero_adjustment: number
+    orphan_refund_credit: number
+  } | null> {
+    const supabase = getSupabase()
+    const user_id = await getUserId()
+    if (!user_id) return null
+    const { data, error } = await supabase.rpc('rpc_financial_diagnostics')
+    if (error) throw error
+    return data as {
+      null_kind: number
+      transfer_no_group: number
+      unbalanced_groups: number
+      missing_leg: number
+      multi_initial_balance: number
+      zero_adjustment: number
+      orphan_refund_credit: number
+    }
+  },
+
+  async getDiagnosticDetails(
+    type: 'null_kind' | 'transfer_no_group' | 'zero_adjustment' | 'multi_initial_balance' | 'orphan_refund_credit'
+  ): Promise<TransactionWithDetails[]> {
+    const supabase = getSupabase()
+    const user_id = await getUserId()
+    if (!user_id) return []
+
+    let query = supabase
+      .from('transactions_with_details')
+      .select('*')
+      .eq('user_id', user_id)
+      .order('date', { ascending: false })
+      .limit(50)
+
+    if (type === 'null_kind') {
+      query = query.is('transaction_kind', null)
+    } else if (type === 'transfer_no_group') {
+      query = query.eq('transaction_kind', 'transfer' as TransactionKind).is('transfer_group_id', null)
+    } else if (type === 'zero_adjustment') {
+      query = query.eq('transaction_kind', 'wallet_adjustment' as TransactionKind).eq('amount', 0)
+    } else if (type === 'multi_initial_balance') {
+      query = query.eq('transaction_kind', 'initial_balance' as TransactionKind)
+    } else if (type === 'orphan_refund_credit') {
+      query = query.eq('transaction_kind', 'refund_credit' as TransactionKind)
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+    return (data ?? []).map(t => ({ ...t, amount: safeNumber(t.amount) }))
   },
 }

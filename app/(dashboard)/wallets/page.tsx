@@ -23,6 +23,7 @@ import { WALLET_PROVIDERS, WALLET_TYPE_OPTIONS, WALLET_NAME_SUGGESTIONS } from '
 import type { Wallet as WalletType, WalletWithBalance, Currency, WalletType as WalletKind } from '@/types'
 import { motion } from 'motion/react'
 import { staggerContainer, staggerItem } from '@/utils/animations'
+import { getErrorMessage } from '@/utils/errors'
 
 const CURRENCY_OPTS = [
   { value: 'ARS', label: 'ARS' },
@@ -266,7 +267,7 @@ export default function WalletsPage() {
       setDeleteTarget(null)
       refetch()
     } catch (e) {
-      addToast(e instanceof Error ? e.message : 'Error al eliminar', 'error')
+      addToast(getErrorMessage(e, 'Error al eliminar'), 'error')
     } finally {
       setDeleting(null)
     }
@@ -720,7 +721,7 @@ export default function WalletsPage() {
               step="0.01"
               value={form.balance ?? 0}
               onChange={e => setForm(f => ({ ...f, balance: parseFloat(e.target.value) || 0 }))}
-              hint="El saldo con el que arranca esta billetera"
+              hint="Tu punto de partida — no se registra como ingreso del mes."
             />
           )}
 

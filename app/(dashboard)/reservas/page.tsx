@@ -17,6 +17,7 @@ import { formatCurrency } from '@/utils/format'
 import { motion } from 'motion/react'
 import { staggerContainer, staggerItem } from '@/utils/animations'
 import type { Reservation } from '@/types'
+import { getErrorMessage } from '@/utils/errors'
 
 // ── Design tokens ─────────────────────────────────────────────────────────
 const CARD_SHADOW   = 'var(--shadow-sm)'
@@ -109,7 +110,7 @@ export default function ReservasPage() {
       addToast('Reserva cancelada', 'info')
       setCancelTarget(null)
     } catch (e) {
-      addToast(e instanceof Error ? e.message : 'Error al cancelar', 'error')
+      addToast(getErrorMessage(e, 'Error al cancelar'), 'error')
     } finally {
       setCancelling(false)
     }
@@ -120,7 +121,7 @@ export default function ReservasPage() {
     : 0
 
   return (
-    <div className="p-5 md:p-7 max-w-5xl mx-auto space-y-6">
+    <div className="p-5 md:p-7 max-w-5xl mx-auto space-y-6 animate-fade-in">
       {/* ── Header ── */}
       <HeroHeader
         title="Tus reservas"
@@ -189,10 +190,10 @@ export default function ReservasPage() {
             <Archive size={24} style={{ color: 'var(--brand-500)' }} />
           </div>
           <p className="text-base font-bold mb-1" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}>
-            Sin reservas activas
+            No tenés reservas todavía
           </p>
-          <p className="text-sm mb-5" style={{ color: 'var(--text-muted)', maxWidth: 280 }}>
-            Creá una reserva para apartar dinero de una billetera sin afectar ingresos ni gastos
+          <p className="text-sm mb-5" style={{ color: 'var(--text-muted)', maxWidth: 300 }}>
+            Apartá dinero para un fin específico sin mezclarlo con tu saldo disponible. No se registra como gasto.
           </p>
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <Plus size={13} />

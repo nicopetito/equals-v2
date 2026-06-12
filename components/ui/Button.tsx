@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 const BASE = 'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white disabled:opacity-40 disabled:cursor-not-allowed'
 
 const VARIANTS = {
-  primary:          'text-white shadow-md hover:shadow-lg hover:-translate-y-px active:translate-y-0 focus:ring-[#d0bcff]/50',
+  primary:          'text-white shadow-md hover:shadow-lg hover:-translate-y-px active:translate-y-0 focus:ring-[var(--brand-100)]',
   secondary:        'backdrop-blur-sm border text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border)] focus:ring-[var(--brand-500)]/30',
   danger:           'text-white shadow-md hover:shadow-lg hover:-translate-y-px focus:ring-red-300/40',
   ghost:            'text-[var(--text-muted)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] focus:ring-[var(--brand-500)]/30',
@@ -54,6 +54,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         disabled={disabled || loading}
+        aria-busy={loading || undefined}
         style={variantStyle}
         className={cn(BASE, VARIANTS[variant], SIZES[size], className)}
         {...props}

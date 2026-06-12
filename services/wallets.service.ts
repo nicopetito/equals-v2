@@ -107,6 +107,7 @@ export const walletsService = {
         date: new Date().toISOString().split('T')[0],
         category_id: catId,
         label: INITIAL_BALANCE_LABEL,
+        transaction_kind: 'initial_balance',
       })
     }
 
@@ -245,6 +246,7 @@ export const walletsService = {
           date: new Date().toISOString().slice(0, 10),
           is_recurring: false,
           label: INITIAL_BALANCE_LABEL,
+          transaction_kind: 'initial_balance',
         }])
       if (error) throw error
     }
@@ -319,6 +321,7 @@ export const walletsService = {
       .in('subtype', ['yield', 'correction'])
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
+      .limit(500)
 
     if (error) throw error
     return (data ?? []).map((t: Record<string, unknown>) => ({

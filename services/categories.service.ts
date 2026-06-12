@@ -11,15 +11,16 @@ async function getUserId(): Promise<string | null> {
 }
 
 export const DEFAULT_CATEGORIES: Omit<Category, 'id' | 'user_id' | 'created_at' | 'updated_at'>[] = [
-  // Gastos (13)
+  // Gastos (14)
   { name: 'Alimentación',  type: 'expense', color: '#ef4444', icon: 'utensils',        is_default: true },
   { name: 'Transporte',    type: 'expense', color: '#f97316', icon: 'car',             is_default: true },
-  { name: 'Vivienda',      type: 'expense', color: '#06b6d4', icon: 'home',            is_default: true },
+  { name: 'Alquiler',      type: 'expense', color: '#06b6d4', icon: 'home',            is_default: true },
   { name: 'Servicios',     type: 'expense', color: '#64748b', icon: 'zap',             is_default: true },
   { name: 'Salud',         type: 'expense', color: '#84cc16', icon: 'heart-pulse',     is_default: true },
   { name: 'Educación',     type: 'expense', color: '#3b82f6', icon: 'book-open',       is_default: true },
   { name: 'Ocio',          type: 'expense', color: '#8b5cf6', icon: 'gamepad-2',       is_default: true },
-  { name: 'Compras',       type: 'expense', color: '#ec4899', icon: 'shopping-bag',    is_default: true },
+  { name: 'Ropa',          type: 'expense', color: '#ec4899', icon: 'shirt',           is_default: true },
+  { name: 'Supermercado',  type: 'expense', color: '#16a34a', icon: 'shopping-cart',   is_default: true },
   { name: 'Mascotas',      type: 'expense', color: '#f59e0b', icon: 'paw-print',       is_default: true },
   { name: 'Deudas',        type: 'expense', color: '#f43f5e', icon: 'credit-card',     is_default: true },
   { name: 'Impuestos',     type: 'expense', color: '#334155', icon: 'landmark',        is_default: true },

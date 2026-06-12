@@ -6,6 +6,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { formatCurrency } from '@/utils/format'
+import { getErrorMessage } from '@/utils/errors'
 import type { Reservation } from '@/types'
 
 interface Props {
@@ -48,7 +49,7 @@ export function MovementModal({ open, onClose, mode, reservation, walletBalance,
       setDate(new Date().toISOString().split('T')[0])
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al procesar movimiento')
+      setError(getErrorMessage(e, 'Error al procesar movimiento'))
     } finally {
       setSaving(false)
     }

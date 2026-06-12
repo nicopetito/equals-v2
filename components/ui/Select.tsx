@@ -65,13 +65,13 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
               'w-full rounded-xl text-sm px-3.5 py-2.5 transition-all duration-150',
               'flex items-center justify-between gap-2 text-left',
               'focus:outline-none focus:ring-2',
-              error   ? 'focus:ring-red-200'    : 'focus:ring-violet-200',
+              error   ? 'focus:ring-[var(--expense-100)]' : 'focus:ring-[var(--brand-100)]',
               disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
               className
             )}
             style={{
               background:  'var(--bg-card)',
-              border:      `1px solid ${error ? '#FCA5A5' : open ? 'rgba(109,59,215,0.45)' : 'var(--border)'}`,
+              border:      `1px solid ${error ? 'var(--expense-100)' : open ? 'rgba(109,59,215,0.45)' : 'var(--border)'}`,
               color:       selectedOption ? 'var(--text-primary)' : 'var(--text-muted)',
               boxShadow:   open
                 ? '0 0 0 3px rgba(109,59,215,0.10), var(--shadow-xs)'

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, CreditCard, TrendingDown, Target, Check, ChevronRight } from 'lucide-react'
+import { X, CreditCard, TrendingDown, Target, Check, ChevronRight, Wallet, Zap, ArrowLeftRight } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { stepForward } from '@/utils/animations'
 import { useAuth } from '@/hooks/useAuth'
@@ -11,7 +11,8 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useGoals } from '@/hooks/useGoals'
 import { userKey } from '@/utils/format'
 
-const DONE_KEY = (userId: string) => `eq_onboarding_${userKey(userId)}`
+const DONE_KEY    = (userId: string) => `eq_onboarding_${userKey(userId)}`
+const INTRO_KEY   = (userId: string) => `eq_intro_${userKey(userId)}`
 
 interface Step {
   id: string
@@ -24,6 +25,27 @@ interface Step {
   bg: string
   checkCondition: boolean
 }
+
+const INTRO_CONCEPTS = [
+  {
+    icon: <Wallet size={20} />,
+    color: '#F59E0B',
+    title: 'Billetera = tu dinero real',
+    text: 'Registrá efectivo, cuentas bancarias o virtuales. Equal no accede a tus cuentas reales.',
+  },
+  {
+    icon: <Zap size={20} />,
+    color: '#6366f1',
+    title: 'Saldo inicial ≠ ingreso',
+    text: 'El saldo inicial es tu punto de partida. No se suma a los ingresos del mes ni afecta tus estadísticas.',
+  },
+  {
+    icon: <ArrowLeftRight size={20} />,
+    color: '#0566d9',
+    title: 'Transferencias no cuentan',
+    text: 'Mover plata entre billeteras o a reservas no se registra como gasto. Solo cambia dónde está tu dinero.',
+  },
+]
 
 function Confetti() {
   const pieces = Array.from({ length: 32 }, (_, i) => i)
@@ -71,15 +93,20 @@ export function Onboarding() {
   const { data: transactions } = useTransactions()
   const { data: goals }        = useGoals()
 
-  const [visible, setVisible]   = useState(false)
-  const [stepIdx, setStepIdx]   = useState(0)
-  const [confetti, setConfetti] = useState(false)
+  const [visible, setVisible]     = useState(false)
+  const [showIntro, setShowIntro] = useState(false)
+  const [stepIdx, setStepIdx]     = useState(0)
+  const [confetti, setConfetti]   = useState(false)
 
   useEffect(() => {
     if (!user?.id) return
     const completed = localStorage.getItem(DONE_KEY(user.id))
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!completed) setVisible(true)
+    if (!completed) {
+      setVisible(true)
+      const introSeen = localStorage.getItem(INTRO_KEY(user.id))
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (!introSeen) setShowIntro(true)
+    }
   }, [user?.id])
 
   const steps: Step[] = [
@@ -122,9 +149,16 @@ export function Onboarding() {
   const allDone     = steps.every(s => s.checkCondition)
   const progress    = steps.filter(s => s.checkCondition).length
 
+  function dismissIntro() {
+    if (!user?.id) return
+    localStorage.setItem(INTRO_KEY(user.id), '1')
+    setShowIntro(false)
+  }
+
   function markDone() {
     if (!user?.id) return
     localStorage.setItem(DONE_KEY(user.id), '1')
+    localStorage.setItem(INTRO_KEY(user.id), '1')
     setConfetti(true)
     setTimeout(() => { setConfetti(false); setVisible(false) }, 2800)
   }
@@ -132,6 +166,7 @@ export function Onboarding() {
   function dismiss() {
     if (!user?.id) return
     localStorage.setItem(DONE_KEY(user.id), '1')
+    localStorage.setItem(INTRO_KEY(user.id), '1')
     setVisible(false)
   }
 
@@ -143,6 +178,76 @@ export function Onboarding() {
   if (!visible) return null
   // Suprimir mientras FirstWalletWizard esté activo (usuario sin billeteras)
   if (walletsLoading || wallets.length === 0) return null
+
+  if (showIntro) return (
+    <>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(6px)' }}
+      >
+        <div
+          className="relative w-full max-w-md rounded-3xl overflow-hidden animate-fade-in"
+          style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow-xl)' }}
+        >
+          <button
+            onClick={dismiss}
+            className="absolute top-4 right-4 w-8 h-8 rounded-xl flex items-center justify-center transition-colors hover:bg-black/5 z-10"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <X size={16} />
+          </button>
+
+          <div className="p-8">
+            <div className="mb-6 text-center">
+              <span className="text-4xl block mb-2">👋</span>
+              <h2
+                className="text-2xl font-extrabold"
+                style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}
+              >
+                ¡Bienvenido a Equal!
+              </h2>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                Tres conceptos clave antes de empezar
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 mb-6">
+              {INTRO_CONCEPTS.map((c) => (
+                <div
+                  key={c.title}
+                  className="flex items-start gap-3 rounded-2xl p-4"
+                  style={{ background: c.color + '12', border: `1px solid ${c.color}30` }}
+                >
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                    style={{ background: c.color + '20', color: c.color }}
+                  >
+                    {c.icon}
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm mb-0.5" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}>
+                      {c.title}
+                    </p>
+                    <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                      {c.text}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={dismissIntro}
+              className="w-full py-3.5 rounded-2xl text-white font-extrabold text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-[0.98]"
+              style={{ background: 'linear-gradient(135deg, #6d3bd7 0%, #0566d9 100%)', boxShadow: 'var(--shadow-md)' }}
+            >
+              Entendido, empezar <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
 
   return (
     <>
@@ -177,18 +282,18 @@ export function Onboarding() {
           </button>
 
           <div className="p-8">
-            {/* Encabezado de bienvenida (solo primer paso) */}
+            {/* Encabezado (solo primer paso) */}
             {stepIdx === 0 && (
               <div className="mb-6 text-center">
-                <span className="text-4xl block mb-2">👋</span>
+                <span className="text-4xl block mb-2">🚀</span>
                 <h2
                   className="text-2xl font-extrabold"
                   style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}
                 >
-                  ¡Bienvenido a Equal!
+                  ¡Empecemos!
                 </h2>
                 <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-                  Completá estos 3 pasos para empezar a controlar tus finanzas
+                  Completá estos 3 pasos para controlar tus finanzas
                 </p>
               </div>
             )}

@@ -53,7 +53,7 @@ export function StatCard({ title, value, subtitle, icon: Icon, trend, variant = 
         {trend && (
           <span className="text-xs font-bold px-2 py-0.5 rounded-full"
             style={{ background: a.bg, color: a.text, border: `1px solid ${a.border}` }}>
-            {trend.value >= 0 ? 'â–²' : 'â–¼'} {Math.abs(trend.value).toFixed(1)}%
+            {trend.value >= 0 ? '▲' : '▼'} {Math.abs(trend.value).toFixed(1)}%
           </span>
         )}
       </div>

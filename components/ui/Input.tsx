@@ -10,6 +10,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ className, label, error, hint, id, ...props }, ref) => {
     const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-')
+    const descId  = (error || hint) ? `${inputId}-desc` : undefined
     return (
       <div className="flex flex-col gap-1">
         {label && (
@@ -20,24 +21,26 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={ref}
           id={inputId}
+          aria-describedby={descId}
+          aria-invalid={error ? true : undefined}
           className={cn(
             'w-full rounded-xl text-sm px-3.5 py-2.5 transition-all duration-150',
             'focus:outline-none focus:ring-2',
             error
-              ? 'focus:ring-red-200 border-red-300'
-              : 'focus:ring-violet-200 focus:border-violet-400',
+              ? 'focus:ring-[var(--expense-100)]'
+              : 'focus:ring-[var(--brand-100)] focus:border-[var(--brand-400)]',
             className
           )}
           style={{
             background: 'var(--bg-card)',
-            border: `1px solid ${error ? '#FCA5A5' : 'var(--border)'}`,
+            border: `1px solid ${error ? 'var(--expense-100)' : 'var(--border)'}`,
             color: 'var(--text-primary)',
             boxShadow: 'var(--shadow-xs)',
           }}
           {...props}
         />
-        {error && <p className="text-xs font-medium" style={{ color: 'var(--expense-500)' }}>{error}</p>}
-        {hint && !error && <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{hint}</p>}
+        {error && <p id={descId} className="text-xs font-medium" style={{ color: 'var(--expense-500)' }}>{error}</p>}
+        {hint && !error && <p id={descId} className="text-xs" style={{ color: 'var(--text-muted)' }}>{hint}</p>}
       </div>
     )
   }

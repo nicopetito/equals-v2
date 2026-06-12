@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
@@ -19,6 +19,7 @@ const SIZES = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl' }
 
 export function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
   const [mounted, setMounted] = useState(false)
+  const titleId = useId()
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMounted(true) }, [])
@@ -76,6 +77,9 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
           >
             <motion.div
               key="modal-panel"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={title ? titleId : undefined}
               variants={modalContent}
               initial="hidden"
               animate="visible"
@@ -108,6 +112,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
                       style={{ background: 'linear-gradient(180deg, #6d3bd7 0%, #0566d9 100%)' }}
                     />
                     <h2
+                      id={titleId}
                       className="text-sm font-bold tracking-tight"
                       style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-sora)' }}
                     >

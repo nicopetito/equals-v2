@@ -37,7 +37,7 @@ import { TemplateConfirmModal } from '@/components/transactions/TemplateConfirmM
 import { seedDemoData } from '@/utils/seed'
 import { formatCurrency, plural } from '@/utils/format'
 import { calculateNetWorth, calculateSavingsMetrics, calculateYieldForPeriod } from '@/utils/finance'
-import { INTERNAL_LABELS, INITIAL_BALANCE_LABEL } from '@/utils/constants'
+import { INTERNAL_LABELS, INITIAL_BALANCE_LABEL, REAL_TRANSACTION_KINDS } from '@/utils/constants'
 import { YieldBanner } from '@/components/ui/YieldBanner'
 import { useYieldCalculator } from '@/hooks/useYieldCalculator'
 import { format } from 'date-fns'
@@ -48,6 +48,7 @@ import { AnimatedAmount } from '@/components/ui/AnimatedAmount'
 import { DashboardFilters } from '@/components/dashboard/DashboardFilters'
 import { motion, AnimatePresence } from 'motion/react'
 import { staggerContainer, staggerItem, fadeUp } from '@/utils/animations'
+import { getErrorMessage } from '@/utils/errors'
 
 // â"€â"€ Design tokens â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 // Usados de forma consistente en TODOS los componentes de esta pÃ¡gina.
@@ -121,7 +122,7 @@ export default function DashboardPage() {
     setSeeding(true)
     try { await seedDemoData(); await refetchTx(); await refetchWallets() }
     catch (e) {
-      const msg = e instanceof Error ? e.message : 'Error al cargar ejemplo'
+      const msg = getErrorMessage(e, 'Error al cargar ejemplo')
       addToast(msg, 'error')
     } finally { setSeeding(false) }
   }
@@ -184,18 +185,23 @@ export default function DashboardPage() {
     filtered.filter(t => !!(t.wallet_id && walletIds.has(t.wallet_id))),
     [filtered, walletIds])
 
-  // Excluir transferencias internas y ajustes de los KPIs de ingresos/gastos
+  // Excluir movimientos internos de los KPIs (transfers, ajustes, reservas, saldo inicial).
+  // Usa transaction_kind cuando está disponible (post-migration 037), cae en label para legacy.
   const kpiFilteredClean = useMemo(
-    () => kpiFiltered.filter(t => !(t.label && INTERNAL_LABELS.has(t.label))),
+    () => kpiFiltered.filter(t => {
+      if (t.transaction_kind) return REAL_TRANSACTION_KINDS.has(t.transaction_kind) || t.transaction_kind === 'yield'
+      return !(t.label && INTERNAL_LABELS.has(t.label))
+    }),
     [kpiFiltered]
   )
 
-  // Para métricas de comportamiento (tasa de ahorro): excluye además el saldo inicial.
-  // Detecta tanto transacciones nuevas (por label) como históricas (por category_name).
+  // Para métricas de comportamiento (tasa de ahorro): excluye además saldo inicial y yield.
+  // Detecta tanto transacciones nuevas (por transaction_kind) como históricas (por label/category_name).
   const kpiFilteredForMetrics = useMemo(
-    () => kpiFilteredClean.filter(t =>
-      t.label !== INITIAL_BALANCE_LABEL && t.category_name !== 'Saldo inicial'
-    ),
+    () => kpiFilteredClean.filter(t => {
+      if (t.transaction_kind) return t.transaction_kind !== 'yield' && t.transaction_kind !== 'initial_balance'
+      return t.label !== INITIAL_BALANCE_LABEL && t.category_name !== 'Saldo inicial'
+    }),
     [kpiFilteredClean]
   )
 
@@ -205,7 +211,9 @@ export default function DashboardPage() {
     // ya está en INTERNAL_LABELS y no llegaría a kpiFilteredClean.
     kpiFiltered
       .filter(t =>
-        (t.label === INITIAL_BALANCE_LABEL || t.category_name === 'Saldo inicial') &&
+        (t.transaction_kind === 'initial_balance' ||
+         t.label === INITIAL_BALANCE_LABEL ||
+         t.category_name === 'Saldo inicial') &&
         t.type === 'income'
       )
       .forEach(t => { map[t.currency] = (map[t.currency] ?? 0) + t.amount })
@@ -242,6 +250,11 @@ export default function DashboardPage() {
     return Object.entries(byCurrency).map(([curr, value]) => ({ curr, value }))
   }, [kpiFilteredClean])
 
+  const internalCount = useMemo(
+    () => kpiFiltered.length - kpiFilteredClean.length,
+    [kpiFiltered, kpiFilteredClean]
+  )
+
   const walletByCurrency = useMemo(() =>
     wallets.reduce<Record<string, number>>((acc, w) => {
       if (w.currency) acc[w.currency] = (acc[w.currency] ?? 0) + (w.current_balance ?? 0)
@@ -267,11 +280,11 @@ export default function DashboardPage() {
 
   const uncategorizedStats = useMemo(() => {
     if (txLoading) return null
-    const count = allTransactions.filter(t =>
-      !t.category_id &&
-      !(t.label && INTERNAL_LABELS.has(t.label)) &&
-      t.label !== INITIAL_BALANCE_LABEL
-    ).length
+    const count = allTransactions.filter(t => {
+      if (t.category_id) return false
+      if (t.transaction_kind) return REAL_TRANSACTION_KINDS.has(t.transaction_kind)
+      return !(t.label && INTERNAL_LABELS.has(t.label)) && t.label !== INITIAL_BALANCE_LABEL
+    }).length
     return count > 0 ? { count } : null
   }, [allTransactions, txLoading])
 
@@ -307,7 +320,7 @@ export default function DashboardPage() {
   const activeCurr = currency === 'all' ? 'ARS' : currency
 
   return (
-    <div className="p-5 md:p-7 max-w-5xl mx-auto space-y-4">
+    <div className="p-5 md:p-7 max-w-5xl mx-auto space-y-4 animate-fade-in">
 
       {wallets.length > 0 && (
         <YieldBanner onConfigure={() => router.push('/wallets')} />
@@ -637,6 +650,42 @@ export default function DashboardPage() {
             </motion.div>
           )}
 
+          {/* Transparencia de cálculo de KPIs */}
+          {summaryRows.length > 0 && (
+            <details className="group">
+              <summary
+                className="flex items-center gap-1.5 cursor-pointer list-none select-none w-fit"
+                style={{ color: 'var(--text-faint)' }}
+              >
+                <Info size={11} />
+                <span className="text-[11px] font-medium group-open:hidden">¿Cómo se calculan estos números?</span>
+                <span className="text-[11px] font-medium hidden group-open:inline">¿Cómo se calculan estos números?</span>
+              </summary>
+              <div
+                className="mt-2 rounded-xl px-3 py-2.5 space-y-1"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+              >
+                <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>Ingresos y Gastos</span>
+                  {' '}incluyen solo movimientos reales. Excluyen transferencias entre billeteras, saldos iniciales, ajustes y reservas.
+                </p>
+                <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>Rendimientos</span>
+                  {' '}se muestran separados y no se incluyen en la tasa de ahorro.
+                </p>
+                <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>Ahorro %</span>
+                  {' '}se calcula sobre ingresos y gastos reales, sin rendimientos ni aportes a objetivos.
+                </p>
+                {internalCount > 0 && (
+                  <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-faint)' }}>
+                    Este período: {internalCount} movimiento{internalCount !== 1 ? 's' : ''} interno{internalCount !== 1 ? 's' : ''} excluido{internalCount !== 1 ? 's' : ''} de los KPIs.
+                  </p>
+                )}
+              </div>
+            </details>
+          )}
+
           {/* Sin datos en período */}
           {!loading && allTransactions.length > 0 && filtered.length === 0 && (
             <div className="rounded-2xl px-4 py-3 text-center"
@@ -849,7 +898,18 @@ export default function DashboardPage() {
           </button>
         </div>
         {recentTx.length === 0
-          ? <EmptyState title="Sin transacciones" description="No hay movimientos en este período." />
+          ? <EmptyState
+              type="transactions"
+              title={wallets.length > 0 ? 'Registrá tu primer movimiento' : 'Sin transacciones'}
+              description={wallets.length > 0
+                ? 'Anotá un gasto o ingreso para empezar a controlar tus finanzas.'
+                : 'No hay movimientos en este período.'
+              }
+              action={wallets.length > 0
+                ? { label: '+ Nueva transacción', onClick: () => router.push('/transactions') }
+                : undefined
+              }
+            />
           : <div>{recentTx.map((tx, i) => <TxRow key={tx.id} tx={tx} index={i} last={i === recentTx.length - 1} />)}</div>
         }
       </div>

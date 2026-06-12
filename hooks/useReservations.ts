@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { reservationsService } from '@/services/reservations.service'
 import type { Reservation } from '@/types'
+import { getErrorMessage } from '@/utils/errors'
 
 export function useReservations() {
   const [data, setData]       = useState<Reservation[]>([])
@@ -15,7 +16,7 @@ export function useReservations() {
     setLoading(true)
     reservationsService.list()
       .then(r  => { if (active) setData(r) })
-      .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Error al cargar reservas') })
+      .catch(e => { if (active) setError(getErrorMessage(e, 'Error al cargar reservas')) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [rev])

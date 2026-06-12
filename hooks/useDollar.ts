@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { dollarService } from '@/services/dollar.service'
 import type { DollarRate } from '@/types'
+import { getErrorMessage } from '@/utils/errors'
 
 export function useDollar(refreshInterval = 60_000) {
   const [data, setData]       = useState<DollarRate[]>([])
@@ -14,7 +15,7 @@ export function useDollar(refreshInterval = 60_000) {
     let active = true
     dollarService.getRates()
       .then(rates => { if (active) { setData(rates); setError(null) } })
-      .catch(e    => { if (active) setError(e instanceof Error ? e.message : 'Error fetching rates') })
+      .catch(e    => { if (active) setError(getErrorMessage(e, 'Error fetching rates')) })
       .finally(()  => { if (active) setLoading(false) })
     return () => { active = false }
   }, [rev])

@@ -13,6 +13,7 @@ import { categoriesService } from '@/services/categories.service'
 import { formatCurrency, safeNumber } from '@/utils/format'
 import { WALLET_ADJUSTMENT_LABEL } from '@/utils/constants'
 import type { WalletWithBalance, Currency } from '@/types'
+import { getErrorMessage } from '@/utils/errors'
 
 type AdjustmentMode =
   | 'balance_correction'
@@ -115,14 +116,15 @@ export function WalletAdjustmentModal({ open, onClose, wallet, wallets, onSucces
           : reason.trim() || 'Ajuste de saldo'
 
         await transactionsService.create({
-          type:        txType,
-          amount:      Math.abs(diff!),
+          type:             txType,
+          amount:           Math.abs(diff!),
           currency,
-          description: desc,
-          wallet_id:   wallet.id,
-          category_id: catId,
+          description:      desc,
+          wallet_id:        wallet.id,
+          category_id:      catId,
           date,
-          label:       WALLET_ADJUSTMENT_LABEL,
+          label:            WALLET_ADJUSTMENT_LABEL,
+          transaction_kind: 'wallet_adjustment',
         })
 
         addToast(`Saldo de "${wallet.name}" ajustado`, 'success')
@@ -148,7 +150,7 @@ export function WalletAdjustmentModal({ open, onClose, wallet, wallets, onSucces
       onSuccess()
       handleClose()
     } catch (e) {
-      addToast(e instanceof Error ? e.message : 'Error al realizar el ajuste', 'error')
+      addToast(getErrorMessage(e, 'Error al realizar el ajuste'), 'error')
     } finally {
       setSaving(false)
     }
@@ -239,6 +241,11 @@ export function WalletAdjustmentModal({ open, onClose, wallet, wallets, onSucces
               )}
               {diff === 0 && realBalance !== '' && (
                 <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>El saldo coincide — no hay diferencia que ajustar.</p>
+              )}
+              {mode === 'balance_correction' && (
+                <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                  💡 El ajuste corrige el saldo — no representa un ingreso o gasto real.
+                </p>
               )}
             </div>
             <div>

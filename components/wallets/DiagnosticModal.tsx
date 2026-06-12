@@ -8,6 +8,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/providers/ToastProvider'
 import { formatCurrency, safeNumber } from '@/utils/format'
+import { getErrorMessage } from '@/utils/errors'
 import type { WalletDiagnostic, WalletWithBalance } from '@/types'
 
 interface DiagnosticModalProps {
@@ -42,7 +43,7 @@ export function DiagnosticModal({ open, onClose, liveWallets }: DiagnosticModalP
       })
       setRows(merged)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al cargar diagnóstico')
+      setError(getErrorMessage(e, 'Error al cargar diagnóstico'))
     } finally {
       setLoading(false)
     }
@@ -198,13 +199,13 @@ export function DiagnosticModal({ open, onClose, liveWallets }: DiagnosticModalP
         )}
 
         {/* Footer actions */}
-        <div className="flex justify-between items-center pt-1">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 pt-1">
           <div className="flex gap-2">
             <button
               onClick={load}
               disabled={loading}
-              className="flex items-center gap-1.5 text-xs font-medium transition-opacity hover:opacity-70"
-              style={{ color: 'var(--brand-500)' }}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg transition-opacity hover:opacity-70 min-h-[36px]"
+              style={{ color: 'var(--brand-500)', background: 'var(--brand-50)', border: '1px solid var(--brand-100)' }}
             >
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
               Actualizar
@@ -212,15 +213,19 @@ export function DiagnosticModal({ open, onClose, liveWallets }: DiagnosticModalP
             {rows.length > 0 && (
               <button
                 onClick={handleCopy}
-                className="flex items-center gap-1.5 text-xs font-medium transition-opacity hover:opacity-70"
-                style={{ color: copied ? '#15803d' : 'var(--text-secondary)' }}
+                className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg transition-opacity hover:opacity-70 min-h-[36px]"
+                style={{
+                  color: copied ? 'var(--income-600)' : 'var(--text-secondary)',
+                  background: 'var(--bg-subtle)',
+                  border: '1px solid var(--border)',
+                }}
               >
                 {copied ? <Check size={13} /> : <Copy size={13} />}
                 {copied ? 'Copiado' : 'Copiar diagnóstico'}
               </button>
             )}
           </div>
-          <Button variant="secondary" onClick={onClose} size="sm">
+          <Button variant="secondary" onClick={onClose} size="sm" className="w-full sm:w-auto">
             Cerrar
           </Button>
         </div>

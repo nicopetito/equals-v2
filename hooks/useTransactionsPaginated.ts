@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { transactionsService } from '@/services/transactions.service'
 import type { TransactionWithDetails, TransactionFilters, TransactionSort, PaginatedResult } from '@/types'
+import { getErrorMessage } from '@/utils/errors'
 
 export function useTransactionsPaginated(
   filters?: TransactionFilters,
@@ -25,7 +26,7 @@ export function useTransactionsPaginated(
     setLoading(true)
     transactionsService.listPaginated(filters, sort, page, pageSize)
       .then(r  => { if (active) setResult(r) })
-      .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Error') })
+      .catch(e => { if (active) setError(getErrorMessage(e, 'Error al cargar transacciones')) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   // eslint-disable-next-line react-hooks/exhaustive-deps

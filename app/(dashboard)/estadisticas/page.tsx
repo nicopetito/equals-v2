@@ -8,7 +8,6 @@ import { useWallets } from '@/hooks/useWallets'
 import { useGoals } from '@/hooks/useGoals'
 import { useFixedTerms } from '@/hooks/useFixedTerms'
 import { useReservations } from '@/hooks/useReservations'
-import { HealthScore } from '@/components/ui/HealthScore'
 import { CategoryDonutChart } from '@/components/ui/CategoryDonutChart'
 import { IncomeExpenseChart } from '@/components/ui/IncomeExpenseChart'
 import { NetWorthSparkline } from '@/components/ui/NetWorthSparkline'
@@ -17,12 +16,16 @@ const ReportModal = dynamic(
   () => import('@/components/ui/ReportModal').then(m => ({ default: m.ReportModal })),
   { ssr: false, loading: () => null }
 )
+const HealthScore = dynamic(
+  () => import('@/components/ui/HealthScore').then(m => ({ default: m.HealthScore })),
+  { ssr: false, loading: () => <div className="h-20 rounded-2xl animate-pulse" style={{ background: 'var(--bg-subtle)' }} /> }
+)
 import { PageHeader } from '@/components/ui/PageHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { HelpButton } from '@/components/help/HelpButton'
 import { formatCurrency, safeNumber } from '@/utils/format'
 import { calculateNetWorth, calculateSavingsMetrics, calculateYieldForPeriod } from '@/utils/finance'
-import { INTERNAL_LABELS, INITIAL_BALANCE_LABEL } from '@/utils/constants'
+import { INTERNAL_LABELS, INITIAL_BALANCE_LABEL, REAL_TRANSACTION_KINDS } from '@/utils/constants'
 import { getDateRangeForPeriod, PERIOD_OPTIONS, type Period } from '@/utils/date'
 import type { Currency } from '@/types'
 import { motion } from 'motion/react'
@@ -158,35 +161,41 @@ export default function EstadisticasPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [allTransactions, startISO, endISO, currency])
 
-  // Excluir transferencias internas, ajustes y transacciones sin billetera válida
+  // Excluir movimientos internos y transacciones sin billetera válida.
+  // Usa transaction_kind cuando está disponible (post-migration 037), cae en label para legacy.
   const filteredForKpis = useMemo(
-    () => filtered.filter(t =>
-      !!(t.wallet_id && walletIds.has(t.wallet_id)) &&
-      !(t.label && INTERNAL_LABELS.has(t.label))
-    ),
+    () => filtered.filter(t => {
+      if (!(t.wallet_id && walletIds.has(t.wallet_id))) return false
+      if (t.transaction_kind) return REAL_TRANSACTION_KINDS.has(t.transaction_kind) || t.transaction_kind === 'yield'
+      return !(t.label && INTERNAL_LABELS.has(t.label))
+    }),
     [filtered, walletIds]
   )
 
   // Para métricas de comportamiento (tasa de ahorro, top categorías, donut): excluye
-  // además el saldo inicial. Detecta tanto nuevas (por label) como históricas (por category_name).
+  // además saldo inicial y yield. Detecta tanto nuevas (por transaction_kind) como históricas.
   const filteredForMetrics = useMemo(
-    () => filteredForKpis.filter(t =>
-      t.label !== INITIAL_BALANCE_LABEL && t.category_name !== 'Saldo inicial'
-    ),
+    () => filteredForKpis.filter(t => {
+      if (t.transaction_kind) return t.transaction_kind !== 'yield' && t.transaction_kind !== 'initial_balance'
+      return t.label !== INITIAL_BALANCE_LABEL && t.category_name !== 'Saldo inicial'
+    }),
     [filteredForKpis]
   )
 
+  // Período anterior para deltas de ingresos/gastos: misma lógica que filteredForKpis
+  // (incluye yield) para comparar like-for-like con totalIncome/totalExpenses.
   const prevFiltered = useMemo(() =>
     allTransactions.filter(t => {
       const d = new Date(t.date)
       if (d < prevStart || d > prevEnd) return false
       if (currency !== 'all' && t.currency !== currency) return false
+      if (!(t.wallet_id && walletIds.has(t.wallet_id))) return false
+      if (t.transaction_kind) return REAL_TRANSACTION_KINDS.has(t.transaction_kind) || t.transaction_kind === 'yield'
       if (t.label && INTERNAL_LABELS.has(t.label)) return false
-      if (t.category_name === 'Saldo inicial') return false
       return true
     }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [allTransactions, prevStartISO, prevEndISO, currency])
+  [allTransactions, prevStartISO, prevEndISO, currency, walletIds])
 
   const stats = useMemo(() => {
     if (currency === 'all') {
@@ -235,7 +244,9 @@ export default function EstadisticasPage() {
     filtered
       .filter(t =>
         !!(t.wallet_id && walletIds.has(t.wallet_id)) &&
-        (t.label === INITIAL_BALANCE_LABEL || t.category_name === 'Saldo inicial') &&
+        (t.transaction_kind === 'initial_balance' ||
+         t.label === INITIAL_BALANCE_LABEL ||
+         t.category_name === 'Saldo inicial') &&
         t.type === 'income'
       )
       .forEach(t => { map[t.currency] = (map[t.currency] ?? 0) + safeNumber(t.amount) })
@@ -243,9 +254,9 @@ export default function EstadisticasPage() {
   }, [filtered, walletIds])
 
   const avgExpense = useMemo(() => {
-    const g = filteredForKpis.filter(t => t.type === 'expense')
+    const g = filteredForMetrics.filter(t => t.type === 'expense')
     return g.length > 0 ? g.reduce((s, t) => s + safeNumber(t.amount), 0) / g.length : null
-  }, [filteredForKpis])
+  }, [filteredForMetrics])
 
   const maxIncome = useMemo(() => {
     const incomes = filteredForMetrics.filter(t => t.type === 'income').map(t => safeNumber(t.amount))
@@ -254,7 +265,7 @@ export default function EstadisticasPage() {
 
   const topExpCategories = useMemo(() => {
     const map: Record<string, { amount: number; count: number; color: string }> = {}
-    filteredForKpis.filter(t => t.type === 'expense').forEach(t => {
+    filteredForMetrics.filter(t => t.type === 'expense').forEach(t => {
       // category_id set but category_name null → the category was deleted
       const name = t.category_name ?? (t.category_id ? 'Categoría eliminada' : 'Sin categoría')
       const color = t.category_name ? (t.category_color ?? '#ffb4ab') : (t.category_id ? '#9ca3af' : '#ffb4ab')
@@ -267,7 +278,7 @@ export default function EstadisticasPage() {
       .sort(([,a],[,b]) => b.amount - a.amount)
       .slice(0, 5)
       .map(([name, data]) => ({ name, ...data, pct: total > 0 ? (data.amount / total) * 100 : 0 }))
-  }, [filteredForKpis])
+  }, [filteredForMetrics])
 
   const topIncCategories = useMemo(() => {
     const map: Record<string, { amount: number; count: number; color: string }> = {}

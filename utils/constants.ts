@@ -4,9 +4,9 @@ export const INITIAL_BALANCE_LABEL      = 'initial_balance'      as const
 export const RESERVATION_DEPOSIT_LABEL  = 'reservation_deposit'  as const
 export const RESERVATION_WITHDRAW_LABEL = 'reservation_withdraw' as const
 
-// Transferencias, ajustes, reservas y saldo inicial: se excluyen de los KPIs de
-// ingresos/gastos del período. El saldo inicial no es un ingreso real del período;
-// sigue afectando el balance de la billetera (vía wallet_current_balance view).
+// INTERNAL_LABELS: mecanismo legado de exclusión por campo `label`.
+// Se mantiene para compatibilidad con transacciones históricas anteriores a migration 037.
+// El sistema nuevo usa `transaction_kind` (REAL_TRANSACTION_KINDS).
 export const INTERNAL_LABELS = new Set<string>([
   INTERNAL_TRANSFER_LABEL,
   WALLET_ADJUSTMENT_LABEL,
@@ -15,7 +15,29 @@ export const INTERNAL_LABELS = new Set<string>([
   RESERVATION_WITHDRAW_LABEL,
 ])
 
-// Textos legibles para mostrar en UI en lugar de los valores técnicos de label.
+// transaction_kind values que representan actividad financiera real del usuario.
+// Todos los demás kinds son movimientos internos/técnicos que no cuentan como
+// ingreso o gasto real en los KPIs.
+export const REAL_TRANSACTION_KINDS = new Set<string>([
+  'income',
+  'expense',
+  'refund_credit',
+])
+
+// Textos legibles para mostrar en UI por transaction_kind.
+export const KIND_COPY: Record<string, string> = {
+  income:             'Ingreso',
+  expense:            'Gasto',
+  transfer:           'Transferencia interna',
+  initial_balance:    'Saldo inicial',
+  wallet_adjustment:  'Ajuste de saldo',
+  reserve_deposit:    'Depósito a reserva',
+  reserve_withdrawal: 'Retiro de reserva',
+  yield:              'Rendimiento',
+  refund_credit:      'Reintegro acreditado',
+}
+
+// Textos legibles para el campo `label` (legado, para transacciones antiguas).
 export const LABEL_COPY: Record<string, string> = {
   initial_balance:      'Saldo inicial',
   internal_transfer:    'Transferencia interna',

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { transactionTemplateService } from '@/services/transaction_template.service'
 import type { TransactionTemplate, TransactionTemplateCreate } from '@/types'
+import { getErrorMessage } from '@/utils/errors'
 
 export function useTransactionTemplates() {
   const [items, setItems]     = useState<TransactionTemplate[]>([])
@@ -14,7 +15,7 @@ export function useTransactionTemplates() {
     let active = true
     transactionTemplateService.list()
       .then(r  => { if (active) setItems(r) })
-      .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Error al cargar plantillas') })
+      .catch(e => { if (active) setError(getErrorMessage(e, 'Error al cargar plantillas')) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [rev])
