@@ -19,6 +19,7 @@ export function HistoryModal({ open, onClose, reservation }: Props) {
 
   useEffect(() => {
     if (!open || !reservation?.id) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     reservationsService.getMovements(reservation.id)
       .then(setMovements)

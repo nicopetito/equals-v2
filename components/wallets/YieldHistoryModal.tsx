@@ -19,6 +19,7 @@ export function YieldHistoryModal({ open, onClose, wallet }: Props) {
 
   useEffect(() => {
     if (open && wallet?.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(true)
       walletsService.getYieldHistory(wallet.id)
         .then(setHistory)

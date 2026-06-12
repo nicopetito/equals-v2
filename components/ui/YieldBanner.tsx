@@ -15,6 +15,7 @@ export function YieldBanner({ onConfigure }: Props) {
 
   useEffect(() => {
     const dismissed = typeof window !== 'undefined' && localStorage.getItem(STORAGE_KEY) === 'dismissed'
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setVisible(!dismissed)
   }, [])
 

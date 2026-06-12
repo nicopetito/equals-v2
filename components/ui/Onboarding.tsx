@@ -102,6 +102,7 @@ export function Onboarding() {
     if (!user?.id) return
     const completed = localStorage.getItem(DONE_KEY(user.id))
     if (!completed) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisible(true)
       const introSeen = localStorage.getItem(INTRO_KEY(user.id))
       // eslint-disable-next-line react-hooks/set-state-in-effect

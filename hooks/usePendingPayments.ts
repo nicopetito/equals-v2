@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useMemo } from 'react'
 import { pendingPaymentService } from '@/services/pending_payment.service'
 import { safeNumber } from '@/utils/format'
